@@ -34,6 +34,7 @@ use crate::interface::commands::market::{
     get_market_overview, get_market_series, get_signal_evidence, list_market_events,
     list_market_relations,
 };
+use crate::interface::commands::patterns::list_historical_patterns;
 use crate::interface::commands::settings::{
     delete_secret, get_app_settings, get_local_api_access, get_secret_status,
     regenerate_local_api_token, save_secret, update_app_settings,
@@ -89,6 +90,7 @@ pub fn run() {
             get_signal_evidence,
             list_market_events,
             list_market_relations,
+            list_historical_patterns,
             get_signal_report,
             list_alert_history,
             list_collection_history,

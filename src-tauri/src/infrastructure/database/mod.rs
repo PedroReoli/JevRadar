@@ -9,7 +9,8 @@ use thiserror::Error;
 use crate::domain::alerts::AlertCandidate;
 use crate::domain::assets::{Asset, AssetClass, Watchlist, WatchlistAsset};
 use crate::domain::backtest::{
-    BacktestDataset, BacktestHorizonResult, BacktestPricePoint, BacktestReport, BacktestSignalPoint,
+    BacktestDataset, BacktestHorizonResult, BacktestPricePoint, BacktestReport,
+    BacktestSignalPoint, HistoricalPatternItem,
 };
 use crate::domain::classification::{
     AnalysisCandidateAsset, DocumentAnalysisResult, PendingDocumentAnalysis,
@@ -44,6 +45,8 @@ const OFFICIAL_FEEDS_SCHEMA: &str = include_str!("migrations/0014_official_feeds
 const REDDIT_COMMUNITIES_SCHEMA: &str = include_str!("migrations/0015_reddit_communities.sql");
 const EVENT_QUERY_INDEXES_SCHEMA: &str = include_str!("migrations/0016_event_query_indexes.sql");
 const JEV_TOKEN_USAGE_SCHEMA: &str = include_str!("migrations/0017_jev_token_usage.sql");
+const BACKTEST_PATTERN_INDEXES_SCHEMA: &str =
+    include_str!("migrations/0018_backtest_pattern_indexes.sql");
 
 pub struct Database {
     connection: Mutex<Connection>,
@@ -90,6 +93,7 @@ impl Database {
         apply_migration(&connection, 15, REDDIT_COMMUNITIES_SCHEMA)?;
         apply_migration(&connection, 16, EVENT_QUERY_INDEXES_SCHEMA)?;
         apply_migration(&connection, 17, JEV_TOKEN_USAGE_SCHEMA)?;
+        apply_migration(&connection, 18, BACKTEST_PATTERN_INDEXES_SCHEMA)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -2075,6 +2079,130 @@ impl Database {
         Ok(reports)
     }
 
+    #[allow(clippy::too_many_arguments)]
+    pub fn historical_pattern_page(
+        &self,
+        asset_class: Option<&str>,
+        horizon_days: i64,
+        outcome: &str,
+        minimum_sample_size: u32,
+        limit: u32,
+        offset: u32,
+    ) -> Result<(Vec<HistoricalPatternItem>, u64), DatabaseError> {
+        let connection = self.connection.lock();
+        let latest_runs = "WITH reference_contract AS (
+                SELECT methodology_version, signal_methodology_version, model_version,
+                       question_version, signal_threshold, confidence_threshold
+                FROM backtest_runs
+                WHERE status = 'completed'
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1
+             ), ranked_runs AS (
+                SELECT br.*,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY br.asset_id
+                           ORDER BY br.created_at DESC, br.id DESC
+                       ) AS rank
+                FROM backtest_runs br
+                JOIN reference_contract rc
+                  ON rc.methodology_version = br.methodology_version
+                 AND rc.signal_methodology_version = br.signal_methodology_version
+                 AND rc.model_version = br.model_version
+                 AND rc.question_version = br.question_version
+                 AND rc.signal_threshold = br.signal_threshold
+                 AND rc.confidence_threshold = br.confidence_threshold
+                WHERE br.status = 'completed'
+             ), latest_runs AS (
+                SELECT * FROM ranked_runs WHERE rank = 1
+             )";
+        let filters = "(?1 IS NULL OR a.asset_class = ?1)
+                       AND btr.horizon_days = ?2
+                       AND btr.sample_size >= ?4
+                       AND (
+                           ?3 = 'all'
+                           OR (?3 = 'outperformed' AND btr.positive_rate IS NOT NULL
+                               AND btr.baseline_positive_rate IS NOT NULL
+                               AND btr.positive_rate > btr.baseline_positive_rate)
+                           OR (?3 = 'underperformed' AND btr.positive_rate IS NOT NULL
+                               AND btr.baseline_positive_rate IS NOT NULL
+                               AND btr.positive_rate <= btr.baseline_positive_rate)
+                           OR (?3 = 'insufficient' AND (
+                               btr.positive_rate IS NULL OR btr.baseline_positive_rate IS NULL))
+                       )";
+        let count_sql = format!(
+            "{latest_runs}
+             SELECT COUNT(*)
+             FROM latest_runs br
+             JOIN backtest_results btr ON btr.run_id = br.id
+             JOIN assets a ON a.id = br.asset_id
+             WHERE {filters}"
+        );
+        let total_items = connection.query_row(
+            &count_sql,
+            params![asset_class, horizon_days, outcome, minimum_sample_size],
+            |row| row.get::<_, i64>(0),
+        )? as u64;
+        let query_sql = format!(
+            "{latest_runs}
+             SELECT br.id,
+                    a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency, a.country_code,
+                    btr.horizon_days, btr.sample_size, btr.mean_return, btr.median_return,
+                    btr.positive_rate, btr.baseline_positive_rate,
+                    CASE WHEN btr.positive_rate IS NULL OR btr.baseline_positive_rate IS NULL
+                         THEN NULL ELSE btr.positive_rate - btr.baseline_positive_rate END,
+                    btr.confidence_interval_low, btr.confidence_interval_high,
+                    br.signal_threshold, br.confidence_threshold, br.methodology_version,
+                    br.signal_methodology_version, br.model_version, br.question_version,
+                    br.evaluation_started_at, br.evaluation_ended_at, br.created_at
+             FROM latest_runs br
+             JOIN backtest_results btr ON btr.run_id = br.id
+             JOIN assets a ON a.id = br.asset_id
+             WHERE {filters}
+             ORDER BY btr.sample_size DESC,
+                      ABS(COALESCE(btr.positive_rate - btr.baseline_positive_rate, 0)) DESC,
+                      a.symbol
+             LIMIT ?5 OFFSET ?6"
+        );
+        let mut statement = connection.prepare(&query_sql)?;
+        let items = statement
+            .query_map(
+                params![
+                    asset_class,
+                    horizon_days,
+                    outcome,
+                    minimum_sample_size,
+                    limit,
+                    offset,
+                ],
+                |row| {
+                    Ok(HistoricalPatternItem {
+                        run_id: row.get(0)?,
+                        asset: map_asset_offset(row, 1)?,
+                        horizon_days: row.get(8)?,
+                        sample_size: row.get::<_, i64>(9)? as usize,
+                        mean_return: row.get(10)?,
+                        median_return: row.get(11)?,
+                        positive_rate: row.get(12)?,
+                        baseline_positive_rate: row.get(13)?,
+                        baseline_difference: row.get(14)?,
+                        confidence_interval_low: row.get(15)?,
+                        confidence_interval_high: row.get(16)?,
+                        signal_threshold: row.get(17)?,
+                        confidence_threshold: row.get(18)?,
+                        methodology_version: row.get(19)?,
+                        signal_methodology_version: row.get(20)?,
+                        model_version: row.get(21)?,
+                        question_version: row.get(22)?,
+                        evaluation_started_at: row.get(23)?,
+                        evaluation_ended_at: row.get(24)?,
+                        created_at: row.get(25)?,
+                    })
+                },
+            )?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok((items, total_items))
+    }
+
     pub fn alert_history(&self, limit: usize) -> Result<Vec<AlertHistoryItem>, DatabaseError> {
         let connection = self.connection.lock();
         let mut statement = connection.prepare(
@@ -2908,6 +3036,17 @@ mod tests {
             .expect("histórico de backtests");
         assert_eq!(history.len(), 1);
         assert_eq!(history[0].results[0].horizon_days, 1);
+        let (patterns, pattern_total) = database
+            .historical_pattern_page(Some("b3_equity"), 1, "outperformed", 1, 25, 0)
+            .expect("padrões históricos");
+        assert_eq!(pattern_total, 1);
+        assert_eq!(patterns[0].asset.symbol, "PETR4");
+        assert_eq!(patterns[0].sample_size, 4);
+        assert_eq!(patterns[0].baseline_difference, Some(0.25));
+        let (_, underperformed_total) = database
+            .historical_pattern_page(None, 1, "underperformed", 0, 25, 0)
+            .expect("filtro abaixo do baseline");
+        assert_eq!(underperformed_total, 0);
     }
 
     #[test]

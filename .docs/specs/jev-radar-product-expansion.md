@@ -28,6 +28,7 @@ Transformar o alpha técnico em um produto navegável e explicável sem alterar 
 
 - Histórico paginado de execuções por ativo e versão.
 - Comparação de resultados em 1, 7 e 30 dias sem misturar contratos de sinal.
+- Central de padrões históricos com o último resultado comparável por ativo, filtros de amostra e diferença para o baseline.
 - Central de relatórios com exportação local, inventário das versões e atalhos para sinais e backtests.
 
 ### 4. Operação e fontes
@@ -73,6 +74,7 @@ Rotas reproduzíveis:
 - `/events?type=&country=&asset=&relation=&confidence=&page=`
 - `/relations?period=&country=&class=&relation=&confidence=&page=`
 - `/backtests?asset=&page=`
+- `/patterns?horizon=&class=&outcome=&sample=&page=`
 - `/operations?status=&source=&page=`
 - `/sources/:sourceId`
 - `/reports`

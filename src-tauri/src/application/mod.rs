@@ -6,6 +6,7 @@ pub mod content_collection_service;
 pub mod content_query_service;
 pub mod coverage_query_service;
 pub mod data_management_service;
+pub mod historical_pattern_query_service;
 pub mod insights_query_service;
 pub mod market_collection_service;
 pub mod market_query_service;

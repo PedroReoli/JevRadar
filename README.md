@@ -24,6 +24,7 @@ O repositório está em **alpha para Windows**. O núcleo público funciona sem 
 - mapa agregado de relações entre países e ativos, com separação explícita entre relação conhecida, correlação, hipótese e causalidade não comprovada;
 - central de lacunas de cobertura que cruza movimentos reais de preço com volume editorial, sem transformar ausência de discussão em recomendação;
 - backtest cronológico em 1, 7 e 30 dias, com baseline, intervalo de confiança e separação calibração/avaliação;
+- central de padrões históricos que compara somente backtests do mesmo contrato, limiares e versões, com filtro de amostra e desempenho contra baseline;
 - API local opcional, autenticada e somente leitura, com Swagger e evidências auditáveis em `http://127.0.0.1:47831/docs/`;
 - atualização confirmada pelo usuário em builds assinados, com verificação criptográfica do artefato;
 - exportação do SQLite e exclusão confirmada do histórico local.

@@ -92,6 +92,7 @@ async function validateApplication(page) {
     ["Eventos", "Eventos e relações", "/events"],
     ["Relações", "Relações entre países e ativos", "/relations"],
     ["Backtest", "Qualidade dos sinais", "/backtest"],
+    ["Padrões", "Padrões históricos", "/patterns"],
     ["Ativos", "Ativos e watchlist", "/watchlist"],
     ["Fontes", "Fontes e documentos", "/sources"],
     ["Operação", "Operação e coletas", "/operations"],

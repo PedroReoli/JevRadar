@@ -100,6 +100,8 @@ Backtests usam `classified_at`, versão fixa do modelo e perguntas, calendário 
 
 Horizontes iniciais: 1, 7 e 30 dias quando houver histórico suficiente.
 
+A central de padrões históricos usa apenas o último backtest concluído de cada ativo compatível com um mesmo contrato de metodologia, modelo, perguntas e limiares. Resultados podem ser filtrados por horizonte, classe, tamanho mínimo da amostra e desempenho contra o baseline. Contratos incompatíveis nunca são agregados silenciosamente.
+
 ## Privacidade e telemetria
 
 Telemetria externa fica desligada por padrão. Métricas operacionais são locais. Crash reporting poderá ser adicionado depois como opt-in separado. O usuário pode exportar e apagar dados locais.

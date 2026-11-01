@@ -18,6 +18,9 @@ use crate::application::content_query_service::{
     ContentQueryService, ContentSourceManagementError,
 };
 use crate::application::coverage_query_service::{CoverageGapQueryError, CoverageQueryService};
+use crate::application::historical_pattern_query_service::{
+    HistoricalPatternQueryError, HistoricalPatternQueryService,
+};
 use crate::application::insights_query_service::InsightsQueryService;
 use crate::application::market_query_service::{MarketEventQueryError, MarketQueryService};
 use crate::domain::assets::AssetClass;
@@ -101,6 +104,17 @@ struct CoverageGapQuery {
     page_size: Option<u32>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HistoricalPatternQuery {
+    asset_class: Option<String>,
+    horizon_days: Option<i64>,
+    outcome: Option<String>,
+    minimum_sample_size: Option<u32>,
+    page: Option<u32>,
+    page_size: Option<u32>,
+}
+
 #[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 struct SignalEvidenceResponse {
@@ -171,6 +185,7 @@ impl From<SignalEvidenceSnapshot> for SignalEvidenceResponse {
         market_events,
         market_relations,
         coverage_gaps,
+        historical_patterns,
         signal_report,
         signal_evidence,
         alert_history,
@@ -216,6 +231,7 @@ pub async fn serve(
         .route("/v1/events", get(market_events))
         .route("/v1/relations", get(market_relations))
         .route("/v1/coverage-gaps", get(coverage_gaps))
+        .route("/v1/historical-patterns", get(historical_patterns))
         .route("/v1/signals/{signal_id}", get(signal_report))
         .route("/v1/signals/{signal_id}/evidence", get(signal_evidence))
         .route("/v1/alerts", get(alert_history))
@@ -452,6 +468,49 @@ async fn coverage_gaps(
 
 #[utoipa::path(
     get,
+    path = "/v1/historical-patterns",
+    params(
+        ("assetClass" = Option<String>, Query, description = "b3Equity, b3Fund, crypto ou macro"),
+        ("horizonDays" = Option<i64>, Query, description = "1, 7 ou 30; padrão 7"),
+        ("outcome" = Option<String>, Query, description = "all, outperformed, underperformed ou insufficient"),
+        ("minimumSampleSize" = Option<u32>, Query, description = "0 a 10000; padrão 0"),
+        ("page" = Option<u32>, Query, description = "Página a partir de 1"),
+        ("pageSize" = Option<u32>, Query, description = "1 a 50; padrão 25")
+    ),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Resultados históricos comparáveis por ativo", body = Object),
+        (status = 400, description = "Filtro ou paginação inválidos"),
+        (status = 401, description = "Token local ausente ou inválido"),
+        (status = 500, description = "Falha ao consultar o banco local")
+    )
+)]
+async fn historical_patterns(
+    State(state): State<ApiState>,
+    Query(query): Query<HistoricalPatternQuery>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    authorize(&headers, &state.token)?;
+    let asset_class = query
+        .asset_class
+        .as_deref()
+        .map(parse_asset_class)
+        .transpose()?;
+    let page = HistoricalPatternQueryService::list(
+        &state.database,
+        asset_class,
+        query.horizon_days.unwrap_or(7),
+        query.outcome.unwrap_or_else(|| "all".to_owned()),
+        query.minimum_sample_size.unwrap_or(0),
+        query.page.unwrap_or(1),
+        query.page_size.unwrap_or(25),
+    )
+    .map_err(historical_pattern_query_status)?;
+    serialize_json(page)
+}
+
+#[utoipa::path(
+    get,
     path = "/v1/signals/{signal_id}",
     params(("signal_id" = String, Path, description = "ID versionado do sinal")),
     security(("bearerAuth" = [])),
@@ -634,6 +693,13 @@ fn coverage_query_status(error: CoverageGapQueryError) -> StatusCode {
     }
 }
 
+fn historical_pattern_query_status(error: HistoricalPatternQueryError) -> StatusCode {
+    match error {
+        HistoricalPatternQueryError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        _ => StatusCode::BAD_REQUEST,
+    }
+}
+
 fn parse_asset_class(value: &str) -> Result<AssetClass, StatusCode> {
     match value {
         "b3Equity" => Ok(AssetClass::B3Equity),
@@ -714,6 +780,7 @@ mod tests {
             "/v1/events",
             "/v1/relations",
             "/v1/coverage-gaps",
+            "/v1/historical-patterns",
             "/v1/alerts",
             "/v1/collections",
             "/v1/backtests",

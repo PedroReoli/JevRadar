@@ -78,3 +78,39 @@ pub struct BacktestReport {
     pub status: String,
     pub results: Vec<BacktestHorizonResult>,
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoricalPatternItem {
+    pub run_id: String,
+    pub asset: Asset,
+    pub horizon_days: i64,
+    pub sample_size: usize,
+    pub mean_return: Option<f64>,
+    pub median_return: Option<f64>,
+    pub positive_rate: Option<f64>,
+    pub baseline_positive_rate: Option<f64>,
+    pub baseline_difference: Option<f64>,
+    pub confidence_interval_low: Option<f64>,
+    pub confidence_interval_high: Option<f64>,
+    pub signal_threshold: f64,
+    pub confidence_threshold: f64,
+    pub methodology_version: String,
+    pub signal_methodology_version: String,
+    pub model_version: String,
+    pub question_version: String,
+    pub evaluation_started_at: String,
+    pub evaluation_ended_at: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoricalPatternPage {
+    pub items: Vec<HistoricalPatternItem>,
+    pub page: u32,
+    pub page_size: u32,
+    pub total_items: u64,
+    pub total_pages: u32,
+    pub methodology_version: String,
+}

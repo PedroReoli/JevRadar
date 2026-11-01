@@ -8,5 +8,6 @@ pub mod data;
 pub mod desktop;
 pub mod insights;
 pub mod market;
+pub mod patterns;
 pub mod settings;
 pub mod system;
