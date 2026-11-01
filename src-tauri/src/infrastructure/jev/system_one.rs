@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 
 use reqwest::blocking::Client;
@@ -316,36 +316,116 @@ fn validate_response(
     response: &SystemOneResponse,
 ) -> Result<(), JevClientError> {
     if response.model.trim().is_empty()
-        || !valid_probability(response.answers.asset_present.noul)
-        || !valid_probability(response.answers.hype.noul)
-        || !valid_probability(response.answers.factual_claim.noul)
-        || !valid_probability(response.answers.event_present.noul)
-        || !valid_choice(&response.answers.asset)
-        || !valid_choice(&response.answers.sentiment)
-        || !valid_choice(&response.answers.content_type)
-        || !valid_choice(&response.answers.event_type)
-        || !valid_choice(&response.answers.event_country)
-        || !valid_choice(&response.answers.relation_type)
-        || !response.answers.relevance.score.is_finite()
-        || !(0.0..=3.0).contains(&response.answers.relevance.score)
-        || !valid_probability(response.answers.relevance.confidence)
-        || !document
-            .candidates
-            .iter()
-            .any(|candidate| candidate.id == response.answers.asset.choice)
+        || !valid_noul(&response.answers.asset_present)
+        || !valid_noul(&response.answers.hype)
+        || !valid_noul(&response.answers.factual_claim)
+        || !valid_noul(&response.answers.event_present)
+        || !valid_choice(
+            &response.answers.asset,
+            document
+                .candidates
+                .iter()
+                .map(|candidate| candidate.id.as_str()),
+        )
+        || !valid_choice(
+            &response.answers.sentiment,
+            ["optimistic", "pessimistic", "neutral"],
+        )
+        || !valid_choice(
+            &response.answers.content_type,
+            ["news", "opinion", "technical_analysis", "meme", "spam"],
+        )
+        || !valid_choice(
+            &response.answers.event_type,
+            [
+                "political",
+                "economic",
+                "regulatory",
+                "climate",
+                "health",
+                "technology",
+                "geopolitical",
+                "other",
+            ],
+        )
+        || !valid_choice(
+            &response.answers.event_country,
+            ["BR", "US", "CN", "RU", "EU", "GLOBAL", "OTHER"],
+        )
+        || !valid_choice(
+            &response.answers.relation_type,
+            ["known", "correlation", "hypothesis", "unproven_causality"],
+        )
+        || !valid_score(&response.answers.relevance, 4)
     {
         return Err(JevClientError::InvalidPayload);
     }
     Ok(())
 }
 
-fn valid_choice(answer: &ChoiceAnswer) -> bool {
-    valid_probability(answer.confidence)
-        && answer.probabilities.contains_key(&answer.choice)
-        && answer
-            .probabilities
-            .values()
-            .all(|value| valid_probability(*value))
+fn valid_noul(answer: &NoulAnswer) -> bool {
+    answer.answer_type == "noul" && valid_probability(answer.noul)
+}
+
+fn valid_choice<'a>(
+    answer: &ChoiceAnswer,
+    expected_options: impl IntoIterator<Item = &'a str>,
+) -> bool {
+    let expected = expected_options.into_iter().collect::<BTreeSet<_>>();
+    let actual = answer
+        .probabilities
+        .keys()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    let selected_probability = answer.probabilities.get(&answer.choice).copied();
+    answer.answer_type == "choice"
+        && valid_probability(answer.confidence)
+        && !expected.is_empty()
+        && expected == actual
+        && valid_distribution(answer.probabilities.values().copied())
+        && selected_probability.is_some_and(|selected| {
+            answer
+                .probabilities
+                .values()
+                .all(|candidate| selected >= *candidate)
+        })
+}
+
+fn valid_score(answer: &ScoreAnswer, level_count: usize) -> bool {
+    let expected = (0..level_count)
+        .map(|level| level.to_string())
+        .collect::<BTreeSet<_>>();
+    let legend = answer.legend.keys().cloned().collect::<BTreeSet<_>>();
+    let probabilities = answer
+        .probabilities
+        .keys()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let expected_score = answer
+        .probabilities
+        .iter()
+        .filter_map(|(level, probability)| {
+            level
+                .parse::<usize>()
+                .ok()
+                .map(|level| level as f64 * probability)
+        })
+        .sum::<f64>();
+    answer.answer_type == "score"
+        && answer.score.is_finite()
+        && (0.0..=(level_count.saturating_sub(1) as f64)).contains(&answer.score)
+        && valid_probability(answer.confidence)
+        && expected == legend
+        && expected == probabilities
+        && valid_distribution(answer.probabilities.values().copied())
+        && (answer.score - expected_score).abs() <= 0.02
+}
+
+fn valid_distribution(values: impl Iterator<Item = f64>) -> bool {
+    let values = values.collect::<Vec<_>>();
+    !values.is_empty()
+        && values.iter().all(|value| valid_probability(*value))
+        && (values.iter().sum::<f64>() - 1.0).abs() <= 0.01
 }
 
 fn valid_probability(value: f64) -> bool {
@@ -376,11 +456,15 @@ struct Answers {
 
 #[derive(Debug, Deserialize)]
 struct NoulAnswer {
+    #[serde(rename = "type")]
+    answer_type: String,
     noul: f64,
 }
 
 #[derive(Debug, Deserialize)]
 struct ChoiceAnswer {
+    #[serde(rename = "type")]
+    answer_type: String,
     choice: String,
     confidence: f64,
     probabilities: BTreeMap<String, f64>,
@@ -388,8 +472,12 @@ struct ChoiceAnswer {
 
 #[derive(Debug, Deserialize)]
 struct ScoreAnswer {
+    #[serde(rename = "type")]
+    answer_type: String,
     score: f64,
     confidence: f64,
+    legend: BTreeMap<String, Value>,
+    probabilities: BTreeMap<String, f64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -404,7 +492,10 @@ mod tests {
 
     use std::collections::BTreeMap;
 
-    use super::{ChoiceAnswer, SystemOneResponse, parse_response, valid_choice, valid_probability};
+    use super::{
+        ChoiceAnswer, JevClientError, SystemOneResponse, parse_response, valid_choice,
+        valid_probability,
+    };
     use crate::domain::classification::{AnalysisCandidateAsset, PendingDocumentAnalysis};
 
     fn document() -> PendingDocumentAnalysis {
@@ -422,26 +513,79 @@ mod tests {
         }
     }
 
-    #[test]
-    fn preserves_expected_score_and_applies_confidence_gates() {
-        let response = serde_json::from_value::<SystemOneResponse>(json!({
+    fn valid_response_json() -> serde_json::Value {
+        json!({
             "model": "jev-latest",
             "answers": {
                 "asset_present": { "type": "noul", "noul": 0.94 },
-                "asset": { "type": "choice", "choice": "asset:b3:PETR4", "confidence": 0.91, "probabilities": { "asset:b3:PETR4": 0.91 } },
-                "sentiment": { "type": "choice", "choice": "optimistic", "confidence": 0.82, "probabilities": { "optimistic": 0.82, "pessimistic": 0.08, "neutral": 0.10 } },
-                "relevance": { "type": "score", "score": 2.6, "confidence": 0.76, "legend": {}, "probabilities": {} },
-                "content_type": { "type": "choice", "choice": "news", "confidence": 0.88, "probabilities": { "news": 0.88 } },
+                "asset": {
+                    "type": "choice",
+                    "choice": "asset:b3:PETR4",
+                    "confidence": 0.91,
+                    "probabilities": { "asset:b3:PETR4": 1.0 }
+                },
+                "sentiment": {
+                    "type": "choice",
+                    "choice": "optimistic",
+                    "confidence": 0.82,
+                    "probabilities": { "optimistic": 0.82, "pessimistic": 0.08, "neutral": 0.10 }
+                },
+                "relevance": {
+                    "type": "score",
+                    "score": 2.6,
+                    "confidence": 0.76,
+                    "legend": { "0": "hype", "1": "weak", "2": "specific", "3": "material" },
+                    "probabilities": { "0": 0.0, "1": 0.1, "2": 0.2, "3": 0.7 }
+                },
+                "content_type": {
+                    "type": "choice",
+                    "choice": "news",
+                    "confidence": 0.88,
+                    "probabilities": {
+                        "news": 0.88, "opinion": 0.03, "technical_analysis": 0.03,
+                        "meme": 0.02, "spam": 0.04
+                    }
+                },
                 "hype": { "type": "noul", "noul": 0.07 },
                 "factual_claim": { "type": "noul", "noul": 0.97 },
                 "event_present": { "type": "noul", "noul": 0.91 },
-                "event_type": { "type": "choice", "choice": "economic", "confidence": 0.88, "probabilities": { "economic": 0.88 } },
-                "event_country": { "type": "choice", "choice": "BR", "confidence": 0.93, "probabilities": { "BR": 0.93 } },
-                "relation_type": { "type": "choice", "choice": "known", "confidence": 0.79, "probabilities": { "known": 0.79 } }
+                "event_type": {
+                    "type": "choice",
+                    "choice": "economic",
+                    "confidence": 0.88,
+                    "probabilities": {
+                        "political": 0.02, "economic": 0.88, "regulatory": 0.02,
+                        "climate": 0.02, "health": 0.02, "technology": 0.02,
+                        "geopolitical": 0.02, "other": 0.0
+                    }
+                },
+                "event_country": {
+                    "type": "choice",
+                    "choice": "BR",
+                    "confidence": 0.93,
+                    "probabilities": {
+                        "BR": 0.93, "US": 0.02, "CN": 0.01, "RU": 0.01,
+                        "EU": 0.01, "GLOBAL": 0.01, "OTHER": 0.01
+                    }
+                },
+                "relation_type": {
+                    "type": "choice",
+                    "choice": "known",
+                    "confidence": 0.79,
+                    "probabilities": {
+                        "known": 0.79, "correlation": 0.07,
+                        "hypothesis": 0.08, "unproven_causality": 0.06
+                    }
+                }
             },
             "usage": { "input_tokens": 100, "output_tokens": 12 }
-        }))
-        .expect("contrato de resposta");
+        })
+    }
+
+    #[test]
+    fn preserves_expected_score_and_applies_confidence_gates() {
+        let response = serde_json::from_value::<SystemOneResponse>(valid_response_json())
+            .expect("contrato de resposta");
         let analysis = parse_response(&document(), response).expect("análise");
         assert_eq!(
             analysis.selected_asset_id.as_deref(),
@@ -463,24 +607,13 @@ mod tests {
 
     #[test]
     fn rejects_low_confidence_asset_instead_of_inventing_a_link() {
-        let response = serde_json::from_value::<SystemOneResponse>(json!({
-            "model": "jev-latest",
-            "answers": {
-                "asset_present": { "noul": 0.51 },
-                "asset": { "choice": "asset:b3:PETR4", "confidence": 0.91, "probabilities": { "asset:b3:PETR4": 0.91 } },
-                "sentiment": { "choice": "optimistic", "confidence": 0.2, "probabilities": { "optimistic": 0.4 } },
-                "relevance": { "score": 1.2, "confidence": 0.5 },
-                "content_type": { "choice": "opinion", "confidence": 0.2, "probabilities": { "opinion": 0.4 } },
-                "hype": { "noul": 0.3 },
-                "factual_claim": { "noul": 0.2 },
-                "event_present": { "noul": 0.8 },
-                "event_type": { "choice": "geopolitical", "confidence": 0.8, "probabilities": { "geopolitical": 0.8 } },
-                "event_country": { "choice": "GLOBAL", "confidence": 0.8, "probabilities": { "GLOBAL": 0.8 } },
-                "relation_type": { "choice": "hypothesis", "confidence": 0.8, "probabilities": { "hypothesis": 0.8 } }
-            },
-            "usage": { "input_tokens": 80, "output_tokens": 10 }
-        }))
-        .expect("contrato de resposta");
+        let mut payload = valid_response_json();
+        payload["answers"]["asset_present"]["noul"] = json!(0.51);
+        payload["answers"]["sentiment"]["confidence"] = json!(0.2);
+        payload["answers"]["content_type"]["confidence"] = json!(0.2);
+        payload["answers"]["event_present"]["noul"] = json!(0.8);
+        let response =
+            serde_json::from_value::<SystemOneResponse>(payload).expect("contrato de resposta");
         let analysis = parse_response(&document(), response).expect("análise");
         assert!(analysis.selected_asset_id.is_none());
         assert_eq!(analysis.sentiment, "uncertain");
@@ -492,15 +625,49 @@ mod tests {
     fn rejects_invalid_probabilities_before_persisting_them() {
         assert!(!valid_probability(f64::NAN));
         assert!(!valid_probability(1.01));
-        assert!(!valid_choice(&ChoiceAnswer {
-            choice: "optimistic".to_owned(),
-            confidence: 0.8,
-            probabilities: BTreeMap::from([("pessimistic".to_owned(), 0.2)]),
-        }));
-        assert!(!valid_choice(&ChoiceAnswer {
-            choice: "optimistic".to_owned(),
-            confidence: 0.8,
-            probabilities: BTreeMap::from([("optimistic".to_owned(), 1.4)]),
-        }));
+        assert!(!valid_choice(
+            &ChoiceAnswer {
+                answer_type: "choice".to_owned(),
+                choice: "optimistic".to_owned(),
+                confidence: 0.8,
+                probabilities: BTreeMap::from([
+                    ("optimistic".to_owned(), 0.8),
+                    ("pessimistic".to_owned(), 0.2),
+                ]),
+            },
+            ["optimistic", "pessimistic", "neutral"],
+        ));
+        assert!(!valid_choice(
+            &ChoiceAnswer {
+                answer_type: "noul".to_owned(),
+                choice: "optimistic".to_owned(),
+                confidence: 0.8,
+                probabilities: BTreeMap::from([
+                    ("optimistic".to_owned(), 0.8),
+                    ("pessimistic".to_owned(), 0.1),
+                    ("neutral".to_owned(), 0.1),
+                ]),
+            },
+            ["optimistic", "pessimistic", "neutral"],
+        ));
+    }
+
+    #[test]
+    fn rejects_incomplete_or_inconsistent_official_contracts() {
+        let mut missing_type = valid_response_json();
+        missing_type["answers"]["hype"]
+            .as_object_mut()
+            .expect("resposta hype")
+            .remove("type");
+        assert!(serde_json::from_value::<SystemOneResponse>(missing_type).is_err());
+
+        let mut inconsistent_score = valid_response_json();
+        inconsistent_score["answers"]["relevance"]["score"] = json!(1.2);
+        let response = serde_json::from_value::<SystemOneResponse>(inconsistent_score)
+            .expect("JSON estruturalmente válido");
+        assert!(matches!(
+            parse_response(&document(), response),
+            Err(JevClientError::InvalidPayload)
+        ));
     }
 }

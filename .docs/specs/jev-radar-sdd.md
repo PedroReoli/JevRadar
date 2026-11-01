@@ -149,5 +149,6 @@ O repositório público usa Apache License 2.0. O motor privado não é coberto 
 ## Referências normativas internas
 
 - `.rules/JEVRADAR-ENGINEERING.md`
+- `.docs/contracts/typesafe-system-one-v1.md`
 - `.agents/rules/RULES-ROUTER.json`
 - `.agents/SKILLS-ROUTER.json`
