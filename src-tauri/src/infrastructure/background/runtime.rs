@@ -4,6 +4,9 @@ use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::thread;
 use std::time::Duration;
 
+use tauri::AppHandle;
+
+use crate::application::alert_service::AlertService;
 use crate::application::classification_service::ClassificationService;
 use crate::application::content_collection_service::ContentCollectionService;
 use crate::application::market_collection_service::MarketCollectionService;
@@ -37,7 +40,12 @@ pub struct BackgroundRuntime {
 }
 
 impl BackgroundRuntime {
-    pub fn start(database: Arc<Database>, secrets: KeyringSecretStore, enabled: bool) -> Self {
+    pub fn start(
+        database: Arc<Database>,
+        secrets: KeyringSecretStore,
+        app_handle: AppHandle,
+        enabled: bool,
+    ) -> Self {
         Self::start_with_task(
             enabled,
             Arc::new(move || {
@@ -56,6 +64,9 @@ impl BackgroundRuntime {
                 }
                 if let Err(error) = SignalService::calculate_latest(&database) {
                     tracing::warn!(error = %error, "agregação de sinais em background falhou");
+                }
+                if let Err(error) = AlertService::notify_new_signals(&database, &app_handle) {
+                    tracing::warn!(error = %error, "entrega de alerta local falhou");
                 }
             }),
         )

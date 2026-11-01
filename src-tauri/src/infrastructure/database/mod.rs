@@ -5,6 +5,7 @@ use parking_lot::Mutex;
 use rusqlite::{Connection, OptionalExtension, params};
 use thiserror::Error;
 
+use crate::domain::alerts::AlertCandidate;
 use crate::domain::assets::{Asset, AssetClass, Watchlist, WatchlistAsset};
 use crate::domain::backtest::{
     BacktestDataset, BacktestHorizonResult, BacktestPricePoint, BacktestReport, BacktestSignalPoint,
@@ -26,6 +27,7 @@ const COLLECTION_SCHEMA: &str = include_str!("migrations/0004_collection_runs.sq
 const CONTENT_SOURCES_SCHEMA: &str = include_str!("migrations/0005_content_sources.sql");
 const DOCUMENT_ANALYSIS_SCHEMA: &str = include_str!("migrations/0006_document_analysis.sql");
 const BACKTEST_PARAMETERS_SCHEMA: &str = include_str!("migrations/0007_backtest_parameters.sql");
+const ALERT_DELIVERIES_SCHEMA: &str = include_str!("migrations/0008_alert_deliveries.sql");
 
 pub struct Database {
     connection: Mutex<Connection>,
@@ -62,6 +64,7 @@ impl Database {
         apply_migration(&connection, 5, CONTENT_SOURCES_SCHEMA)?;
         apply_migration(&connection, 6, DOCUMENT_ANALYSIS_SCHEMA)?;
         apply_migration(&connection, 7, BACKTEST_PARAMETERS_SCHEMA)?;
+        apply_migration(&connection, 8, ALERT_DELIVERIES_SCHEMA)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -1034,6 +1037,67 @@ impl Database {
         Ok(Some(report))
     }
 
+    pub fn pending_alert_candidates(
+        &self,
+        alert_level: u8,
+    ) -> Result<Vec<AlertCandidate>, DatabaseError> {
+        let connection = self.connection.lock();
+        let mut statement = connection.prepare(
+            "WITH signal_history AS (
+                 SELECT ms.id, ms.asset_id, ms.signal_score, ms.confidence,
+                        ms.independent_source_count, ms.evidence_count, ms.hype_penalty,
+                        ms.window_ended_at, a.symbol,
+                        LAG(ms.signal_score) OVER (
+                            PARTITION BY ms.asset_id ORDER BY ms.window_ended_at, ms.calculated_at
+                        ) AS previous_score,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY ms.asset_id ORDER BY ms.window_ended_at DESC, ms.calculated_at DESC
+                        ) AS newest
+                 FROM market_signals ms
+                 JOIN assets a ON a.id = ms.asset_id
+             )
+             SELECT sh.id, sh.symbol, sh.signal_score, sh.confidence,
+                    sh.independent_source_count, sh.evidence_count, sh.hype_penalty,
+                    sh.previous_score
+             FROM signal_history sh
+             WHERE sh.newest = 1
+               AND NOT EXISTS (
+                   SELECT 1 FROM alert_deliveries ad
+                   WHERE ad.signal_id = sh.id AND ad.alert_level = ?1
+               )
+             ORDER BY ABS(sh.signal_score) DESC",
+        )?;
+        statement
+            .query_map(params![alert_level], |row| {
+                Ok(AlertCandidate {
+                    signal_id: row.get(0)?,
+                    asset_symbol: row.get(1)?,
+                    signal_score: row.get(2)?,
+                    confidence: row.get(3)?,
+                    independent_source_count: row.get::<_, i64>(4)? as usize,
+                    evidence_count: row.get::<_, i64>(5)? as usize,
+                    hype_penalty: row.get(6)?,
+                    previous_score: row.get(7)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(Into::into)
+    }
+
+    pub fn mark_alert_delivered(
+        &self,
+        signal_id: &str,
+        alert_level: u8,
+        delivered_at: &str,
+    ) -> Result<(), DatabaseError> {
+        self.connection.lock().execute(
+            "INSERT OR IGNORE INTO alert_deliveries (signal_id, alert_level, delivered_at)
+             VALUES (?1, ?2, ?3)",
+            params![signal_id, alert_level, delivered_at],
+        )?;
+        Ok(())
+    }
+
     fn read_setting(&self, key: &str) -> Result<Option<String>, DatabaseError> {
         Ok(self
             .connection
@@ -1379,6 +1443,19 @@ mod tests {
             .expect("contagem de contribuições");
         assert_eq!((signal_count, evidence_count), (1, 1));
         drop(connection);
+        let alert_candidates = database
+            .pending_alert_candidates(2)
+            .expect("candidatos de alerta");
+        assert_eq!(alert_candidates.len(), 1);
+        database
+            .mark_alert_delivered("signal:test", 2, "2026-11-02T00:02:00Z")
+            .expect("alerta registrado");
+        assert!(
+            database
+                .pending_alert_candidates(2)
+                .expect("alerta deduplicado")
+                .is_empty()
+        );
 
         database
             .store_backtest_report(&BacktestReport {

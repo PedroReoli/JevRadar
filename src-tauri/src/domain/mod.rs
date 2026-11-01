@@ -1,3 +1,4 @@
+pub mod alerts;
 pub mod assets;
 pub mod backtest;
 pub mod classification;

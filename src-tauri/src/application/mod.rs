@@ -1,3 +1,4 @@
+pub mod alert_service;
 pub mod backtest_service;
 pub mod catalog_service;
 pub mod classification_service;

@@ -34,10 +34,15 @@ pub fn run() {
                 .app_name("JevRadar")
                 .build(),
         )
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir()?;
             let database = Database::open(app_data_dir.join("jevradar.sqlite3"))?;
-            app.manage(AppState::new(database, KeyringSecretStore::new()));
+            app.manage(AppState::new(
+                database,
+                KeyringSecretStore::new(),
+                app.handle().clone(),
+            ));
             create_system_tray(app)?;
             register_main_window_lifecycle(app);
             Ok(())
