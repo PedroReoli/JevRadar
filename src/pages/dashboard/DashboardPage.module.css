@@ -86,7 +86,8 @@
 .healthCard,
 .emptyCard,
 .collectionCard,
-.marketPanel {
+.marketPanel,
+.signalPanel {
   border: var(--border-width-thin) solid var(--color-border-subtle);
   border-radius: var(--radius-xl);
   background: var(--color-surface-panel);
@@ -143,6 +144,105 @@
 
 .marketPanel {
   overflow: hidden;
+}
+
+.signalPanel {
+  overflow: hidden;
+}
+
+.signalList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.signalRow {
+  min-height: var(--size-signal-row);
+  display: grid;
+  grid-template-columns: minmax(var(--size-asset-symbol), 0.7fr) minmax(var(--size-signal-score), 0.6fr) minmax(0, 1.7fr);
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  border-left: var(--border-width-emphasis) solid var(--color-neutral-border);
+  border-bottom: var(--border-width-thin) solid var(--color-border-subtle);
+  background: var(--color-neutral-surface);
+}
+
+.signalRow[data-tone="positive"] {
+  border-left-color: var(--color-positive-text);
+  background: var(--color-positive-surface);
+}
+
+.signalRow[data-tone="negative"] {
+  border-left-color: var(--color-negative-text);
+  background: var(--color-negative-surface);
+}
+
+.signalRow:last-child {
+  border-bottom: 0;
+}
+
+.signalIdentity,
+.signalScore {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.signalIdentity strong,
+.signalScore strong {
+  color: var(--color-text-primary);
+  font: var(--font-code-label);
+}
+
+.signalIdentity span,
+.signalScore span {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font: var(--font-label-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.signalScore progress {
+  width: 100%;
+  height: var(--size-progress-track);
+  border: 0;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background: var(--color-border-subtle);
+  accent-color: var(--color-neutral-text);
+}
+
+.signalRow[data-tone="positive"] progress {
+  accent-color: var(--color-positive-text);
+}
+
+.signalRow[data-tone="negative"] progress {
+  accent-color: var(--color-negative-text);
+}
+
+.signalMetrics {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.signalMetrics div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.signalMetrics dt {
+  color: var(--color-text-muted);
+  font: var(--font-label-xs);
+}
+
+.signalMetrics dd {
+  margin: 0;
+  color: var(--color-text-primary);
+  font: var(--font-label-md);
 }
 
 .marketHeader {
@@ -388,6 +488,14 @@
     grid-template-columns: var(--size-asset-symbol) minmax(0, 1fr) auto;
     gap: var(--space-2) var(--space-3);
     padding-inline: var(--space-4);
+  }
+
+  .signalRow {
+    grid-template-columns: minmax(0, 1fr) minmax(var(--size-signal-score), auto);
+  }
+
+  .signalMetrics {
+    grid-column: 1 / -1;
   }
 
   .marketValue {

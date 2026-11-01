@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 import { CollectionStatusCard } from "@/features/dashboard/components/CollectionStatusCard";
 import { MarketSnapshotPanel } from "@/features/dashboard/components/MarketSnapshotPanel";
+import { SignalRadarPanel } from "@/features/dashboard/components/SignalRadarPanel";
 import { SystemHealthCard } from "@/features/dashboard/components/SystemHealthCard";
 import { useMarketOverview, useRefreshMarketData } from "@/features/dashboard/hooks/useMarketOverview";
 import { useSystemStatus } from "@/hooks/useSystemStatus";
@@ -53,7 +54,10 @@ export function DashboardPage() {
       {marketQuery.isError ? (
         <div className={styles.errorMessage} role="alert">{t("dashboard.marketLoadError")}</div>
       ) : (
-        <MarketSnapshotPanel snapshots={marketQuery.data?.snapshots ?? []} />
+        <>
+          <SignalRadarPanel signals={marketQuery.data?.signals ?? []} />
+          <MarketSnapshotPanel snapshots={marketQuery.data?.snapshots ?? []} />
+        </>
       )}
 
       {marketQuery.data?.snapshots.every((snapshot) => snapshot.closeValue === null) ? (

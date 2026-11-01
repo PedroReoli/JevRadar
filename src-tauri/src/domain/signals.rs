@@ -34,3 +34,21 @@ pub struct CalculatedSignal {
     pub calculated_at: String,
     pub evidence: Vec<WeightedEvidence>,
 }
+use serde::Serialize;
+
+use crate::domain::assets::Asset;
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarketSignalSnapshot {
+    pub asset: Asset,
+    pub signal_score: f64,
+    pub confidence: f64,
+    pub source_count: usize,
+    pub independent_source_count: usize,
+    pub evidence_count: usize,
+    pub hype_penalty: f64,
+    pub window_started_at: String,
+    pub window_ended_at: String,
+    pub methodology_version: String,
+}

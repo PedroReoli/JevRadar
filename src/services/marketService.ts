@@ -24,6 +24,18 @@ const marketOverviewSchema = z.object({
       interval: z.string().nullable(),
     }),
   ),
+  signals: z.array(z.object({
+    asset: assetSchema,
+    signalScore: z.number().min(-1).max(1),
+    confidence: z.number().min(0).max(1),
+    sourceCount: z.number().int().nonnegative(),
+    independentSourceCount: z.number().int().nonnegative(),
+    evidenceCount: z.number().int().nonnegative(),
+    hypePenalty: z.number().min(0).max(1),
+    windowStartedAt: z.string(),
+    windowEndedAt: z.string(),
+    methodologyVersion: z.string(),
+  })),
   latestCollection: z
     .object({
       runId: z.string(),

@@ -7,6 +7,7 @@ impl MarketQueryService {
     pub fn overview(database: &Database) -> Result<MarketOverview, DatabaseError> {
         Ok(MarketOverview {
             snapshots: database.market_snapshots()?,
+            signals: database.latest_market_signals()?,
             latest_collection: database.latest_collection_run()?,
         })
     }

@@ -14,7 +14,7 @@ use crate::domain::content::{
     ContentOverview, ContentSource, ContentSourceResult, ContentSourceStatus, SourceDocumentInput,
 };
 use crate::domain::market::{LatestCollectionRun, MarketSnapshot};
-use crate::domain::signals::{CalculatedSignal, SignalEvidenceInput};
+use crate::domain::signals::{CalculatedSignal, MarketSignalSnapshot, SignalEvidenceInput};
 
 const INITIAL_SCHEMA: &str = include_str!("migrations/0001_initial.sql");
 const SETTINGS_SCHEMA: &str = include_str!("migrations/0002_settings.sql");
@@ -797,6 +797,42 @@ impl Database {
         }
         transaction.commit()?;
         Ok(())
+    }
+
+    pub fn latest_market_signals(&self) -> Result<Vec<MarketSignalSnapshot>, DatabaseError> {
+        let connection = self.connection.lock();
+        let mut statement = connection.prepare(
+            "SELECT a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency, a.country_code,
+                    ms.signal_score, ms.confidence, ms.source_count, ms.independent_source_count,
+                    ms.evidence_count, ms.hype_penalty, ms.window_started_at, ms.window_ended_at,
+                    ms.methodology_version
+             FROM market_signals ms
+             JOIN assets a ON a.id = ms.asset_id
+             WHERE ms.id = (
+                 SELECT latest.id FROM market_signals latest
+                 WHERE latest.asset_id = ms.asset_id
+                 ORDER BY latest.window_ended_at DESC, latest.calculated_at DESC
+                 LIMIT 1
+             )
+             ORDER BY ABS(ms.signal_score) DESC, ms.confidence DESC, a.symbol",
+        )?;
+        statement
+            .query_map([], |row| {
+                Ok(MarketSignalSnapshot {
+                    asset: map_asset(row)?,
+                    signal_score: row.get(7)?,
+                    confidence: row.get(8)?,
+                    source_count: row.get::<_, i64>(9)? as usize,
+                    independent_source_count: row.get::<_, i64>(10)? as usize,
+                    evidence_count: row.get::<_, i64>(11)? as usize,
+                    hype_penalty: row.get(12)?,
+                    window_started_at: row.get(13)?,
+                    window_ended_at: row.get(14)?,
+                    methodology_version: row.get(15)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(Into::into)
     }
 
     fn read_setting(&self, key: &str) -> Result<Option<String>, DatabaseError> {

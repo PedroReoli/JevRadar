@@ -1,6 +1,7 @@
 use serde::Serialize;
 
 use crate::domain::assets::Asset;
+use crate::domain::signals::MarketSignalSnapshot;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -29,5 +30,6 @@ pub struct LatestCollectionRun {
 #[serde(rename_all = "camelCase")]
 pub struct MarketOverview {
     pub snapshots: Vec<MarketSnapshot>,
+    pub signals: Vec<MarketSignalSnapshot>,
     pub latest_collection: Option<LatestCollectionRun>,
 }

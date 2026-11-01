@@ -21,7 +21,21 @@ export interface LatestCollectionRun {
 
 export interface MarketOverview {
   snapshots: MarketSnapshot[];
+  signals: MarketSignalSnapshot[];
   latestCollection: LatestCollectionRun | null;
+}
+
+export interface MarketSignalSnapshot {
+  asset: Asset;
+  signalScore: number;
+  confidence: number;
+  sourceCount: number;
+  independentSourceCount: number;
+  evidenceCount: number;
+  hypePenalty: number;
+  windowStartedAt: string;
+  windowEndedAt: string;
+  methodologyVersion: string;
 }
 
 export interface SourceCollectionResult {

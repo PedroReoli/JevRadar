@@ -33,6 +33,18 @@ describe("marketService", () => {
         sourceName: "Binance Public API",
         interval: "1d",
       }],
+      signals: [{
+        asset,
+        signalScore: 0.64,
+        confidence: 0.78,
+        sourceCount: 3,
+        independentSourceCount: 3,
+        evidenceCount: 8,
+        hypePenalty: 0.12,
+        windowStartedAt: "2026-10-31T12:00:00Z",
+        windowEndedAt: "2026-11-01T12:00:00Z",
+        methodologyVersion: "weighted-sentiment-v1",
+      }],
       latestCollection: {
         runId: "collection:1",
         status: "completed",
@@ -44,6 +56,7 @@ describe("marketService", () => {
     });
     const overview = await getMarketOverview();
     expect(overview.snapshots[0]!.asset.symbol).toBe("BTC");
+    expect(overview.signals[0]!.signalScore).toBe(0.64);
     expect(invoke).toHaveBeenCalledWith("get_market_overview");
   });
 
