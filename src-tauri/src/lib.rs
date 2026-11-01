@@ -23,6 +23,10 @@ use crate::interface::commands::content::{
 };
 use crate::interface::commands::data::{export_local_data, purge_local_data};
 use crate::interface::commands::desktop::resolve_close_request;
+use crate::interface::commands::insights::{
+    get_jev_usage, get_signal_report, list_alert_history, list_backtest_history,
+    list_collection_history,
+};
 use crate::interface::commands::market::{
     get_market_overview, get_market_series, get_signal_evidence,
 };
@@ -69,6 +73,11 @@ pub fn run() {
             get_market_overview,
             get_market_series,
             get_signal_evidence,
+            get_signal_report,
+            list_alert_history,
+            list_collection_history,
+            list_backtest_history,
+            get_jev_usage,
             get_system_status,
             get_app_settings,
             update_app_settings,

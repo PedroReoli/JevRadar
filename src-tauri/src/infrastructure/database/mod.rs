@@ -19,6 +19,7 @@ use crate::domain::content::{
     ContentOverview, ContentSource, ContentSourceResult, ContentSourceStatus, SourceDocumentInput,
 };
 use crate::domain::events::MarketEventSnapshot;
+use crate::domain::insights::{AlertHistoryItem, CollectionRunSnapshot};
 use crate::domain::market::{LatestCollectionRun, MarketSeries, MarketSeriesPoint, MarketSnapshot};
 use crate::domain::signals::{
     CalculatedSignal, MarketSignalSnapshot, SignalEvidenceInput, SignalEvidenceSnapshot,
@@ -458,6 +459,54 @@ impl Database {
             )
             .optional()
             .map_err(Into::into)
+    }
+
+    pub fn collection_history(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<CollectionRunSnapshot>, DatabaseError> {
+        let connection = self.connection.lock();
+        let mut statement = connection.prepare(
+            "SELECT id, trigger_kind, status, started_at, completed_at,
+                    stored_observation_count, source_error_count
+             FROM collection_runs
+             ORDER BY started_at DESC
+             LIMIT ?1",
+        )?;
+        let mut runs = statement
+            .query_map(params![i64::try_from(limit).unwrap_or(100)], |row| {
+                Ok(CollectionRunSnapshot {
+                    run_id: row.get(0)?,
+                    trigger_kind: row.get(1)?,
+                    status: row.get(2)?,
+                    started_at: row.get(3)?,
+                    completed_at: row.get(4)?,
+                    stored_observation_count: row.get::<_, i64>(5)? as usize,
+                    source_error_count: row.get::<_, i64>(6)? as usize,
+                    sources: Vec::new(),
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut source_statement = connection.prepare(
+            "SELECT source_id, status, stored_observation_count, skipped_asset_count, error_code
+             FROM collection_run_sources
+             WHERE run_id = ?1
+             ORDER BY source_id",
+        )?;
+        for run in &mut runs {
+            run.sources = source_statement
+                .query_map(params![run.run_id], |row| {
+                    Ok(SourceCollectionResult {
+                        source_id: row.get(0)?,
+                        status: row.get(1)?,
+                        stored_observation_count: row.get::<_, i64>(2)? as usize,
+                        skipped_asset_count: row.get::<_, i64>(3)? as usize,
+                        error_code: row.get(4)?,
+                    })
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
+        }
+        Ok(runs)
     }
 
     pub fn enabled_content_sources(&self) -> Result<Vec<ContentSource>, DatabaseError> {
@@ -1065,6 +1114,44 @@ impl Database {
             .map_err(Into::into)
     }
 
+    pub fn market_signal(
+        &self,
+        signal_id: &str,
+    ) -> Result<Option<MarketSignalSnapshot>, DatabaseError> {
+        self.connection
+            .lock()
+            .query_row(
+                "SELECT ms.id, a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency,
+                        a.country_code, ms.signal_score, ms.confidence, ms.source_count,
+                        ms.independent_source_count, ms.evidence_count, ms.hype_penalty,
+                        ms.window_started_at, ms.window_ended_at, ms.methodology_version,
+                        ms.model_version, ms.question_version
+                 FROM market_signals ms
+                 JOIN assets a ON a.id = ms.asset_id
+                 WHERE ms.id = ?1",
+                params![signal_id],
+                |row| {
+                    Ok(MarketSignalSnapshot {
+                        id: row.get(0)?,
+                        asset: map_asset_offset(row, 1)?,
+                        signal_score: row.get(8)?,
+                        confidence: row.get(9)?,
+                        source_count: row.get::<_, i64>(10)? as usize,
+                        independent_source_count: row.get::<_, i64>(11)? as usize,
+                        evidence_count: row.get::<_, i64>(12)? as usize,
+                        hype_penalty: row.get(13)?,
+                        window_started_at: row.get(14)?,
+                        window_ended_at: row.get(15)?,
+                        methodology_version: row.get(16)?,
+                        model_version: row.get(17)?,
+                        question_version: row.get(18)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
     pub fn signal_evidence(
         &self,
         signal_id: &str,
@@ -1442,6 +1529,74 @@ impl Database {
         Ok(Some(report))
     }
 
+    pub fn backtest_history(
+        &self,
+        asset_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<BacktestReport>, DatabaseError> {
+        let connection = self.connection.lock();
+        let mut statement = connection.prepare(
+            "SELECT br.id, a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency,
+                    a.country_code, br.methodology_version, br.signal_methodology_version,
+                    br.model_version, br.question_version, br.signal_threshold,
+                    br.confidence_threshold, br.calibration_started_at, br.calibration_ended_at,
+                    br.evaluation_started_at, br.evaluation_ended_at, br.created_at,
+                    br.completed_at, br.status
+             FROM backtest_runs br
+             JOIN assets a ON a.id = br.asset_id
+             WHERE (?1 IS NULL OR br.asset_id = ?1)
+             ORDER BY br.created_at DESC
+             LIMIT ?2",
+        )?;
+        let mut reports = statement
+            .query_map(
+                params![asset_id, i64::try_from(limit).unwrap_or(100)],
+                map_backtest_report,
+            )?
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut result_statement = connection.prepare(
+            "SELECT horizon_days, sample_size, mean_return, median_return, positive_rate,
+                    baseline_positive_rate, confidence_interval_low, confidence_interval_high
+             FROM backtest_results WHERE run_id = ?1 ORDER BY horizon_days",
+        )?;
+        for report in &mut reports {
+            report.results = result_statement
+                .query_map(params![report.run_id], map_backtest_result)?
+                .collect::<Result<Vec<_>, _>>()?;
+        }
+        Ok(reports)
+    }
+
+    pub fn alert_history(&self, limit: usize) -> Result<Vec<AlertHistoryItem>, DatabaseError> {
+        let connection = self.connection.lock();
+        let mut statement = connection.prepare(
+            "SELECT ad.signal_id, ad.alert_level, ad.delivered_at,
+                    a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency,
+                    a.country_code, ms.signal_score, ms.confidence, ms.evidence_count,
+                    ms.independent_source_count
+             FROM alert_deliveries ad
+             JOIN market_signals ms ON ms.id = ad.signal_id
+             JOIN assets a ON a.id = ms.asset_id
+             ORDER BY ad.delivered_at DESC
+             LIMIT ?1",
+        )?;
+        statement
+            .query_map(params![i64::try_from(limit).unwrap_or(100)], |row| {
+                Ok(AlertHistoryItem {
+                    signal_id: row.get(0)?,
+                    alert_level: row.get(1)?,
+                    delivered_at: row.get(2)?,
+                    asset: map_asset_offset(row, 3)?,
+                    signal_score: row.get(10)?,
+                    confidence: row.get(11)?,
+                    evidence_count: row.get::<_, i64>(12)? as usize,
+                    independent_source_count: row.get::<_, i64>(13)? as usize,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(Into::into)
+    }
+
     pub fn pending_alert_candidates(
         &self,
         alert_level: u8,
@@ -1557,6 +1712,40 @@ fn map_asset_offset(row: &rusqlite::Row<'_>, offset: usize) -> Result<Asset, rus
         exchange: row.get(offset + 4)?,
         currency: row.get(offset + 5)?,
         country_code: row.get(offset + 6)?,
+    })
+}
+
+fn map_backtest_report(row: &rusqlite::Row<'_>) -> Result<BacktestReport, rusqlite::Error> {
+    Ok(BacktestReport {
+        run_id: row.get(0)?,
+        asset: map_asset_offset(row, 1)?,
+        methodology_version: row.get(8)?,
+        signal_methodology_version: row.get(9)?,
+        model_version: row.get(10)?,
+        question_version: row.get(11)?,
+        signal_threshold: row.get(12)?,
+        confidence_threshold: row.get(13)?,
+        calibration_started_at: row.get(14)?,
+        calibration_ended_at: row.get(15)?,
+        evaluation_started_at: row.get(16)?,
+        evaluation_ended_at: row.get(17)?,
+        created_at: row.get(18)?,
+        completed_at: row.get(19)?,
+        status: row.get(20)?,
+        results: Vec::new(),
+    })
+}
+
+fn map_backtest_result(row: &rusqlite::Row<'_>) -> Result<BacktestHorizonResult, rusqlite::Error> {
+    Ok(BacktestHorizonResult {
+        horizon_days: row.get(0)?,
+        sample_size: row.get::<_, i64>(1)? as usize,
+        mean_return: row.get(2)?,
+        median_return: row.get(3)?,
+        positive_rate: row.get(4)?,
+        baseline_positive_rate: row.get(5)?,
+        confidence_interval_low: row.get(6)?,
+        confidence_interval_high: row.get(7)?,
     })
 }
 
@@ -2044,6 +2233,14 @@ mod tests {
         database
             .mark_alert_delivered("signal:test", 2, "2026-11-02T00:02:00Z")
             .expect("alerta registrado");
+        let signal_report = database
+            .market_signal("signal:test")
+            .expect("sinal por id")
+            .expect("sinal existente");
+        assert_eq!(signal_report.asset.symbol, "PETR4");
+        let alert_history = database.alert_history(10).expect("histórico de alertas");
+        assert_eq!(alert_history.len(), 1);
+        assert_eq!(alert_history[0].alert_level, 2);
         assert!(
             database
                 .pending_alert_candidates(2, "2026-01-01T00:00:00Z")
@@ -2095,6 +2292,43 @@ mod tests {
             .expect("relatório existente");
         assert_eq!(backtest.results[0].sample_size, 4);
         assert_eq!(backtest.signal_threshold, 0.15);
+        let history = database
+            .backtest_history(Some("asset:b3:PETR4"), 10)
+            .expect("histórico de backtests");
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].results[0].horizon_days, 1);
+    }
+
+    #[test]
+    fn lists_collection_runs_with_their_isolated_source_results() {
+        use crate::domain::collection::SourceCollectionResult;
+
+        let directory = tempdir().expect("diretório temporário");
+        let database = Database::open(directory.path().join("operations.sqlite3")).expect("banco");
+        database
+            .start_collection_run("run:test", "manual", "2026-11-01T10:00:00Z")
+            .expect("inicia coleta");
+        database
+            .finish_collection_run(
+                "run:test",
+                "partial",
+                "2026-11-01T10:01:00Z",
+                7,
+                1,
+                &[SourceCollectionResult {
+                    source_id: "source:binance".to_owned(),
+                    status: "completed".to_owned(),
+                    stored_observation_count: 7,
+                    skipped_asset_count: 0,
+                    error_code: None,
+                }],
+            )
+            .expect("finaliza coleta");
+
+        let history = database.collection_history(10).expect("histórico");
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].status, "partial");
+        assert_eq!(history[0].sources[0].source_id, "source:binance");
     }
 
     #[test]

@@ -6,6 +6,7 @@ pub mod collection;
 pub mod content;
 pub mod desktop;
 pub mod events;
+pub mod insights;
 pub mod market;
 pub mod prediction;
 pub mod settings;
