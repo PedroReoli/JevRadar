@@ -1,3 +1,4 @@
+pub mod backtest;
 pub mod catalog;
 pub mod classification;
 pub mod collection;

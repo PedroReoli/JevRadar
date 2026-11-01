@@ -6,6 +6,9 @@ use rusqlite::{Connection, OptionalExtension, params};
 use thiserror::Error;
 
 use crate::domain::assets::{Asset, AssetClass, Watchlist, WatchlistAsset};
+use crate::domain::backtest::{
+    BacktestDataset, BacktestHorizonResult, BacktestPricePoint, BacktestReport, BacktestSignalPoint,
+};
 use crate::domain::classification::{
     AnalysisCandidateAsset, DocumentAnalysisResult, PendingDocumentAnalysis,
 };
@@ -22,6 +25,7 @@ const MARKET_CORE_SCHEMA: &str = include_str!("migrations/0003_market_core.sql")
 const COLLECTION_SCHEMA: &str = include_str!("migrations/0004_collection_runs.sql");
 const CONTENT_SOURCES_SCHEMA: &str = include_str!("migrations/0005_content_sources.sql");
 const DOCUMENT_ANALYSIS_SCHEMA: &str = include_str!("migrations/0006_document_analysis.sql");
+const BACKTEST_PARAMETERS_SCHEMA: &str = include_str!("migrations/0007_backtest_parameters.sql");
 
 pub struct Database {
     connection: Mutex<Connection>,
@@ -57,6 +61,7 @@ impl Database {
         apply_migration(&connection, 4, COLLECTION_SCHEMA)?;
         apply_migration(&connection, 5, CONTENT_SOURCES_SCHEMA)?;
         apply_migration(&connection, 6, DOCUMENT_ANALYSIS_SCHEMA)?;
+        apply_migration(&connection, 7, BACKTEST_PARAMETERS_SCHEMA)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -835,6 +840,200 @@ impl Database {
             .map_err(Into::into)
     }
 
+    pub fn backtest_dataset(&self, asset_id: &str) -> Result<BacktestDataset, DatabaseError> {
+        let connection = self.connection.lock();
+        let asset = connection
+            .query_row(
+                "SELECT id, symbol, name, asset_class, exchange, currency, country_code
+                 FROM assets WHERE id = ?1 AND active = 1",
+                params![asset_id],
+                map_asset,
+            )
+            .optional()?
+            .ok_or(DatabaseError::AssetNotFound)?;
+        let mut signal_statement = connection.prepare(
+            "SELECT window_ended_at, signal_score, confidence
+             FROM market_signals
+             WHERE asset_id = ?1
+             ORDER BY window_ended_at",
+        )?;
+        let signals = signal_statement
+            .query_map(params![asset_id], |row| {
+                Ok(BacktestSignalPoint {
+                    ended_at: row.get(0)?,
+                    signal_score: row.get(1)?,
+                    confidence: row.get(2)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut price_statement = connection.prepare(
+            "SELECT observed_at, close_value
+             FROM market_observations
+             WHERE asset_id = ?1 AND interval = '1d'
+             ORDER BY observed_at",
+        )?;
+        let prices = price_statement
+            .query_map(params![asset_id], |row| {
+                Ok(BacktestPricePoint {
+                    observed_at: row.get(0)?,
+                    close_value: row.get(1)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        let (model_version, question_version) = connection
+            .query_row(
+                "SELECT dc.model_version, dc.question_version
+                 FROM document_classifications dc
+                 JOIN document_assets da ON da.id = dc.document_asset_id
+                 WHERE da.asset_id = ?1
+                 ORDER BY dc.classified_at DESC
+                 LIMIT 1",
+                params![asset_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?
+            .unwrap_or_else(|| ("unavailable".to_owned(), "unavailable".to_owned()));
+        Ok(BacktestDataset {
+            asset,
+            signals,
+            prices,
+            model_version,
+            question_version,
+        })
+    }
+
+    pub fn store_backtest_report(&self, report: &BacktestReport) -> Result<(), DatabaseError> {
+        let mut connection = self.connection.lock();
+        let transaction = connection.transaction()?;
+        transaction.execute(
+            "INSERT INTO backtest_runs (
+                id, asset_id, methodology_version, model_version, question_version,
+                calibration_started_at, calibration_ended_at, evaluation_started_at,
+                evaluation_ended_at, created_at, completed_at, status,
+                signal_threshold, confidence_threshold
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+            params![
+                report.run_id,
+                report.asset.id,
+                report.methodology_version,
+                report.model_version,
+                report.question_version,
+                report.calibration_started_at,
+                report.calibration_ended_at,
+                report.evaluation_started_at,
+                report.evaluation_ended_at,
+                report.created_at,
+                report.completed_at,
+                report.status,
+                report.signal_threshold,
+                report.confidence_threshold,
+            ],
+        )?;
+        for result in &report.results {
+            transaction.execute(
+                "INSERT INTO backtest_results (
+                    run_id, horizon_days, sample_size, mean_return, median_return,
+                    positive_rate, baseline_positive_rate, confidence_interval_low,
+                    confidence_interval_high
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                params![
+                    report.run_id,
+                    result.horizon_days,
+                    result.sample_size as i64,
+                    result.mean_return,
+                    result.median_return,
+                    result.positive_rate,
+                    result.baseline_positive_rate,
+                    result.confidence_interval_low,
+                    result.confidence_interval_high,
+                ],
+            )?;
+        }
+        transaction.commit()?;
+        Ok(())
+    }
+
+    pub fn latest_backtest_report(
+        &self,
+        asset_id: &str,
+    ) -> Result<Option<BacktestReport>, DatabaseError> {
+        let connection = self.connection.lock();
+        let report = connection
+            .query_row(
+                "SELECT br.id, a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency,
+                        a.country_code, br.methodology_version, br.model_version,
+                        br.question_version, br.signal_threshold, br.confidence_threshold,
+                        br.calibration_started_at, br.calibration_ended_at,
+                        br.evaluation_started_at, br.evaluation_ended_at, br.created_at,
+                        br.completed_at, br.status
+                 FROM backtest_runs br
+                 JOIN assets a ON a.id = br.asset_id
+                 WHERE br.asset_id = ?1
+                 ORDER BY br.created_at DESC LIMIT 1",
+                params![asset_id],
+                |row| {
+                    Ok(BacktestReport {
+                        run_id: row.get(0)?,
+                        asset: Asset {
+                            id: row.get(1)?,
+                            symbol: row.get(2)?,
+                            name: row.get(3)?,
+                            asset_class: AssetClass::from_storage_value(
+                                row.get::<_, String>(4)?.as_str(),
+                            )
+                            .ok_or_else(|| {
+                                rusqlite::Error::InvalidColumnType(
+                                    4,
+                                    "asset_class".to_owned(),
+                                    rusqlite::types::Type::Text,
+                                )
+                            })?,
+                            exchange: row.get(5)?,
+                            currency: row.get(6)?,
+                            country_code: row.get(7)?,
+                        },
+                        methodology_version: row.get(8)?,
+                        model_version: row.get(9)?,
+                        question_version: row.get(10)?,
+                        signal_threshold: row.get(11)?,
+                        confidence_threshold: row.get(12)?,
+                        calibration_started_at: row.get(13)?,
+                        calibration_ended_at: row.get(14)?,
+                        evaluation_started_at: row.get(15)?,
+                        evaluation_ended_at: row.get(16)?,
+                        created_at: row.get(17)?,
+                        completed_at: row.get(18)?,
+                        status: row.get(19)?,
+                        results: Vec::new(),
+                    })
+                },
+            )
+            .optional()?;
+        let Some(mut report) = report else {
+            return Ok(None);
+        };
+        let mut result_statement = connection.prepare(
+            "SELECT horizon_days, sample_size, mean_return, median_return, positive_rate,
+                    baseline_positive_rate, confidence_interval_low, confidence_interval_high
+             FROM backtest_results WHERE run_id = ?1 ORDER BY horizon_days",
+        )?;
+        report.results = result_statement
+            .query_map(params![report.run_id], |row| {
+                Ok(BacktestHorizonResult {
+                    horizon_days: row.get(0)?,
+                    sample_size: row.get::<_, i64>(1)? as usize,
+                    mean_return: row.get(2)?,
+                    median_return: row.get(3)?,
+                    positive_rate: row.get(4)?,
+                    baseline_positive_rate: row.get(5)?,
+                    confidence_interval_low: row.get(6)?,
+                    confidence_interval_high: row.get(7)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Some(report))
+    }
+
     fn read_setting(&self, key: &str) -> Result<Option<String>, DatabaseError> {
         Ok(self
             .connection
@@ -1083,6 +1282,7 @@ mod tests {
 
     #[test]
     fn finds_candidates_and_persists_a_typed_document_analysis() {
+        use crate::domain::backtest::{BacktestHorizonResult, BacktestReport};
         use crate::domain::classification::DocumentAnalysisResult;
         use crate::domain::content::SourceDocumentInput;
         use crate::domain::signals::{CalculatedSignal, WeightedEvidence};
@@ -1178,5 +1378,50 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM signal_evidence", [], |row| row.get(0))
             .expect("contagem de contribuições");
         assert_eq!((signal_count, evidence_count), (1, 1));
+        drop(connection);
+
+        database
+            .store_backtest_report(&BacktestReport {
+                run_id: "backtest:test".to_owned(),
+                asset: pending[0]
+                    .candidates
+                    .first()
+                    .map(|_| {
+                        database
+                            .list_assets(Some("PETR4"), None)
+                            .expect("ativo")
+                            .remove(0)
+                    })
+                    .expect("candidato"),
+                methodology_version: "positive-turn-forward-return-v1".to_owned(),
+                model_version: "jev-latest".to_owned(),
+                question_version: "document-market-signal-v1".to_owned(),
+                signal_threshold: 0.15,
+                confidence_threshold: 0.6,
+                calibration_started_at: "2026-08-01T00:00:00Z".to_owned(),
+                calibration_ended_at: "2026-09-01T00:00:00Z".to_owned(),
+                evaluation_started_at: "2026-09-01T00:00:00Z".to_owned(),
+                evaluation_ended_at: "2026-11-01T00:00:00Z".to_owned(),
+                created_at: "2026-11-01T00:03:00Z".to_owned(),
+                completed_at: Some("2026-11-01T00:03:01Z".to_owned()),
+                status: "completed".to_owned(),
+                results: vec![BacktestHorizonResult {
+                    horizon_days: 1,
+                    sample_size: 4,
+                    mean_return: Some(0.01),
+                    median_return: Some(0.008),
+                    positive_rate: Some(0.75),
+                    baseline_positive_rate: Some(0.5),
+                    confidence_interval_low: Some(0.30),
+                    confidence_interval_high: Some(0.95),
+                }],
+            })
+            .expect("backtest persistido");
+        let backtest = database
+            .latest_backtest_report("asset:b3:PETR4")
+            .expect("consulta backtest")
+            .expect("relatório existente");
+        assert_eq!(backtest.results[0].sample_size, 4);
+        assert_eq!(backtest.signal_threshold, 0.15);
     }
 }

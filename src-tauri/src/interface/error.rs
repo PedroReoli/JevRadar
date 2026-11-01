@@ -101,3 +101,18 @@ impl From<ClassificationServiceError> for CommandError {
         }
     }
 }
+use crate::application::backtest_service::BacktestServiceError;
+
+impl From<BacktestServiceError> for CommandError {
+    fn from(error: BacktestServiceError) -> Self {
+        let code = match error {
+            BacktestServiceError::InvalidRequest(_) => "backtest_invalid_request",
+            BacktestServiceError::InsufficientHistory => "backtest_insufficient_history",
+            BacktestServiceError::Database(_) => "database_error",
+        };
+        Self {
+            code,
+            message: error.to_string(),
+        }
+    }
+}

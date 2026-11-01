@@ -10,6 +10,7 @@ use tracing_subscriber::EnvFilter;
 use crate::infrastructure::database::Database;
 use crate::infrastructure::desktop::{create_system_tray, register_main_window_lifecycle};
 use crate::infrastructure::secrets::KeyringSecretStore;
+use crate::interface::commands::backtest::{get_latest_backtest, run_backtest};
 use crate::interface::commands::catalog::{
     add_watchlist_asset, get_default_watchlist, list_assets, remove_watchlist_asset,
 };
@@ -57,7 +58,9 @@ pub fn run() {
             get_secret_status,
             save_secret,
             delete_secret,
-            resolve_close_request
+            resolve_close_request,
+            run_backtest,
+            get_latest_backtest
         ])
         .run(tauri::generate_context!())
         .expect("falha ao executar o JevRadar");
