@@ -24,7 +24,7 @@ use crate::interface::commands::content::{
     set_content_source_enabled,
 };
 use crate::interface::commands::coverage::list_coverage_gaps;
-use crate::interface::commands::data::{export_local_data, purge_local_data};
+use crate::interface::commands::data::{export_local_data, export_market_report, purge_local_data};
 use crate::interface::commands::desktop::{resolve_close_request, send_test_notification};
 use crate::interface::commands::insights::{
     get_jev_usage, get_signal_report, list_alert_history, list_backtest_history,
@@ -107,6 +107,7 @@ pub fn run() {
             resolve_close_request,
             send_test_notification,
             export_local_data,
+            export_market_report,
             purge_local_data,
             run_backtest,
             get_latest_backtest

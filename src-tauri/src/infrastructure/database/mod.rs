@@ -2081,6 +2081,16 @@ impl Database {
         Ok(reports)
     }
 
+    pub fn backtest_report_count(&self) -> Result<u64, DatabaseError> {
+        let count =
+            self.connection
+                .lock()
+                .query_row("SELECT COUNT(*) FROM backtest_runs", [], |row| {
+                    row.get::<_, i64>(0)
+                })?;
+        Ok(u64::try_from(count).unwrap_or(0))
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn historical_pattern_page(
         &self,

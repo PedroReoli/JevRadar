@@ -2,6 +2,8 @@ use chrono::Utc;
 use tauri::{Manager, State};
 
 use crate::application::data_management_service::DataManagementService;
+use crate::application::report_export_service::ReportExportService;
+use crate::domain::report::{ExportMarketReportRequest, MarketReportExport};
 use crate::interface::error::CommandError;
 use crate::state::AppState;
 
@@ -23,4 +25,15 @@ pub fn export_local_data(
 #[tauri::command]
 pub fn purge_local_data(state: State<'_, AppState>) -> Result<(), CommandError> {
     DataManagementService::purge(&state.database).map_err(CommandError::internal)
+}
+
+#[tauri::command]
+pub fn export_market_report(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    request: ExportMarketReportRequest,
+) -> Result<MarketReportExport, CommandError> {
+    let export_directory = app.path().download_dir().map_err(CommandError::internal)?;
+    ReportExportService::export(&state.database, &export_directory, request)
+        .map_err(CommandError::from)
 }

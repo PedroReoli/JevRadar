@@ -106,6 +106,8 @@ A central de padrões históricos usa apenas o último backtest concluído de ca
 
 Telemetria externa fica desligada por padrão. Métricas operacionais são locais. Crash reporting poderá ser adicionado depois como opt-in separado. O usuário pode exportar e apagar dados locais.
 
+Relatórios de mercado são exportados localmente em duas representações do mesmo recorte: Markdown legível e JSON versionado. O contrato registra período, confiança mínima, totais, truncamento e versões; não exporta segredos, texto bruto nem linguagem de recomendação.
+
 ## Licença
 
 O repositório público usa Apache License 2.0. O motor privado não é coberto por essa licença.

@@ -10,6 +10,7 @@ pub mod historical_pattern_query_service;
 pub mod insights_query_service;
 pub mod market_collection_service;
 pub mod market_query_service;
+pub mod report_export_service;
 pub mod settings_service;
 pub mod signal_service;
 pub mod system_status_service;

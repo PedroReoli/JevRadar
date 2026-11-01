@@ -29,7 +29,7 @@ Transformar o alpha técnico em um produto navegável e explicável sem alterar 
 - Histórico paginado de execuções por ativo e versão.
 - Comparação de resultados em 1, 7 e 30 dias sem misturar contratos de sinal.
 - Central de padrões históricos com o último resultado comparável por ativo, filtros de amostra e diferença para o baseline.
-- Central de relatórios com exportação local, inventário das versões e atalhos para sinais e backtests.
+- Central de relatórios com exportação local em Markdown e JSON versionado, inventário das versões e atalhos para sinais e backtests.
 
 ### 4. Operação e fontes
 

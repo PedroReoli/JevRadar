@@ -33,6 +33,11 @@ impl MarketQueryService {
         }
         signals.retain(|item| item.confidence >= filter.minimum_confidence);
         let cutoff = Utc::now() - Duration::hours(i64::from(filter.period_hours));
+        signals.retain(|item| {
+            chrono::DateTime::parse_from_rfc3339(&item.window_ended_at)
+                .map(|time| time.with_timezone(&Utc) >= cutoff)
+                .unwrap_or(false)
+        });
         events.retain(|item| {
             item.confidence >= filter.minimum_confidence
                 && chrono::DateTime::parse_from_rfc3339(&item.started_at)
@@ -74,6 +79,31 @@ impl MarketQueryService {
         page: u32,
         page_size: u32,
     ) -> Result<MarketEventPage, MarketEventQueryError> {
+        Self::events_for_period(
+            database,
+            720,
+            event_type,
+            country_code,
+            asset_id,
+            relation_type,
+            minimum_confidence,
+            page,
+            page_size,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn events_for_period(
+        database: &Database,
+        period_hours: u16,
+        event_type: Option<String>,
+        country_code: Option<String>,
+        asset_id: Option<String>,
+        relation_type: Option<String>,
+        minimum_confidence: f64,
+        page: u32,
+        page_size: u32,
+    ) -> Result<MarketEventPage, MarketEventQueryError> {
         validate_optional_filter(
             event_type.as_deref(),
             &[
@@ -91,7 +121,10 @@ impl MarketQueryService {
             relation_type.as_deref(),
             &["known", "correlation", "hypothesis", "unproven_causality"],
         )?;
-        if !minimum_confidence.is_finite() || !(0.0..=1.0).contains(&minimum_confidence) {
+        if !(1..=720).contains(&period_hours)
+            || !minimum_confidence.is_finite()
+            || !(0.0..=1.0).contains(&minimum_confidence)
+        {
             return Err(MarketEventQueryError::InvalidFilter);
         }
         if country_code.as_ref().is_some_and(|value| {
@@ -113,7 +146,7 @@ impl MarketQueryService {
             .checked_sub(1)
             .and_then(|value| value.checked_mul(page_size))
             .ok_or(MarketEventQueryError::InvalidPagination)?;
-        let started_after = (Utc::now() - Duration::hours(720)).to_rfc3339();
+        let started_after = (Utc::now() - Duration::hours(i64::from(period_hours))).to_rfc3339();
         let (items, total_items) = database.list_market_event_page(
             event_type.as_deref(),
             country_code.as_deref(),
@@ -241,6 +274,14 @@ mod tests {
         assert!(matches!(
             invalid_page,
             MarketEventQueryError::InvalidPagination
+        ));
+
+        let invalid_period =
+            MarketQueryService::events_for_period(&database, 0, None, None, None, None, 0.0, 1, 25)
+                .expect_err("período vazio deve falhar");
+        assert!(matches!(
+            invalid_period,
+            MarketEventQueryError::InvalidFilter
         ));
     }
 

@@ -5,6 +5,8 @@ use crate::application::classification_service::ClassificationServiceError;
 use crate::application::content_collection_service::ContentCollectionServiceError;
 use crate::application::content_query_service::ContentSourceManagementError;
 use crate::application::market_collection_service::MarketCollectionServiceError;
+use crate::application::market_query_service::MarketEventQueryError;
+use crate::application::report_export_service::ReportExportError;
 use crate::application::settings_service::SettingsServiceError;
 use crate::infrastructure::database::DatabaseError;
 use crate::infrastructure::secrets::SecretStoreError;
@@ -120,6 +122,23 @@ impl From<ClassificationServiceError> for CommandError {
                 code: "database_error",
                 message: error.to_string(),
             },
+        }
+    }
+}
+
+impl From<ReportExportError> for CommandError {
+    fn from(error: ReportExportError) -> Self {
+        let code = match &error {
+            ReportExportError::InvalidRequest(_) => "validation_error",
+            ReportExportError::Database(_)
+            | ReportExportError::Query(MarketEventQueryError::Database(_)) => "database_error",
+            ReportExportError::Query(_) => "validation_error",
+            ReportExportError::Io(_) => "report_write_error",
+            ReportExportError::Serialization(_) => "report_serialization_error",
+        };
+        Self {
+            code,
+            message: error.to_string(),
         }
     }
 }

@@ -10,6 +10,7 @@ pub mod events;
 pub mod insights;
 pub mod market;
 pub mod prediction;
+pub mod report;
 pub mod settings;
 pub mod signals;
 pub mod system_status;
