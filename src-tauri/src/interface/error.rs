@@ -103,6 +103,7 @@ impl From<ContentSourceManagementError> for CommandError {
             ContentSourceManagementError::InvalidName
             | ContentSourceManagementError::InvalidUrl
             | ContentSourceManagementError::InvalidSourceKind
+            | ContentSourceManagementError::InvalidSourceId
             | ContentSourceManagementError::InvalidFeedQuery
             | ContentSourceManagementError::InvalidFeedFilter
             | ContentSourceManagementError::InvalidFeedPagination => "validation_error",

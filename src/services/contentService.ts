@@ -2,7 +2,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { z } from "zod";
 
 import { assetSchema } from "@/services/contractSchemas";
-import type { ContentCollectionSummary, ContentOverview, CustomFeedKind, DocumentFeedFilter, DocumentFeedPage } from "@/types/content";
+import type { ContentCollectionSummary, ContentOverview, ContentSourceDetail, CustomFeedKind, DocumentFeedFilter, DocumentFeedPage } from "@/types/content";
 
 const runStatusSchema = z.enum(["completed", "failed", "skipped"]);
 const sourceSchema = z.object({
@@ -22,6 +22,7 @@ const overviewSchema = z.object({
   totalDocumentCount: z.number().int().nonnegative(),
   unclassifiedDocumentCount: z.number().int().nonnegative(),
 });
+const sourceIdSchema = z.string().min(8).max(120).regex(/^source:[A-Za-z0-9:+_.-]+$/);
 const collectionSummarySchema = z.object({
   storedDocumentCount: z.number().int().nonnegative(),
   sourceErrorCount: z.number().int().nonnegative(),
@@ -69,6 +70,13 @@ export async function getContentOverview(): Promise<ContentOverview> {
   requireDesktopRuntime();
   const response: unknown = await invoke("get_content_overview");
   return overviewSchema.parse(response);
+}
+
+export async function getContentSourceDetail(sourceId: string): Promise<ContentSourceDetail | null> {
+  requireDesktopRuntime();
+  const validatedSourceId = sourceIdSchema.parse(sourceId);
+  const response: unknown = await invoke("get_content_source_detail", { sourceId: validatedSourceId });
+  return sourceSchema.nullable().parse(response);
 }
 
 export async function refreshContentSources(): Promise<ContentCollectionSummary> {

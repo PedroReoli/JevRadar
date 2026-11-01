@@ -23,6 +23,8 @@ export interface ContentOverview {
   unclassifiedDocumentCount: number;
 }
 
+export type ContentSourceDetail = ContentSourceStatus;
+
 export interface ContentCollectionSummary {
   storedDocumentCount: number;
   sourceErrorCount: number;

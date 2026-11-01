@@ -11,6 +11,8 @@ pub enum ContentSourceManagementError {
     InvalidUrl,
     #[error("tipo de fonte personalizada inválido")]
     InvalidSourceKind,
+    #[error("identificador da fonte inválido")]
+    InvalidSourceId,
     #[error("consulta do feed inválida")]
     InvalidFeedQuery,
     #[error("filtro do feed inválido")]
@@ -26,6 +28,19 @@ pub struct ContentQueryService;
 impl ContentQueryService {
     pub fn overview(database: &Database) -> Result<ContentOverview, DatabaseError> {
         database.content_overview()
+    }
+
+    pub fn source_detail(
+        database: &Database,
+        source_id: &str,
+    ) -> Result<Option<crate::domain::content::ContentSourceStatus>, ContentSourceManagementError>
+    {
+        if !valid_source_id(source_id) {
+            return Err(ContentSourceManagementError::InvalidSourceId);
+        }
+        database
+            .content_source_detail(source_id)
+            .map_err(Into::into)
     }
 
     pub fn set_source_enabled(
@@ -144,6 +159,14 @@ fn validate_optional_filter(
         return Err(ContentSourceManagementError::InvalidFeedFilter);
     }
     Ok(())
+}
+
+fn valid_source_id(value: &str) -> bool {
+    value.starts_with("source:")
+        && value.len() <= 120
+        && value
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || ":+-_.".contains(character))
 }
 
 #[cfg(test)]
@@ -318,6 +341,28 @@ mod tests {
         assert!(matches!(
             invalid,
             ContentSourceManagementError::InvalidSourceKind
+        ));
+    }
+
+    #[test]
+    fn returns_one_source_without_loading_the_full_overview() {
+        let database = database();
+        let source =
+            ContentQueryService::source_detail(&database, "source:rss:agencia-brasil-economia")
+                .expect("consulta válida")
+                .expect("fonte inicial existente");
+        assert_eq!(source.source_kind, "rss");
+        assert_eq!(source.document_count, 0);
+
+        let missing = ContentQueryService::source_detail(&database, "source:rss:inexistente")
+            .expect("ausência não é falha");
+        assert!(missing.is_none());
+
+        let invalid = ContentQueryService::source_detail(&database, "source:<script>")
+            .expect_err("identificador inseguro deve falhar");
+        assert!(matches!(
+            invalid,
+            ContentSourceManagementError::InvalidSourceId
         ));
     }
 }

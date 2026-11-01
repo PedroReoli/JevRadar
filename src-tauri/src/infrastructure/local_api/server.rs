@@ -237,6 +237,7 @@ impl From<SignalEvidenceSnapshot> for SignalEvidenceResponse {
         asset_comparison,
         signal_explorer,
         content_overview,
+        content_source_detail,
         document_feed,
         market_events,
         market_relations,
@@ -291,6 +292,7 @@ pub async fn serve(
         .route("/v1/comparison", get(asset_comparison))
         .route("/v1/signal-explorer", get(signal_explorer))
         .route("/v1/sources", get(content_overview))
+        .route("/v1/sources/{source_id}", get(content_source_detail))
         .route("/v1/documents", get(document_feed))
         .route("/v1/events", get(market_events))
         .route("/v1/relations", get(market_relations))
@@ -463,6 +465,31 @@ async fn content_overview(
     serde_json::to_value(overview)
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/sources/{source_id}",
+    params(("source_id" = String, Path, description = "Identificador local da fonte")),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Detalhe e contagem local da fonte", body = Object),
+        (status = 400, description = "Identificador inválido"),
+        (status = 401, description = "Token local ausente ou inválido"),
+        (status = 404, description = "Fonte não encontrada"),
+        (status = 500, description = "Falha ao consultar o banco local")
+    )
+)]
+async fn content_source_detail(
+    State(state): State<ApiState>,
+    Path(source_id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    authorize(&headers, &state.token)?;
+    let source = ContentQueryService::source_detail(&state.database, &source_id)
+        .map_err(content_query_status)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+    serialize_json(source)
 }
 
 #[utoipa::path(
@@ -1088,9 +1115,10 @@ mod tests {
 
     use super::{
         ApiDoc, asset_detail_query_status, authorize, bounded_limit, comparison_query_status,
-        valid_signal_id,
+        content_query_status, valid_signal_id,
     };
     use crate::application::comparison_query_service::ComparisonQueryError;
+    use crate::application::content_query_service::ContentSourceManagementError;
     use crate::application::market_query_service::AssetDetailQueryError;
     use crate::infrastructure::database::DatabaseError;
 
@@ -1130,6 +1158,7 @@ mod tests {
             "/v1/assets/{asset_id}/overview",
             "/v1/comparison",
             "/v1/signal-explorer",
+            "/v1/sources/{source_id}",
             "/v1/signals/{signal_id}",
             "/v1/documents",
             "/v1/events",
@@ -1180,6 +1209,20 @@ mod tests {
             comparison_query_status(ComparisonQueryError::Database(DatabaseError::Sqlite(
                 rusqlite::Error::InvalidQuery,
             ))),
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    #[test]
+    fn maps_source_detail_input_and_database_failures_without_leaking_details() {
+        assert_eq!(
+            content_query_status(ContentSourceManagementError::InvalidSourceId),
+            axum::http::StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            content_query_status(ContentSourceManagementError::Database(
+                DatabaseError::Sqlite(rusqlite::Error::InvalidQuery),
+            )),
             axum::http::StatusCode::INTERNAL_SERVER_ERROR
         );
     }

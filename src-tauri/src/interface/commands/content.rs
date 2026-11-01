@@ -2,7 +2,9 @@ use tauri::State;
 
 use crate::application::content_collection_service::ContentCollectionService;
 use crate::application::content_query_service::ContentQueryService;
-use crate::domain::content::{ContentCollectionSummary, ContentOverview, DocumentFeedPage};
+use crate::domain::content::{
+    ContentCollectionSummary, ContentOverview, ContentSourceStatus, DocumentFeedPage,
+};
 use crate::interface::error::CommandError;
 use crate::state::AppState;
 
@@ -23,6 +25,14 @@ pub async fn refresh_content_sources(
 #[tauri::command]
 pub fn get_content_overview(state: State<'_, AppState>) -> Result<ContentOverview, CommandError> {
     ContentQueryService::overview(&state.database).map_err(CommandError::internal)
+}
+
+#[tauri::command]
+pub fn get_content_source_detail(
+    state: State<'_, AppState>,
+    source_id: String,
+) -> Result<Option<ContentSourceStatus>, CommandError> {
+    ContentQueryService::source_detail(&state.database, &source_id).map_err(Into::into)
 }
 
 #[tauri::command]

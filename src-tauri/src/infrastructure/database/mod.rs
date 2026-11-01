@@ -1172,6 +1172,43 @@ impl Database {
         })
     }
 
+    pub fn content_source_detail(
+        &self,
+        source_id: &str,
+    ) -> Result<Option<ContentSourceStatus>, DatabaseError> {
+        let connection = self.connection.lock();
+        connection
+            .query_row(
+                "SELECT s.id, s.name, s.source_kind, s.collection_method, s.enabled,
+                        CASE WHEN s.id LIKE 'source:custom:%' THEN 1 ELSE 0 END,
+                        COUNT(sd.id) AS document_count,
+                        scs.status, scs.last_collected_at, scs.error_code
+                 FROM sources s
+                 LEFT JOIN source_documents sd ON sd.source_id = s.id
+                 LEFT JOIN source_collection_state scs ON scs.source_id = s.id
+                 WHERE s.id = ?1
+                   AND s.source_kind IN ('rss', 'reddit', 'forum', 'x')
+                 GROUP BY s.id",
+                params![source_id],
+                |row| {
+                    Ok(ContentSourceStatus {
+                        id: row.get(0)?,
+                        name: row.get(1)?,
+                        source_kind: row.get(2)?,
+                        collection_method: row.get(3)?,
+                        enabled: row.get(4)?,
+                        user_managed: row.get(5)?,
+                        document_count: row.get::<_, i64>(6)? as usize,
+                        status: row.get(7)?,
+                        last_collected_at: row.get(8)?,
+                        error_code: row.get(9)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn list_document_feed_page(
         &self,

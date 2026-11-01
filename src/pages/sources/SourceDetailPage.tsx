@@ -3,28 +3,28 @@ import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 
 import { PageState } from "@/components/product/PageState";
-import { useContentOverview, useRefreshContentSources } from "@/features/sources/hooks/useContentSources";
+import { useContentSourceDetail, useRefreshContentSources } from "@/features/sources/hooks/useContentSources";
 import styles from "@/styles/ProductPage.module.css";
 
 export function SourceDetailPage() {
   const { i18n, t } = useTranslation();
-  const { sourceId } = useParams();
-  const overviewQuery = useContentOverview();
+  const { sourceId = "" } = useParams();
+  const sourceQuery = useContentSourceDetail(sourceId);
   const refreshMutation = useRefreshContentSources();
-  const source = overviewQuery.data?.sources.find((item) => item.id === sourceId);
+  const source = sourceQuery.data;
   const date = new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium", timeStyle: "short" });
 
-  if (overviewQuery.isPending) {
+  if (sourceQuery.isPending) {
     return <main className={styles.page}><PageState kind="loading" message={t("product.loading")} /></main>;
   }
-  if (overviewQuery.isError) {
+  if (sourceQuery.isError) {
     return (
       <main className={styles.page}>
         <PageState
           actionLabel={t("product.retry")}
           kind="error"
           message={t("product.loadError")}
-          onAction={() => void overviewQuery.refetch()}
+          onAction={() => void sourceQuery.refetch()}
         />
       </main>
     );

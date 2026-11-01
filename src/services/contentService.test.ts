@@ -11,6 +11,7 @@ import {
   addFeedSource,
   addRssSource,
   getContentOverview,
+  getContentSourceDetail,
   listDocumentFeed,
   refreshContentSources,
   setContentSourceEnabled,
@@ -39,6 +40,29 @@ describe("contentService", () => {
     const overview = await getContentOverview();
     expect(overview.sources[0]!.status).toBe("skipped");
     expect(invoke).toHaveBeenCalledWith("get_content_overview");
+  });
+
+  it("consulta e valida somente a fonte solicitada", async () => {
+    invoke.mockResolvedValueOnce({
+      id: "source:reddit",
+      name: "Reddit",
+      sourceKind: "reddit",
+      collectionMethod: "official_api",
+      enabled: true,
+      userManaged: false,
+      documentCount: 12,
+      status: "completed",
+      lastCollectedAt: "2026-11-01T12:00:00Z",
+      errorCode: null,
+    });
+
+    expect((await getContentSourceDetail("source:reddit"))?.documentCount).toBe(12);
+    expect(invoke).toHaveBeenCalledWith("get_content_source_detail", { sourceId: "source:reddit" });
+  });
+
+  it("rejeita identificador inseguro antes de chamar o core", async () => {
+    await expect(getContentSourceDetail("source:<script>")).rejects.toThrow();
+    expect(invoke).not.toHaveBeenCalled();
   });
 
   it("valida o resultado da coleta manual", async () => {

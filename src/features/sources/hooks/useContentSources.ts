@@ -1,14 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { addFeedSource, getContentOverview, refreshContentSources, setContentSourceEnabled } from "@/services/contentService";
+import { addFeedSource, getContentOverview, getContentSourceDetail, refreshContentSources, setContentSourceEnabled } from "@/services/contentService";
 import type { CustomFeedKind } from "@/types/content";
 
 const contentOverviewKey = ["content-overview"] as const;
+const contentSourceDetailKey = (sourceId: string) => ["content-source-detail", sourceId] as const;
 
 export function useContentOverview() {
   return useQuery({
     queryKey: contentOverviewKey,
     queryFn: getContentOverview,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useContentSourceDetail(sourceId: string) {
+  return useQuery({
+    queryKey: contentSourceDetailKey(sourceId),
+    queryFn: () => getContentSourceDetail(sourceId),
+    enabled: sourceId.length > 0,
     refetchInterval: 60_000,
   });
 }
@@ -37,7 +47,10 @@ export function useRefreshContentSources() {
   return useMutation({
     mutationFn: refreshContentSources,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: contentOverviewKey });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: contentOverviewKey }),
+        queryClient.invalidateQueries({ queryKey: ["content-source-detail"] }),
+      ]);
     },
   });
 }
