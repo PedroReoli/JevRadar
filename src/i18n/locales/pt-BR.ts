@@ -2,6 +2,7 @@ export const ptBR = {
   app: {
     name: "JevRadar",
     tagline: "Sentimento, contexto e evidência",
+    loadingView: "Carregando módulo…",
   },
   bootstrap: {
     loading: "Preparando sua instalação local…",

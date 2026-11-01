@@ -2,6 +2,7 @@ export const en = {
   app: {
     name: "JevRadar",
     tagline: "Sentiment, context, and evidence",
+    loadingView: "Loading module…",
   },
   bootstrap: {
     loading: "Preparing your local installation…",
