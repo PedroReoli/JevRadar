@@ -1,4 +1,4 @@
-import { Activity, Bell, ChartNoAxesCombined, FileBarChart, Files, Globe2, ListFilter, Newspaper, Radar, RadioTower, Settings } from "lucide-react";
+import { Activity, Bell, ChartNoAxesCombined, FileBarChart, Files, Globe2, ListFilter, Newspaper, Radar, RadioTower, ScanSearch, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 
@@ -8,6 +8,7 @@ const navigation = [
   { to: "/dashboard", labelKey: "navigation.dashboard", icon: Radar },
   { to: "/signals", labelKey: "navigation.signals", icon: RadioTower },
   { to: "/feed", labelKey: "navigation.feed", icon: Files },
+  { to: "/coverage-gaps", labelKey: "navigation.coverage", icon: ScanSearch },
   { to: "/alerts", labelKey: "navigation.alerts", icon: Bell },
   { to: "/events", labelKey: "navigation.events", icon: Globe2 },
   { to: "/backtest", labelKey: "navigation.backtest", icon: ChartNoAxesCombined },

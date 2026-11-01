@@ -19,6 +19,7 @@ use crate::domain::content::{
     ContentOverview, ContentSource, ContentSourceResult, ContentSourceStatus, DocumentFeedItem,
     SourceDocumentInput,
 };
+use crate::domain::coverage::CoverageGapItem;
 use crate::domain::events::MarketEventSnapshot;
 use crate::domain::insights::{AlertHistoryItem, CollectionRunSnapshot};
 use crate::domain::market::{LatestCollectionRun, MarketSeries, MarketSeriesPoint, MarketSnapshot};
@@ -495,6 +496,105 @@ impl Database {
             })?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(snapshots)
+    }
+
+    pub fn list_coverage_gap_page(
+        &self,
+        cutoff: &str,
+        asset_class: Option<&str>,
+        minimum_movement_percent: f64,
+        maximum_evidence_count: u8,
+        limit: u32,
+        offset: u32,
+    ) -> Result<(Vec<CoverageGapItem>, u64), DatabaseError> {
+        let connection = self.connection.lock();
+        let common_table_expressions = "WITH ranked_observations AS (
+                 SELECT mo.*,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY mo.asset_id
+                            ORDER BY mo.observed_at DESC, mo.collected_at DESC
+                        ) AS position
+                 FROM market_observations mo
+                 JOIN watchlist_assets ranked_wa ON ranked_wa.asset_id = mo.asset_id
+                 JOIN watchlists ranked_w ON ranked_w.id = ranked_wa.watchlist_id
+                    AND ranked_w.is_default = 1
+                 WHERE ranked_wa.enabled = 1
+             ), recent_evidence AS (
+                 SELECT da.asset_id,
+                        COUNT(DISTINCT dc.id) AS evidence_count,
+                        COUNT(DISTINCT sd.source_id) AS source_count,
+                        MAX(dc.classified_at) AS last_evidence_at
+                 FROM document_classifications dc
+                 JOIN document_assets da ON da.id = dc.document_asset_id
+                 JOIN source_documents sd ON sd.id = da.document_id
+                 WHERE dc.classified_at >= ?1 AND sd.duplicate_of_id IS NULL
+                 GROUP BY da.asset_id
+             )";
+        let joins = "FROM watchlist_assets wa
+             JOIN watchlists w ON w.id = wa.watchlist_id AND w.is_default = 1
+             JOIN assets a ON a.id = wa.asset_id
+             JOIN ranked_observations latest ON latest.asset_id = a.id AND latest.position = 1
+             JOIN ranked_observations previous ON previous.asset_id = a.id AND previous.position = 2
+             JOIN sources source ON source.id = latest.source_id
+             LEFT JOIN recent_evidence evidence ON evidence.asset_id = a.id";
+        let filters = "wa.enabled = 1
+             AND (?2 IS NULL OR a.asset_class = ?2)
+             AND previous.close_value != 0
+             AND ABS(((latest.close_value / previous.close_value) - 1.0) * 100.0) >= ?3
+             AND COALESCE(evidence.evidence_count, 0) <= ?4";
+        let count_sql =
+            format!("{common_table_expressions} SELECT COUNT(*) {joins} WHERE {filters}");
+        let total_items = connection.query_row(
+            &count_sql,
+            params![
+                cutoff,
+                asset_class,
+                minimum_movement_percent,
+                maximum_evidence_count,
+            ],
+            |row| row.get::<_, i64>(0),
+        )? as u64;
+        let query_sql = format!(
+            "{common_table_expressions}
+             SELECT a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency,
+                    a.country_code, latest.close_value, previous.close_value,
+                    ((latest.close_value / previous.close_value) - 1.0) * 100.0,
+                    latest.observed_at, source.name,
+                    COALESCE(evidence.evidence_count, 0),
+                    COALESCE(evidence.source_count, 0), evidence.last_evidence_at
+             {joins}
+             WHERE {filters}
+             ORDER BY ABS(((latest.close_value / previous.close_value) - 1.0) * 100.0) DESC,
+                      a.symbol
+             LIMIT ?5 OFFSET ?6"
+        );
+        let mut statement = connection.prepare(&query_sql)?;
+        let items = statement
+            .query_map(
+                params![
+                    cutoff,
+                    asset_class,
+                    minimum_movement_percent,
+                    maximum_evidence_count,
+                    limit,
+                    offset,
+                ],
+                |row| {
+                    Ok(CoverageGapItem {
+                        asset: map_asset(row)?,
+                        close_value: row.get(7)?,
+                        previous_close_value: row.get(8)?,
+                        change_percent: row.get(9)?,
+                        observed_at: row.get(10)?,
+                        market_source_name: row.get(11)?,
+                        evidence_count: row.get::<_, i64>(12)? as u64,
+                        independent_source_count: row.get::<_, i64>(13)? as u64,
+                        last_evidence_at: row.get(14)?,
+                    })
+                },
+            )?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok((items, total_items))
     }
 
     pub fn latest_collection_run(&self) -> Result<Option<LatestCollectionRun>, DatabaseError> {

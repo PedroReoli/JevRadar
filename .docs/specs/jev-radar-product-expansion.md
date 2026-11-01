@@ -65,6 +65,7 @@ Rotas reproduzíveis:
 
 - `/signals?period=&direction=&asset=&confidence=`
 - `/feed?q=&source=&type=&sentiment=&status=&confidence=&page=`
+- `/coverage-gaps?period=&class=&movement=&evidence=&page=`
 - `/assets/:assetId`
 - `/signals/:signalId`
 - `/alerts?level=&asset=`

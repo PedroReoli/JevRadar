@@ -17,8 +17,10 @@ use crate::application::backtest_service::BacktestService;
 use crate::application::content_query_service::{
     ContentQueryService, ContentSourceManagementError,
 };
+use crate::application::coverage_query_service::{CoverageGapQueryError, CoverageQueryService};
 use crate::application::insights_query_service::InsightsQueryService;
 use crate::application::market_query_service::{MarketEventQueryError, MarketQueryService};
+use crate::domain::assets::AssetClass;
 use crate::domain::market::MarketOverviewFilter;
 use crate::domain::signals::SignalEvidenceSnapshot;
 use crate::infrastructure::database::Database;
@@ -72,6 +74,17 @@ struct MarketEventQuery {
     asset_id: Option<String>,
     relation_type: Option<String>,
     minimum_confidence: Option<f64>,
+    page: Option<u32>,
+    page_size: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CoverageGapQuery {
+    period_hours: Option<u16>,
+    asset_class: Option<String>,
+    minimum_movement_percent: Option<f64>,
+    maximum_evidence_count: Option<u8>,
     page: Option<u32>,
     page_size: Option<u32>,
 }
@@ -144,6 +157,7 @@ impl From<SignalEvidenceSnapshot> for SignalEvidenceResponse {
         content_overview,
         document_feed,
         market_events,
+        coverage_gaps,
         signal_report,
         signal_evidence,
         alert_history,
@@ -187,6 +201,7 @@ pub async fn serve(
         .route("/v1/sources", get(content_overview))
         .route("/v1/documents", get(document_feed))
         .route("/v1/events", get(market_events))
+        .route("/v1/coverage-gaps", get(coverage_gaps))
         .route("/v1/signals/{signal_id}", get(signal_report))
         .route("/v1/signals/{signal_id}/evidence", get(signal_evidence))
         .route("/v1/alerts", get(alert_history))
@@ -330,6 +345,49 @@ async fn market_events(
         query.page_size.unwrap_or(25),
     )
     .map_err(event_query_status)?;
+    serialize_json(page)
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/coverage-gaps",
+    params(
+        ("periodHours" = Option<u16>, Query, description = "1 a 720; padrão 24"),
+        ("assetClass" = Option<String>, Query, description = "b3Equity, b3Fund, crypto ou macro"),
+        ("minimumMovementPercent" = Option<f64>, Query, description = "0.5 a 25; padrão 2"),
+        ("maximumEvidenceCount" = Option<u8>, Query, description = "0 a 10; padrão 0"),
+        ("page" = Option<u32>, Query, description = "Página a partir de 1"),
+        ("pageSize" = Option<u32>, Query, description = "1 a 50; padrão 25")
+    ),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Movimentos com baixa cobertura editorial", body = Object),
+        (status = 400, description = "Filtro ou paginação inválidos"),
+        (status = 401, description = "Token local ausente ou inválido"),
+        (status = 500, description = "Falha ao consultar o banco local")
+    )
+)]
+async fn coverage_gaps(
+    State(state): State<ApiState>,
+    Query(query): Query<CoverageGapQuery>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    authorize(&headers, &state.token)?;
+    let asset_class = query
+        .asset_class
+        .as_deref()
+        .map(parse_asset_class)
+        .transpose()?;
+    let page = CoverageQueryService::gaps(
+        &state.database,
+        query.period_hours.unwrap_or(24),
+        asset_class,
+        query.minimum_movement_percent.unwrap_or(2.0),
+        query.maximum_evidence_count.unwrap_or(0),
+        query.page.unwrap_or(1),
+        query.page_size.unwrap_or(25),
+    )
+    .map_err(coverage_query_status)?;
     serialize_json(page)
 }
 
@@ -510,6 +568,23 @@ fn event_query_status(error: MarketEventQueryError) -> StatusCode {
     }
 }
 
+fn coverage_query_status(error: CoverageGapQueryError) -> StatusCode {
+    match error {
+        CoverageGapQueryError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        _ => StatusCode::BAD_REQUEST,
+    }
+}
+
+fn parse_asset_class(value: &str) -> Result<AssetClass, StatusCode> {
+    match value {
+        "b3Equity" => Ok(AssetClass::B3Equity),
+        "b3Fund" => Ok(AssetClass::B3Fund),
+        "crypto" => Ok(AssetClass::Crypto),
+        "macro" => Ok(AssetClass::Macro),
+        _ => Err(StatusCode::BAD_REQUEST),
+    }
+}
+
 fn bounded_limit(value: Option<usize>, default: usize) -> usize {
     value.unwrap_or(default).clamp(1, 200)
 }
@@ -578,6 +653,7 @@ mod tests {
             "/v1/signals/{signal_id}",
             "/v1/documents",
             "/v1/events",
+            "/v1/coverage-gaps",
             "/v1/alerts",
             "/v1/collections",
             "/v1/backtests",

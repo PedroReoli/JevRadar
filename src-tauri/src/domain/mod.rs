@@ -4,6 +4,7 @@ pub mod backtest;
 pub mod classification;
 pub mod collection;
 pub mod content;
+pub mod coverage;
 pub mod desktop;
 pub mod events;
 pub mod insights;

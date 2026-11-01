@@ -4,6 +4,7 @@ pub mod catalog_service;
 pub mod classification_service;
 pub mod content_collection_service;
 pub mod content_query_service;
+pub mod coverage_query_service;
 pub mod data_management_service;
 pub mod insights_query_service;
 pub mod market_collection_service;

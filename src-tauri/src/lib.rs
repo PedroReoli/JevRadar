@@ -23,6 +23,7 @@ use crate::interface::commands::content::{
     add_rss_source, get_content_overview, list_document_feed, refresh_content_sources,
     set_content_source_enabled,
 };
+use crate::interface::commands::coverage::list_coverage_gaps;
 use crate::interface::commands::data::{export_local_data, purge_local_data};
 use crate::interface::commands::desktop::{resolve_close_request, send_test_notification};
 use crate::interface::commands::insights::{
@@ -81,6 +82,7 @@ pub fn run() {
             set_content_source_enabled,
             add_rss_source,
             list_document_feed,
+            list_coverage_gaps,
             get_market_overview,
             get_market_series,
             get_signal_evidence,
