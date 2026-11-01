@@ -99,6 +99,10 @@ async function validateApplication(page) {
     assert(pathName === expectedPath, `Rota ${linkName} abriu ${pathName}, esperado ${expectedPath}.`);
   }
 
+  await page.getByRole("heading", { name: "Atualizações do aplicativo" }).waitFor();
+  await page.getByRole("button", { name: "Verificar atualização" }).click();
+  await page.getByText("Não foi possível consultar o canal de atualização").waitFor();
+
   await page.getByLabel("Idioma").selectOption("en");
   await page.getByRole("button", { name: "Salvar preferências" }).click();
   await page.getByRole("heading", { name: "Settings", exact: true }).waitFor();

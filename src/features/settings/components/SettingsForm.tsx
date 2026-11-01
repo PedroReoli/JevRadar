@@ -8,6 +8,7 @@ import { DataManagementSection } from "@/features/settings/components/DataManage
 import { InterfaceSettingsSection } from "@/features/settings/components/InterfaceSettingsSection";
 import { OperationSettingsSection } from "@/features/settings/components/OperationSettingsSection";
 import { ProfileSettingsSection } from "@/features/settings/components/ProfileSettingsSection";
+import { UpdateSettingsSection } from "@/features/settings/components/UpdateSettingsSection";
 import styles from "@/features/settings/SettingsForm.module.css";
 import { useSettingsDraft } from "@/features/settings/hooks/useSettingsDraft";
 import { useUpdateAppSettings } from "@/hooks/useAppSettings";
@@ -51,6 +52,7 @@ export function SettingsForm({ settings, secretStatus }: SettingsFormProps) {
       <OperationSettingsSection disabled={mutation.isPending} settings={draft} update={handleUpdate} />
       <ProfileSettingsSection disabled={mutation.isPending} settings={draft} update={handleUpdate} />
       <CredentialsSettingsSection status={secretStatus} />
+      <UpdateSettingsSection />
       <DataManagementSection />
 
       <div className={styles.actionBar}>

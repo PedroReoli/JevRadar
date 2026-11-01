@@ -380,6 +380,12 @@
   text-overflow: ellipsis;
 }
 
+.updateProgress {
+  width: min(100%, var(--control-width-settings));
+  height: var(--space-2);
+  accent-color: var(--color-accent-strong);
+}
+
 .fieldError,
 .errorMessage {
   color: var(--color-negative-text);
