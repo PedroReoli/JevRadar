@@ -144,7 +144,9 @@ async function validateApplication(page) {
 
   await page.goto("http://tauri.localhost/watchlist");
   const catalog = page.getByRole("region", { name: "Catálogo de ativos" });
+  await catalog.getByRole("listitem").first().waitFor();
   const visibleItems = await catalog.getByRole("listitem").count();
+  assert(visibleItems > 0, "O catálogo não carregou nenhum ativo no perfil E2E isolado.");
   assert(visibleItems <= 50, `O catálogo renderizou ${visibleItems} itens; o limite é 50.`);
 
   await page.setViewportSize({ width: 960, height: 640 });
