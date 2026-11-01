@@ -92,6 +92,7 @@ async function validateApplication(page) {
     ["Eventos", "Eventos e relações", "/events"],
     ["Relações", "Relações entre países e ativos", "/relations"],
     ["Contexto", "Central de contexto de mercado", "/context"],
+    ["Comparar", "Comparação de ativos", "/compare"],
     ["Backtest", "Qualidade dos sinais", "/backtest"],
     ["Padrões", "Padrões históricos", "/patterns"],
     ["Ativos", "Ativos e watchlist", "/watchlist"],

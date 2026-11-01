@@ -1,0 +1,290 @@
+.filters,
+.chart,
+.tablePanel {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-panel);
+  box-shadow: var(--shadow-panel);
+}
+
+.filters header,
+.tablePanel header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.filters header > div,
+.tablePanel header > div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.filters h2,
+.tablePanel h2,
+.chart figcaption {
+  margin: 0;
+  color: var(--color-text-primary);
+  font: var(--font-title-lg);
+}
+
+.filters p,
+.tablePanel p,
+.chart > p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font: var(--font-body-sm);
+}
+
+.filters header > strong {
+  color: var(--color-accent-text);
+  font: var(--font-code-label);
+  white-space: nowrap;
+}
+
+.selectFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.selectFilters label {
+  flex: 1 1 var(--size-backtest-threshold);
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font: var(--font-label-sm);
+}
+
+.selectFilters select {
+  min-height: var(--control-height-md);
+  padding-inline: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  background: var(--color-surface-raised);
+  font: var(--font-body-md);
+}
+
+.assetChoices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--size-comparison-choice), 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.assetChoices legend {
+  margin-bottom: var(--space-3);
+  color: var(--color-text-secondary);
+  font: var(--font-label-sm);
+}
+
+.assetChoices label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  cursor: pointer;
+}
+
+.assetChoices label:has(input:checked) {
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-surface);
+}
+
+.assetChoices label:has(input:disabled) {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+.assetChoices span {
+  min-width: 0;
+  display: grid;
+}
+
+.assetChoices strong {
+  color: var(--color-text-primary);
+  font: var(--font-label-md);
+}
+
+.assetChoices small {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font: var(--font-label-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chartGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.chart {
+  margin: 0;
+}
+
+.unit {
+  color: var(--color-text-muted);
+  font: var(--font-label-xs);
+}
+
+.divergingList {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.divergingList li {
+  display: grid;
+  grid-template-columns: var(--size-context-label) minmax(var(--size-comparison-track), 1fr) minmax(var(--size-comparison-track), 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.assetLabel {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font: var(--font-label-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.negativeTrack,
+.positiveTrack {
+  height: var(--size-progress-track);
+  background: var(--color-neutral-surface-strong);
+}
+
+.negativeTrack {
+  display: flex;
+  justify-content: flex-end;
+  border-radius: var(--radius-full) 0 0 var(--radius-full);
+}
+
+.positiveTrack {
+  border-radius: 0 var(--radius-full) var(--radius-full) 0;
+}
+
+.negativeTrack span,
+.positiveTrack span {
+  display: block;
+  width: 0;
+  height: 100%;
+}
+
+[data-direction="negative"] .negativeTrack span {
+  width: var(--comparison-share);
+  background: var(--color-negative-text);
+}
+
+[data-direction="positive"] .positiveTrack span {
+  width: var(--comparison-share);
+  background: var(--color-positive-text);
+}
+
+[data-direction="neutral"] .positiveTrack span {
+  width: var(--border-width-emphasis);
+  background: var(--color-neutral-text);
+}
+
+.divergingList strong {
+  min-width: var(--size-comparison-value);
+  color: var(--color-text-primary);
+  font: var(--font-code-label);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.dataTable summary {
+  cursor: pointer;
+  color: var(--color-accent-text);
+  font: var(--font-label-sm);
+}
+
+.tableScroll {
+  overflow-x: auto;
+}
+
+.tableScroll table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--color-text-secondary);
+  font: var(--font-body-sm);
+}
+
+.tableScroll th,
+.tableScroll td {
+  padding: var(--space-3);
+  border-bottom: var(--border-width-thin) solid var(--color-border-subtle);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tableScroll th {
+  color: var(--color-text-primary);
+  font: var(--font-label-sm);
+}
+
+.tableScroll tbody th span,
+.tableScroll tbody td small {
+  display: block;
+  color: var(--color-text-muted);
+  font: var(--font-label-xs);
+}
+
+.tableScroll a {
+  color: var(--color-accent-text);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: var(--border-width-thin);
+  height: var(--border-width-thin);
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 64rem) {
+  .chartGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 32rem) {
+  .filters header,
+  .tablePanel header {
+    flex-direction: column;
+  }
+
+  .divergingList li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .negativeTrack,
+  .positiveTrack {
+    grid-row: 2;
+  }
+
+  .negativeTrack {
+    grid-column: 1;
+  }
+
+  .positiveTrack {
+    grid-column: 2;
+  }
+}

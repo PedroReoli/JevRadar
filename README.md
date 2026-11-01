@@ -23,6 +23,7 @@ O repositório está em **alpha para Windows**. O núcleo público funciona sem 
 - explorador paginado de eventos políticos, econômicos e geopolíticos, com relações rastreáveis por ativo, país, tipo e confiança;
 - mapa agregado de relações entre países e ativos, com separação explícita entre relação conhecida, correlação, hipótese e causalidade não comprovada;
 - central macro e geopolítica com KPIs, ranking de contextos, países/regiões e ativos relacionados, acompanhada por alternativa tabular acessível;
+- comparação compartilhável de 2–4 ativos da watchlist, com preço, sentimento, confiança, diversidade, hype e eventos em escalas separadas;
 - central de lacunas de cobertura que cruza movimentos reais de preço com volume editorial, sem transformar ausência de discussão em recomendação;
 - backtest cronológico em 1, 7 e 30 dias, com baseline, intervalo de confiança e separação calibração/avaliação;
 - central de padrões históricos que compara somente backtests do mesmo contrato, limiares e versões, com filtro de amostra e desempenho contra baseline;

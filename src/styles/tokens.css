@@ -70,6 +70,9 @@
   --size-market-chart: 22rem;
   --size-context-label: 7.5rem;
   --size-context-bar-min: 6rem;
+  --size-comparison-choice: 10rem;
+  --size-comparison-track: 5rem;
+  --size-comparison-value: 4rem;
   --size-toggle-width: 2.5rem;
   --size-toggle-height: 1.25rem;
   --icon-size-sm: 1rem;
