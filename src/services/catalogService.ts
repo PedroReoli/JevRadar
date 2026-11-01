@@ -1,7 +1,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { z } from "zod";
 
-import type { Asset, AssetClass, Watchlist } from "@/types/assets";
+import type { Asset, AssetClass, CatalogRefreshSummary, Watchlist } from "@/types/assets";
 
 const assetClassSchema = z.enum(["b3Equity", "b3Fund", "crypto", "macro"]);
 const assetSchema = z.object({
@@ -25,6 +25,17 @@ const watchlistSchema = z.object({
     }),
   ),
 });
+const catalogRefreshSchema = z.object({
+  status: z.enum(["completed", "partial", "failed"]),
+  upsertedCount: z.number().int().nonnegative(),
+  refreshedAt: z.string().min(1),
+  sources: z.array(z.object({
+    sourceId: z.string().min(1),
+    status: z.enum(["completed", "failed"]),
+    discoveredCount: z.number().int().nonnegative(),
+    errorCode: z.string().nullable(),
+  })),
+});
 
 function requireDesktopRuntime() {
   if (!isTauri()) {
@@ -45,6 +56,11 @@ export async function getDefaultWatchlist(): Promise<Watchlist> {
   requireDesktopRuntime();
   const response: unknown = await invoke("get_default_watchlist");
   return watchlistSchema.parse(response);
+}
+
+export async function refreshAssetCatalog(): Promise<CatalogRefreshSummary> {
+  requireDesktopRuntime();
+  return catalogRefreshSchema.parse(await invoke("refresh_asset_catalog"));
 }
 
 export async function addWatchlistAsset(assetId: string): Promise<Watchlist> {

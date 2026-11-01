@@ -11,6 +11,7 @@ import {
   addWatchlistAsset,
   getDefaultWatchlist,
   listAssets,
+  refreshAssetCatalog,
   removeWatchlistAsset,
 } from "@/services/catalogService";
 
@@ -56,5 +57,20 @@ describe("catalogService", () => {
     expect(invoke).toHaveBeenNthCalledWith(1, "get_default_watchlist");
     expect(invoke).toHaveBeenNthCalledWith(2, "add_watchlist_asset", { assetId: asset.id });
     expect(invoke).toHaveBeenNthCalledWith(3, "remove_watchlist_asset", { assetId: asset.id });
+  });
+
+  it("valida o resultado parcial da sincronização de catálogos", async () => {
+    invoke.mockResolvedValueOnce({
+      status: "partial",
+      upsertedCount: 480,
+      refreshedAt: "2026-11-01T12:00:00Z",
+      sources: [
+        { sourceId: "source:brapi", status: "completed", discoveredCount: 480, errorCode: null },
+        { sourceId: "source:binance", status: "failed", discoveredCount: 0, errorCode: "catalog_request_failed" },
+      ],
+    });
+
+    await expect(refreshAssetCatalog()).resolves.toMatchObject({ status: "partial", upsertedCount: 480 });
+    expect(invoke).toHaveBeenCalledWith("refresh_asset_catalog");
   });
 });

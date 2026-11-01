@@ -22,3 +22,17 @@ export interface Watchlist {
   limit: number;
   assets: WatchlistAsset[];
 }
+
+export interface CatalogSourceRefresh {
+  sourceId: string;
+  status: "completed" | "failed";
+  discoveredCount: number;
+  errorCode: string | null;
+}
+
+export interface CatalogRefreshSummary {
+  status: "completed" | "partial" | "failed";
+  upsertedCount: number;
+  refreshedAt: string;
+  sources: CatalogSourceRefresh[];
+}

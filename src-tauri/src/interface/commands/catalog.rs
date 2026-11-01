@@ -1,7 +1,7 @@
 use tauri::State;
 
 use crate::application::catalog_service::CatalogService;
-use crate::domain::assets::{Asset, AssetClass, Watchlist};
+use crate::domain::assets::{Asset, AssetClass, CatalogRefreshSummary, Watchlist};
 use crate::interface::error::CommandError;
 use crate::state::AppState;
 
@@ -12,6 +12,17 @@ pub fn list_assets(
     asset_class: Option<AssetClass>,
 ) -> Result<Vec<Asset>, CommandError> {
     CatalogService::list_assets(&state.database, query, asset_class).map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn refresh_asset_catalog(
+    state: State<'_, AppState>,
+) -> Result<CatalogRefreshSummary, CommandError> {
+    let database = std::sync::Arc::clone(&state.database);
+    tauri::async_runtime::spawn_blocking(move || CatalogService::refresh_assets(&database))
+        .await
+        .map_err(|_| CommandError::internal("catalog_task_failed"))?
+        .map_err(Into::into)
 }
 
 #[tauri::command]

@@ -4,6 +4,7 @@ import {
   addWatchlistAsset,
   getDefaultWatchlist,
   listAssets,
+  refreshAssetCatalog,
   removeWatchlistAsset,
 } from "@/services/catalogService";
 import type { AssetClass } from "@/types/assets";
@@ -21,6 +22,16 @@ export function useDefaultWatchlist() {
   return useQuery({
     queryKey: watchlistKey,
     queryFn: getDefaultWatchlist,
+  });
+}
+
+export function useCatalogRefresh() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: refreshAssetCatalog,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["asset-catalog"] });
+    },
   });
 }
 

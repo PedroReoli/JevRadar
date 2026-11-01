@@ -5,11 +5,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import "@/i18n/config";
 
-const { listAssets, getDefaultWatchlist, addWatchlistAsset, removeWatchlistAsset } = vi.hoisted(() => ({
+const { listAssets, getDefaultWatchlist, addWatchlistAsset, removeWatchlistAsset, refreshAssetCatalog } = vi.hoisted(() => ({
   listAssets: vi.fn(),
   getDefaultWatchlist: vi.fn(),
   addWatchlistAsset: vi.fn(),
   removeWatchlistAsset: vi.fn(),
+  refreshAssetCatalog: vi.fn(),
 }));
 
 vi.mock("@/services/catalogService", () => ({
@@ -17,6 +18,7 @@ vi.mock("@/services/catalogService", () => ({
   getDefaultWatchlist,
   addWatchlistAsset,
   removeWatchlistAsset,
+  refreshAssetCatalog,
 }));
 
 import { WatchlistPage } from "@/pages/watchlist/WatchlistPage";

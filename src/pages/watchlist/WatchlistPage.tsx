@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { RefreshCw, Search } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
@@ -9,6 +9,7 @@ import { SelectedAssets } from "@/features/watchlist/components/SelectedAssets";
 import styles from "@/features/watchlist/Watchlist.module.css";
 import {
   useAssetCatalog,
+  useCatalogRefresh,
   useDefaultWatchlist,
   useWatchlistActions,
 } from "@/features/watchlist/hooks/useWatchlist";
@@ -26,6 +27,7 @@ export function WatchlistPage() {
   const catalogQuery = useAssetCatalog(query, assetClass);
   const watchlistQuery = useDefaultWatchlist();
   const actions = useWatchlistActions();
+  const catalogRefresh = useCatalogRefresh();
   const selectedIds = useMemo(
     () => new Set(watchlistQuery.data?.assets.map(({ asset }) => asset.id) ?? []),
     [watchlistQuery.data],
@@ -62,7 +64,26 @@ export function WatchlistPage() {
           />
         </label>
         <AssetClassFilter value={assetClass} onChange={(value) => updateParam("class", value)} />
+        <button
+          className={styles.iconAction}
+          disabled={catalogRefresh.isPending}
+          onClick={() => catalogRefresh.mutate()}
+          type="button"
+        >
+          <RefreshCw aria-hidden="true" size="var(--icon-size-sm)" />
+          {catalogRefresh.isPending ? t("watchlist.syncingCatalog") : t("watchlist.syncCatalog")}
+        </button>
       </div>
+
+      {catalogRefresh.data ? (
+        <p className={pageStyles.statusMessage} role="status">
+          {t("watchlist.syncResult", {
+            count: catalogRefresh.data.upsertedCount,
+            errors: catalogRefresh.data.sources.filter((source) => source.status === "failed").length,
+          })}
+        </p>
+      ) : null}
+      {catalogRefresh.isError ? <div className={pageStyles.errorMessage} role="alert">{t("watchlist.syncError")}</div> : null}
 
       {hasLoadError ? (
         <div className={pageStyles.errorMessage} role="alert">{t("watchlist.loadError")}</div>

@@ -14,7 +14,8 @@ use crate::infrastructure::desktop::{create_system_tray, register_main_window_li
 use crate::infrastructure::secrets::KeyringSecretStore;
 use crate::interface::commands::backtest::{get_latest_backtest, run_backtest};
 use crate::interface::commands::catalog::{
-    add_watchlist_asset, get_default_watchlist, list_assets, remove_watchlist_asset,
+    add_watchlist_asset, get_default_watchlist, list_assets, refresh_asset_catalog,
+    remove_watchlist_asset,
 };
 use crate::interface::commands::classification::classify_pending_documents;
 use crate::interface::commands::collection::refresh_market_data;
@@ -61,6 +62,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             list_assets,
+            refresh_asset_catalog,
             get_default_watchlist,
             add_watchlist_asset,
             remove_watchlist_asset,

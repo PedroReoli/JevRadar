@@ -206,6 +206,44 @@ impl Database {
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
+    pub fn upsert_assets(&self, assets: &[Asset]) -> Result<usize, DatabaseError> {
+        let mut connection = self.connection.lock();
+        let transaction = connection.transaction()?;
+        let mut changed = 0;
+        for asset in assets {
+            changed += transaction.execute(
+                "INSERT INTO assets (
+                    id, symbol, name, asset_class, exchange, currency, country_code, active
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1)
+                 ON CONFLICT(id) DO UPDATE SET
+                    symbol = excluded.symbol,
+                    name = excluded.name,
+                    asset_class = excluded.asset_class,
+                    exchange = excluded.exchange,
+                    currency = excluded.currency,
+                    country_code = excluded.country_code,
+                    active = 1,
+                    updated_at = CURRENT_TIMESTAMP",
+                params![
+                    asset.id,
+                    asset.symbol,
+                    asset.name,
+                    asset.asset_class.as_storage_value(),
+                    asset.exchange,
+                    asset.currency,
+                    asset.country_code,
+                ],
+            )?;
+            transaction.execute(
+                "INSERT OR IGNORE INTO asset_aliases (asset_id, alias, normalized_alias)
+                 VALUES (?1, ?2, lower(?2))",
+                params![asset.id, asset.name],
+            )?;
+        }
+        transaction.commit()?;
+        Ok(changed)
+    }
+
     pub fn default_watchlist(&self, limit: u8) -> Result<Watchlist, DatabaseError> {
         let connection = self.connection.lock();
         let (id, name) = connection.query_row(

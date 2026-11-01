@@ -1,4 +1,5 @@
 pub mod background;
+pub mod catalog;
 pub mod content;
 pub mod database;
 pub mod desktop;

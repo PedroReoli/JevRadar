@@ -58,3 +58,21 @@ pub struct Watchlist {
     pub limit: u8,
     pub assets: Vec<WatchlistAsset>,
 }
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogSourceRefresh {
+    pub source_id: String,
+    pub status: String,
+    pub discovered_count: usize,
+    pub error_code: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogRefreshSummary {
+    pub status: String,
+    pub upserted_count: usize,
+    pub refreshed_at: String,
+    pub sources: Vec<CatalogSourceRefresh>,
+}
