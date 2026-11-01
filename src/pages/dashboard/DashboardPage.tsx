@@ -8,12 +8,14 @@ import { EventTimeline } from "@/features/dashboard/components/EventTimeline";
 import { MarketSnapshotPanel } from "@/features/dashboard/components/MarketSnapshotPanel";
 import { LowAttentionPanel } from "@/features/dashboard/components/LowAttentionPanel";
 import { PriceSentimentChart } from "@/features/dashboard/components/PriceSentimentChart";
+import { ReadingProfilePanel } from "@/features/dashboard/components/ReadingProfilePanel";
 import { RadarFilters } from "@/features/dashboard/components/RadarFilters";
 import { SignalRadarPanel } from "@/features/dashboard/components/SignalRadarPanel";
 import { SignalEvidencePanel } from "@/features/dashboard/components/SignalEvidencePanel";
 import { SystemHealthCard } from "@/features/dashboard/components/SystemHealthCard";
 import { useMarketOverview, useMarketSeries, useRefreshMarketData, useSignalEvidence } from "@/features/dashboard/hooks/useMarketOverview";
 import { useSystemStatus } from "@/hooks/useSystemStatus";
+import { useAppSettingsQuery } from "@/hooks/useAppSettings";
 import styles from "@/pages/dashboard/DashboardPage.module.css";
 import type { ComponentStatus } from "@/types/system";
 import type { AssetClass } from "@/types/assets";
@@ -34,6 +36,7 @@ export function DashboardPage() {
     minimumConfidence: supportedConfidence.has(confidenceParam) ? confidenceParam : 0,
   };
   const statusQuery = useSystemStatus();
+  const settingsQuery = useAppSettingsQuery();
   const marketQuery = useMarketOverview(filter);
   const requestedAssetId = searchParams.get("asset");
   const visibleAssets = marketQuery.data?.snapshots.map((snapshot) => snapshot.asset) ?? [];
@@ -94,6 +97,13 @@ export function DashboardPage() {
       </header>
 
       <RadarFilters filter={filter} onChange={updateFilter} />
+
+      {settingsQuery.data ? (
+        <ReadingProfilePanel
+          experienceLevel={settingsQuery.data.experienceLevel}
+          investmentRange={settingsQuery.data.investmentRange}
+        />
+      ) : null}
 
       {refreshMutation.isError ? <div className={styles.errorMessage} role="alert">{t("dashboard.refreshError")}</div> : null}
 
