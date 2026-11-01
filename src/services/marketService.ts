@@ -1,7 +1,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { z } from "zod";
 
-import type { CollectionSummary, MarketOverview, MarketOverviewFilter, MarketSeries } from "@/types/market";
+import type { CollectionSummary, MarketOverview, MarketOverviewFilter, MarketSeries, SignalEvidenceSnapshot } from "@/types/market";
 
 const assetSchema = z.object({
   id: z.string(),
@@ -25,6 +25,7 @@ const marketOverviewSchema = z.object({
     }),
   ),
   signals: z.array(z.object({
+    id: z.string(),
     asset: assetSchema,
     signalScore: z.number().min(-1).max(1),
     confidence: z.number().min(0).max(1),
@@ -85,6 +86,24 @@ const marketSeriesSchema = z.object({
     confidence: z.number().min(0).max(1).nullable(),
   })),
 });
+const signalEvidenceSchema = z.array(z.object({
+  classificationId: z.string(),
+  sourceName: z.string(),
+  title: z.string().nullable(),
+  excerpt: z.string(),
+  canonicalUrl: z.string().url().nullable(),
+  publishedAt: z.string(),
+  sentiment: z.enum(["optimistic", "pessimistic", "neutral", "uncertain"]),
+  sentimentProbability: z.number().min(0).max(1),
+  relevanceExpected: z.number().min(0).max(3),
+  contentType: z.enum(["news", "opinion", "technical_analysis", "meme", "spam", "uncertain"]),
+  hypeProbability: z.number().min(0).max(1),
+  factualClaimProbability: z.number().min(0).max(1),
+  confidence: z.number().min(0).max(1),
+  contributionWeight: z.number(),
+  modelVersion: z.string(),
+  questionVersion: z.string(),
+}));
 
 function requireDesktopRuntime() {
   if (!isTauri()) throw new Error("desktop_runtime_required");
@@ -106,4 +125,10 @@ export async function getMarketSeries(assetId: string, periodHours: number): Pro
   requireDesktopRuntime();
   const response: unknown = await invoke("get_market_series", { assetId, periodHours });
   return marketSeriesSchema.parse(response);
+}
+
+export async function getSignalEvidence(signalId: string): Promise<SignalEvidenceSnapshot[]> {
+  requireDesktopRuntime();
+  const response: unknown = await invoke("get_signal_evidence", { signalId });
+  return signalEvidenceSchema.parse(response);
 }

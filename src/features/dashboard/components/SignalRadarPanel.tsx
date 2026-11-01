@@ -1,10 +1,12 @@
-import { RadioTower } from "lucide-react";
+import { FileSearch, RadioTower } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import styles from "@/pages/dashboard/DashboardPage.module.css";
 import type { MarketSignalSnapshot } from "@/types/market";
 
 interface SignalRadarPanelProps {
+  onSelect?: (signalId: string) => void;
+  selectedSignalId?: string | null;
   signals: MarketSignalSnapshot[];
 }
 
@@ -14,7 +16,7 @@ function signalTone(score: number) {
   return "neutral";
 }
 
-export function SignalRadarPanel({ signals }: SignalRadarPanelProps) {
+export function SignalRadarPanel({ onSelect, selectedSignalId, signals }: SignalRadarPanelProps) {
   const { i18n, t } = useTranslation();
   const percent = new Intl.NumberFormat(i18n.language, { style: "percent", maximumFractionDigits: 0 });
   const score = new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 2, signDisplay: "exceptZero" });
@@ -51,6 +53,15 @@ export function SignalRadarPanel({ signals }: SignalRadarPanelProps) {
                   <div><dt>{t("dashboard.sources")}</dt><dd>{signal.independentSourceCount}</dd></div>
                   <div><dt>{t("dashboard.hype")}</dt><dd>{percent.format(signal.hypePenalty)}</dd></div>
                 </dl>
+                <button
+                  aria-pressed={selectedSignalId === signal.id}
+                  className={styles.evidenceAction}
+                  onClick={() => onSelect?.(signal.id)}
+                  type="button"
+                >
+                  <FileSearch aria-hidden="true" size="var(--icon-size-sm)" />
+                  {selectedSignalId === signal.id ? t("dashboard.hideEvidence") : t("dashboard.inspectEvidence")}
+                </button>
               </li>
             );
           })}

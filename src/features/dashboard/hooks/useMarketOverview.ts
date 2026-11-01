@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { getMarketOverview, getMarketSeries, refreshMarketData } from "@/services/marketService";
+import { getMarketOverview, getMarketSeries, getSignalEvidence, refreshMarketData } from "@/services/marketService";
 import type { MarketOverviewFilter } from "@/types/market";
 
 const marketOverviewKey = ["market-overview"] as const;
@@ -10,6 +10,14 @@ export function useMarketOverview(filter: MarketOverviewFilter) {
     queryKey: [...marketOverviewKey, filter],
     queryFn: () => getMarketOverview(filter),
     refetchInterval: 60_000,
+  });
+}
+
+export function useSignalEvidence(signalId: string | null) {
+  return useQuery({
+    enabled: Boolean(signalId),
+    queryKey: ["signal-evidence", signalId],
+    queryFn: () => getSignalEvidence(signalId!),
   });
 }
 

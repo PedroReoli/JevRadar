@@ -2,6 +2,7 @@ use tauri::State;
 
 use crate::application::market_query_service::MarketQueryService;
 use crate::domain::market::{MarketOverview, MarketOverviewFilter, MarketSeries};
+use crate::domain::signals::SignalEvidenceSnapshot;
 use crate::interface::error::CommandError;
 use crate::state::AppState;
 
@@ -13,6 +14,14 @@ pub fn get_market_overview(
     let filter = filter.unwrap_or_default();
     filter.validate().map_err(CommandError::internal)?;
     MarketQueryService::overview(&state.database, filter).map_err(CommandError::internal)
+}
+
+#[tauri::command]
+pub fn get_signal_evidence(
+    state: State<'_, AppState>,
+    signal_id: String,
+) -> Result<Vec<SignalEvidenceSnapshot>, CommandError> {
+    MarketQueryService::signal_evidence(&state.database, &signal_id).map_err(CommandError::internal)
 }
 
 #[tauri::command]

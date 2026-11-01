@@ -7,7 +7,7 @@ vi.mock("@tauri-apps/api/core", () => ({
   isTauri: () => true,
 }));
 
-import { getMarketOverview, getMarketSeries, refreshMarketData } from "@/services/marketService";
+import { getMarketOverview, getMarketSeries, getSignalEvidence, refreshMarketData } from "@/services/marketService";
 
 const asset = {
   id: "asset:crypto:BTC",
@@ -34,6 +34,7 @@ describe("marketService", () => {
         interval: "1d",
       }],
       signals: [{
+        id: "signal:btc",
         asset,
         signalScore: 0.64,
         confidence: 0.78,
@@ -108,5 +109,29 @@ describe("marketService", () => {
     const series = await getMarketSeries(asset.id, 168);
     expect(series.points[0]!.closeValue).toBe(77918.01);
     expect(invoke).toHaveBeenCalledWith("get_market_series", { assetId: asset.id, periodHours: 168 });
+  });
+
+  it("valida as evidências auditáveis de um sinal", async () => {
+    invoke.mockResolvedValueOnce([{
+      classificationId: "classification:1",
+      sourceName: "Agência Brasil",
+      title: "Petrobras divulga fato relevante",
+      excerpt: "A companhia divulgou dados operacionais.",
+      canonicalUrl: "https://example.com/evidence",
+      publishedAt: "2026-11-01T00:00:00Z",
+      sentiment: "neutral",
+      sentimentProbability: 0.72,
+      relevanceExpected: 2.4,
+      contentType: "news",
+      hypeProbability: 0.05,
+      factualClaimProbability: 0.94,
+      confidence: 0.83,
+      contributionWeight: 0.61,
+      modelVersion: "jev-latest",
+      questionVersion: "document-market-signal-v1",
+    }]);
+    const evidence = await getSignalEvidence("signal:1");
+    expect(evidence[0]!.modelVersion).toBe("jev-latest");
+    expect(invoke).toHaveBeenCalledWith("get_signal_evidence", { signalId: "signal:1" });
   });
 });

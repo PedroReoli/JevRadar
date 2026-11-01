@@ -20,7 +20,9 @@ use crate::domain::content::{
 };
 use crate::domain::events::MarketEventSnapshot;
 use crate::domain::market::{LatestCollectionRun, MarketSeries, MarketSeriesPoint, MarketSnapshot};
-use crate::domain::signals::{CalculatedSignal, MarketSignalSnapshot, SignalEvidenceInput};
+use crate::domain::signals::{
+    CalculatedSignal, MarketSignalSnapshot, SignalEvidenceInput, SignalEvidenceSnapshot,
+};
 
 const INITIAL_SCHEMA: &str = include_str!("migrations/0001_initial.sql");
 const SETTINGS_SCHEMA: &str = include_str!("migrations/0002_settings.sql");
@@ -952,7 +954,7 @@ impl Database {
     pub fn latest_market_signals(&self) -> Result<Vec<MarketSignalSnapshot>, DatabaseError> {
         let connection = self.connection.lock();
         let mut statement = connection.prepare(
-            "SELECT a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency, a.country_code,
+            "SELECT ms.id, a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency, a.country_code,
                     ms.signal_score, ms.confidence, ms.source_count, ms.independent_source_count,
                     ms.evidence_count, ms.hype_penalty, ms.window_started_at, ms.window_ended_at,
                     ms.methodology_version
@@ -969,16 +971,61 @@ impl Database {
         statement
             .query_map([], |row| {
                 Ok(MarketSignalSnapshot {
-                    asset: map_asset(row)?,
-                    signal_score: row.get(7)?,
-                    confidence: row.get(8)?,
-                    source_count: row.get::<_, i64>(9)? as usize,
-                    independent_source_count: row.get::<_, i64>(10)? as usize,
-                    evidence_count: row.get::<_, i64>(11)? as usize,
-                    hype_penalty: row.get(12)?,
-                    window_started_at: row.get(13)?,
-                    window_ended_at: row.get(14)?,
-                    methodology_version: row.get(15)?,
+                    id: row.get(0)?,
+                    asset: map_asset_offset(row, 1)?,
+                    signal_score: row.get(8)?,
+                    confidence: row.get(9)?,
+                    source_count: row.get::<_, i64>(10)? as usize,
+                    independent_source_count: row.get::<_, i64>(11)? as usize,
+                    evidence_count: row.get::<_, i64>(12)? as usize,
+                    hype_penalty: row.get(13)?,
+                    window_started_at: row.get(14)?,
+                    window_ended_at: row.get(15)?,
+                    methodology_version: row.get(16)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(Into::into)
+    }
+
+    pub fn signal_evidence(
+        &self,
+        signal_id: &str,
+    ) -> Result<Vec<SignalEvidenceSnapshot>, DatabaseError> {
+        let connection = self.connection.lock();
+        let mut statement = connection.prepare(
+            "SELECT dc.id, s.name, sd.title, SUBSTR(sd.raw_text, 1, 400), sd.canonical_url,
+                    sd.published_at, dc.sentiment, dc.sentiment_probability,
+                    COALESCE(dc.relevance_expected, dc.relevance_score), dc.content_type,
+                    dc.hype_probability, dc.factual_claim_probability, dc.confidence,
+                    se.contribution_weight, dc.model_version, dc.question_version
+             FROM signal_evidence se
+             JOIN document_classifications dc ON dc.id = se.classification_id
+             JOIN document_assets da ON da.id = dc.document_asset_id
+             JOIN source_documents sd ON sd.id = da.document_id
+             JOIN sources s ON s.id = sd.source_id
+             WHERE se.signal_id = ?1
+             ORDER BY ABS(se.contribution_weight) DESC, dc.confidence DESC",
+        )?;
+        statement
+            .query_map(params![signal_id], |row| {
+                Ok(SignalEvidenceSnapshot {
+                    classification_id: row.get(0)?,
+                    source_name: row.get(1)?,
+                    title: row.get(2)?,
+                    excerpt: row.get(3)?,
+                    canonical_url: row.get(4)?,
+                    published_at: row.get(5)?,
+                    sentiment: row.get(6)?,
+                    sentiment_probability: row.get(7)?,
+                    relevance_expected: row.get(8)?,
+                    content_type: row.get(9)?,
+                    hype_probability: row.get(10)?,
+                    factual_claim_probability: row.get(11)?,
+                    confidence: row.get(12)?,
+                    contribution_weight: row.get(13)?,
+                    model_version: row.get(14)?,
+                    question_version: row.get(15)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()
@@ -1365,22 +1412,26 @@ impl Database {
 }
 
 fn map_asset(row: &rusqlite::Row<'_>) -> Result<Asset, rusqlite::Error> {
-    let stored_class = row.get::<_, String>(3)?;
+    map_asset_offset(row, 0)
+}
+
+fn map_asset_offset(row: &rusqlite::Row<'_>, offset: usize) -> Result<Asset, rusqlite::Error> {
+    let stored_class = row.get::<_, String>(offset + 3)?;
     let asset_class = AssetClass::from_storage_value(&stored_class).ok_or_else(|| {
         rusqlite::Error::FromSqlConversionFailure(
-            3,
+            offset + 3,
             rusqlite::types::Type::Text,
             format!("classe de ativo inválida: {stored_class}").into(),
         )
     })?;
     Ok(Asset {
-        id: row.get(0)?,
-        symbol: row.get(1)?,
-        name: row.get(2)?,
+        id: row.get(offset)?,
+        symbol: row.get(offset + 1)?,
+        name: row.get(offset + 2)?,
         asset_class,
-        exchange: row.get(4)?,
-        currency: row.get(5)?,
-        country_code: row.get(6)?,
+        exchange: row.get(offset + 4)?,
+        currency: row.get(offset + 5)?,
+        country_code: row.get(offset + 6)?,
     })
 }
 
@@ -1708,6 +1759,11 @@ mod tests {
             .expect("contagem de contribuições");
         assert_eq!((signal_count, evidence_count), (1, 1));
         drop(connection);
+        let snapshots = database
+            .signal_evidence("signal:test")
+            .expect("rastreabilidade");
+        assert_eq!(snapshots.len(), 1);
+        assert_eq!(snapshots[0].model_version, "jev-latest");
         let alert_candidates = database
             .pending_alert_candidates(2, "2026-01-01T00:00:00Z")
             .expect("candidatos de alerta");

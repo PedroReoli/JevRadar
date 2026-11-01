@@ -10,8 +10,9 @@ import { LowAttentionPanel } from "@/features/dashboard/components/LowAttentionP
 import { PriceSentimentChart } from "@/features/dashboard/components/PriceSentimentChart";
 import { RadarFilters } from "@/features/dashboard/components/RadarFilters";
 import { SignalRadarPanel } from "@/features/dashboard/components/SignalRadarPanel";
+import { SignalEvidencePanel } from "@/features/dashboard/components/SignalEvidencePanel";
 import { SystemHealthCard } from "@/features/dashboard/components/SystemHealthCard";
-import { useMarketOverview, useMarketSeries, useRefreshMarketData } from "@/features/dashboard/hooks/useMarketOverview";
+import { useMarketOverview, useMarketSeries, useRefreshMarketData, useSignalEvidence } from "@/features/dashboard/hooks/useMarketOverview";
 import { useSystemStatus } from "@/hooks/useSystemStatus";
 import styles from "@/pages/dashboard/DashboardPage.module.css";
 import type { ComponentStatus } from "@/types/system";
@@ -40,6 +41,11 @@ export function DashboardPage() {
     ? requestedAssetId
     : visibleAssets[0]?.id ?? null;
   const seriesQuery = useMarketSeries(selectedAssetId, filter.periodHours);
+  const requestedSignalId = searchParams.get("signal");
+  const selectedSignalId = marketQuery.data?.signals.some((signal) => signal.id === requestedSignalId)
+    ? requestedSignalId
+    : null;
+  const evidenceQuery = useSignalEvidence(selectedSignalId);
   const refreshMutation = useRefreshMarketData();
   const fallbackStatus: ComponentStatus = statusQuery.isPending ? "pending" : "unavailable";
   const status = statusQuery.data;
@@ -53,6 +59,12 @@ export function DashboardPage() {
   const updateAsset = (assetId: string) => {
     const next = new URLSearchParams(searchParams);
     next.set("asset", assetId);
+    setSearchParams(next, { replace: true });
+  };
+  const updateSignal = (signalId: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (selectedSignalId === signalId) next.delete("signal");
+    else next.set("signal", signalId);
     setSearchParams(next, { replace: true });
   };
 
@@ -104,7 +116,12 @@ export function DashboardPage() {
             signals={marketQuery.data?.signals ?? []}
             snapshots={marketQuery.data?.snapshots ?? []}
           />
-          <SignalRadarPanel signals={marketQuery.data?.signals ?? []} />
+          <SignalRadarPanel
+            onSelect={updateSignal}
+            selectedSignalId={selectedSignalId}
+            signals={marketQuery.data?.signals ?? []}
+          />
+          {selectedSignalId ? <SignalEvidencePanel evidence={evidenceQuery.data ?? []} isLoading={evidenceQuery.isPending} /> : null}
           <EventTimeline events={marketQuery.data?.events ?? []} />
           <MarketSnapshotPanel snapshots={marketQuery.data?.snapshots ?? []} />
         </>

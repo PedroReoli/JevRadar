@@ -61,6 +61,7 @@ export interface MarketEventSnapshot {
 }
 
 export interface MarketSignalSnapshot {
+  id: string;
   asset: Asset;
   signalScore: number;
   confidence: number;
@@ -71,6 +72,25 @@ export interface MarketSignalSnapshot {
   windowStartedAt: string;
   windowEndedAt: string;
   methodologyVersion: string;
+}
+
+export interface SignalEvidenceSnapshot {
+  classificationId: string;
+  sourceName: string;
+  title: string | null;
+  excerpt: string;
+  canonicalUrl: string | null;
+  publishedAt: string;
+  sentiment: "optimistic" | "pessimistic" | "neutral" | "uncertain";
+  sentimentProbability: number;
+  relevanceExpected: number;
+  contentType: "news" | "opinion" | "technical_analysis" | "meme" | "spam" | "uncertain";
+  hypeProbability: number;
+  factualClaimProbability: number;
+  confidence: number;
+  contributionWeight: number;
+  modelVersion: string;
+  questionVersion: string;
 }
 
 export interface SourceCollectionResult {

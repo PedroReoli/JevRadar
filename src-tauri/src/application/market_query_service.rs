@@ -1,6 +1,7 @@
 use chrono::{Duration, Utc};
 
 use crate::domain::market::{MarketOverview, MarketOverviewFilter, MarketSeries};
+use crate::domain::signals::SignalEvidenceSnapshot;
 use crate::infrastructure::database::{Database, DatabaseError};
 
 pub struct MarketQueryService;
@@ -41,5 +42,12 @@ impl MarketQueryService {
     ) -> Result<MarketSeries, DatabaseError> {
         let cutoff = (Utc::now() - Duration::hours(i64::from(period_hours))).to_rfc3339();
         database.market_series(asset_id, &cutoff)
+    }
+
+    pub fn signal_evidence(
+        database: &Database,
+        signal_id: &str,
+    ) -> Result<Vec<SignalEvidenceSnapshot>, DatabaseError> {
+        database.signal_evidence(signal_id)
     }
 }

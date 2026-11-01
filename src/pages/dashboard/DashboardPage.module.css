@@ -118,7 +118,8 @@
 .signalPanel,
 .eventPanel,
 .chartPanel,
-.attentionPanel {
+.attentionPanel,
+.evidencePanel {
   border: var(--border-width-thin) solid var(--color-border-subtle);
   border-radius: var(--radius-xl);
   background: var(--color-surface-panel);
@@ -363,7 +364,7 @@
 .signalRow {
   min-height: var(--size-signal-row);
   display: grid;
-  grid-template-columns: minmax(var(--size-asset-symbol), 0.7fr) minmax(var(--size-signal-score), 0.6fr) minmax(0, 1.7fr);
+  grid-template-columns: minmax(var(--size-asset-symbol), 0.7fr) minmax(var(--size-signal-score), 0.6fr) minmax(0, 1.7fr) auto;
   align-items: center;
   gap: var(--space-5);
   padding: var(--space-4) var(--space-5);
@@ -447,6 +448,98 @@
   margin: 0;
   color: var(--color-text-primary);
   font: var(--font-label-md);
+}
+
+.evidenceAction {
+  min-height: var(--control-height-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-inline: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-accent-border);
+  border-radius: var(--radius-md);
+  color: var(--color-accent-text);
+  background: var(--color-accent-surface);
+  font: var(--font-label-xs);
+  cursor: pointer;
+}
+
+.evidenceList {
+  margin: 0;
+  padding: var(--space-5);
+  display: grid;
+  gap: var(--space-4);
+  list-style: none;
+}
+
+.evidenceList li {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+
+.evidenceList header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.evidenceList header div {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.evidenceList strong {
+  color: var(--color-text-primary);
+  font: var(--font-label-md);
+}
+
+.evidenceList span,
+.evidenceList footer {
+  color: var(--color-text-muted);
+  font: var(--font-label-xs);
+}
+
+.evidenceList p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font: var(--font-body-sm);
+}
+
+.evidenceList a {
+  color: var(--color-accent-text);
+}
+
+.evidenceList dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.evidenceList dl div {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-neutral-surface);
+}
+
+.evidenceList dt {
+  color: var(--color-text-muted);
+  font: var(--font-label-xs);
+}
+
+.evidenceList dd {
+  margin: 0;
+  color: var(--color-text-primary);
+  font: var(--font-code-label);
 }
 
 .marketHeader {
@@ -704,6 +797,15 @@
 
   .signalMetrics {
     grid-column: 1 / -1;
+  }
+
+  .evidenceAction {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .evidenceList dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .marketValue {

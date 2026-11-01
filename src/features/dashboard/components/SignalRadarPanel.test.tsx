@@ -8,6 +8,7 @@ import { SignalRadarPanel } from "@/features/dashboard/components/SignalRadarPan
 describe("SignalRadarPanel", () => {
   it("mostra o viés como evidência e não como recomendação", () => {
     render(<SignalRadarPanel signals={[{
+      id: "signal:petr4",
       asset: {
         id: "asset:b3:PETR4",
         symbol: "PETR4",
