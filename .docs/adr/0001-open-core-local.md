@@ -14,6 +14,8 @@ O JevRadar deve ser utilizável, auditável e apresentável como projeto open so
 
 O repositório público conterá aplicação desktop, UI, contratos, integrações, adapters e agregação descritiva sob Apache-2.0. O motor preditivo avançado será um módulo privado com contrato versionado. A versão pública permanecerá funcional sem esse módulo.
 
+O contrato inicial está documentado em [predictive-engine-v1](../contracts/predictive-engine-v1.md) e tipado em `src-tauri/src/domain/prediction.rs`. Ele transporta somente sinais agregados e resultados históricos, nunca conteúdo bruto ou credenciais.
+
 O código privado terá repositório privado próprio quando sua implementação começar. `.gitignore` protege apenas o checkout público e não substitui versionamento ou backup.
 
 ## Alternativas rejeitadas

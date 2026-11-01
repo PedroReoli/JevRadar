@@ -4,6 +4,8 @@ mod infrastructure;
 mod interface;
 mod state;
 
+pub use domain::prediction::*;
+
 use tauri::Manager;
 use tracing_subscriber::EnvFilter;
 
