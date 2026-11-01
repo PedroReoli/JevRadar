@@ -6,6 +6,7 @@ use thiserror::Error;
 
 use crate::domain::assets::{Asset, AssetClass};
 use crate::domain::collection::MarketObservationInput;
+use crate::infrastructure::http::{RetryPolicy, send_with_retry};
 
 const BINANCE_SOURCE_ID: &str = "source:binance";
 const BRAPI_SOURCE_ID: &str = "source:brapi";
@@ -47,18 +48,22 @@ pub fn collect_binance(
 
     for asset in selected {
         let symbol = format!("{}USDT", asset.symbol);
-        let payload = client
-            .get("https://data-api.binance.vision/api/v3/klines")
-            .query(&[
-                ("symbol", symbol.as_str()),
-                ("interval", "1d"),
-                ("limit", "100"),
-            ])
-            .send()
-            .and_then(reqwest::blocking::Response::error_for_status)
-            .map_err(|_| MarketProviderError::Request)?
-            .json::<Vec<Vec<Value>>>()
-            .map_err(|_| MarketProviderError::InvalidPayload)?;
+        let payload = send_with_retry(
+            || {
+                client
+                    .get("https://data-api.binance.vision/api/v3/klines")
+                    .query(&[
+                        ("symbol", symbol.as_str()),
+                        ("interval", "1d"),
+                        ("limit", "100"),
+                    ])
+            },
+            RetryPolicy::Idempotent,
+        )
+        .and_then(reqwest::blocking::Response::error_for_status)
+        .map_err(|_| MarketProviderError::Request)?
+        .json::<Vec<Vec<Value>>>()
+        .map_err(|_| MarketProviderError::InvalidPayload)?;
         observations.extend(parse_binance_klines(asset, payload)?);
     }
 
@@ -97,23 +102,27 @@ pub fn collect_brapi(
         .map(|asset| asset.symbol.as_str())
         .collect::<Vec<_>>()
         .join(",");
-    let mut request = client
-        .get("https://brapi.dev/api/v2/stocks/historical")
-        .query(&[
-            ("symbols", symbols.as_str()),
-            ("range", "3mo"),
-            ("interval", "1d"),
-            ("sortOrder", "asc"),
-        ]);
-    if let Some(token) = token {
-        request = request.bearer_auth(token);
-    }
-    let payload = request
-        .send()
-        .and_then(reqwest::blocking::Response::error_for_status)
-        .map_err(|_| MarketProviderError::Request)?
-        .json::<BrapiResponse>()
-        .map_err(|_| MarketProviderError::InvalidPayload)?;
+    let payload = send_with_retry(
+        || {
+            let request = client
+                .get("https://brapi.dev/api/v2/stocks/historical")
+                .query(&[
+                    ("symbols", symbols.as_str()),
+                    ("range", "3mo"),
+                    ("interval", "1d"),
+                    ("sortOrder", "asc"),
+                ]);
+            match token {
+                Some(token) => request.bearer_auth(token),
+                None => request,
+            }
+        },
+        RetryPolicy::Idempotent,
+    )
+    .and_then(reqwest::blocking::Response::error_for_status)
+    .map_err(|_| MarketProviderError::Request)?
+    .json::<BrapiResponse>()
+    .map_err(|_| MarketProviderError::InvalidPayload)?;
 
     Ok(ProviderCollection {
         source_id: BRAPI_SOURCE_ID,
@@ -143,14 +152,14 @@ pub fn collect_bcb(
         let url = format!(
             "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{series_code}/dados/ultimos/100"
         );
-        let payload = client
-            .get(url)
-            .query(&[("formato", "json")])
-            .send()
-            .and_then(reqwest::blocking::Response::error_for_status)
-            .map_err(|_| MarketProviderError::Request)?
-            .json::<Vec<BcbPoint>>()
-            .map_err(|_| MarketProviderError::InvalidPayload)?;
+        let payload = send_with_retry(
+            || client.get(&url).query(&[("formato", "json")]),
+            RetryPolicy::Idempotent,
+        )
+        .and_then(reqwest::blocking::Response::error_for_status)
+        .map_err(|_| MarketProviderError::Request)?
+        .json::<Vec<BcbPoint>>()
+        .map_err(|_| MarketProviderError::InvalidPayload)?;
         observations.extend(parse_bcb_points(asset, payload)?);
     }
 

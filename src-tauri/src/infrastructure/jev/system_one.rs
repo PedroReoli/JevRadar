@@ -7,6 +7,7 @@ use serde_json::{Value, json};
 use thiserror::Error;
 
 use crate::domain::classification::{DocumentAnalysisResult, PendingDocumentAnalysis};
+use crate::infrastructure::http::{RetryPolicy, send_with_retry};
 
 const SYSTEM_ONE_URL: &str = "https://api.typesafe.ai/v1/systemone";
 const REQUESTED_MODEL: &str = "jev-latest";
@@ -158,16 +159,19 @@ impl JevClient {
                 }
             }
         });
-        let response = self
-            .client
-            .post(SYSTEM_ONE_URL)
-            .bearer_auth(&self.api_key)
-            .json(&request)
-            .send()
-            .and_then(reqwest::blocking::Response::error_for_status)
-            .map_err(|_| JevClientError::Request)?
-            .json::<SystemOneResponse>()
-            .map_err(|_| JevClientError::InvalidPayload)?;
+        let response = send_with_retry(
+            || {
+                self.client
+                    .post(SYSTEM_ONE_URL)
+                    .bearer_auth(&self.api_key)
+                    .json(&request)
+            },
+            RetryPolicy::RateLimitOnly,
+        )
+        .and_then(reqwest::blocking::Response::error_for_status)
+        .map_err(|_| JevClientError::Request)?
+        .json::<SystemOneResponse>()
+        .map_err(|_| JevClientError::InvalidPayload)?;
         parse_response(document, response)
     }
 }

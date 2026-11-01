@@ -6,6 +6,7 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 use crate::domain::content::{ContentSource, SourceDocumentInput};
+use crate::infrastructure::http::{RetryPolicy, send_with_retry};
 
 const MAX_DOCUMENT_CHARS: usize = 8_000;
 const REDDIT_SOURCE_ID: &str = "source:reddit";
@@ -40,9 +41,7 @@ pub fn collect_rss(
         .base_url
         .as_deref()
         .ok_or(ContentProviderError::MissingUrl)?;
-    let bytes = client
-        .get(url)
-        .send()
+    let bytes = send_with_retry(|| client.get(url), RetryPolicy::Idempotent)
         .and_then(reqwest::blocking::Response::error_for_status)
         .map_err(|_| ContentProviderError::Request)?
         .bytes()
@@ -114,25 +113,33 @@ pub fn collect_reddit(
     client_id: &str,
     client_secret: &str,
 ) -> Result<Vec<SourceDocumentInput>, ContentProviderError> {
-    let token = client
-        .post("https://www.reddit.com/api/v1/access_token")
-        .basic_auth(client_id, Some(client_secret))
-        .form(&[("grant_type", "client_credentials")])
-        .send()
-        .and_then(reqwest::blocking::Response::error_for_status)
-        .map_err(|_| ContentProviderError::Request)?
-        .json::<RedditToken>()
-        .map_err(|_| ContentProviderError::InvalidPayload)?;
+    let token = send_with_retry(
+        || {
+            client
+                .post("https://www.reddit.com/api/v1/access_token")
+                .basic_auth(client_id, Some(client_secret))
+                .form(&[("grant_type", "client_credentials")])
+        },
+        RetryPolicy::Idempotent,
+    )
+    .and_then(reqwest::blocking::Response::error_for_status)
+    .map_err(|_| ContentProviderError::Request)?
+    .json::<RedditToken>()
+    .map_err(|_| ContentProviderError::InvalidPayload)?;
     let url = format!("https://oauth.reddit.com/r/{REDDIT_COMMUNITIES}/new");
-    let listing = client
-        .get(url)
-        .bearer_auth(token.access_token)
-        .query(&[("limit", "100"), ("raw_json", "1")])
-        .send()
-        .and_then(reqwest::blocking::Response::error_for_status)
-        .map_err(|_| ContentProviderError::Request)?
-        .json::<RedditListing>()
-        .map_err(|_| ContentProviderError::InvalidPayload)?;
+    let listing = send_with_retry(
+        || {
+            client
+                .get(&url)
+                .bearer_auth(&token.access_token)
+                .query(&[("limit", "100"), ("raw_json", "1")])
+        },
+        RetryPolicy::Idempotent,
+    )
+    .and_then(reqwest::blocking::Response::error_for_status)
+    .map_err(|_| ContentProviderError::Request)?
+    .json::<RedditListing>()
+    .map_err(|_| ContentProviderError::InvalidPayload)?;
     let collected_at = Utc::now();
     let retention_expires_at = (collected_at + Duration::days(30)).to_rfc3339();
 
@@ -175,19 +182,23 @@ pub fn collect_x(
     bearer_token: &str,
     query: &str,
 ) -> Result<Vec<SourceDocumentInput>, ContentProviderError> {
-    let response = client
-        .get("https://api.x.com/2/tweets/search/recent")
-        .bearer_auth(bearer_token)
-        .query(&[
-            ("query", query),
-            ("tweet.fields", "created_at,author_id,lang"),
-            ("max_results", "100"),
-        ])
-        .send()
-        .and_then(reqwest::blocking::Response::error_for_status)
-        .map_err(|_| ContentProviderError::Request)?
-        .json::<XSearchResponse>()
-        .map_err(|_| ContentProviderError::InvalidPayload)?;
+    let response = send_with_retry(
+        || {
+            client
+                .get("https://api.x.com/2/tweets/search/recent")
+                .bearer_auth(bearer_token)
+                .query(&[
+                    ("query", query),
+                    ("tweet.fields", "created_at,author_id,lang"),
+                    ("max_results", "100"),
+                ])
+        },
+        RetryPolicy::Idempotent,
+    )
+    .and_then(reqwest::blocking::Response::error_for_status)
+    .map_err(|_| ContentProviderError::Request)?
+    .json::<XSearchResponse>()
+    .map_err(|_| ContentProviderError::InvalidPayload)?;
     let collected_at = Utc::now();
     let retention_expires_at = (collected_at + Duration::days(30)).to_rfc3339();
 
