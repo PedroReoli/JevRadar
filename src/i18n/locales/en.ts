@@ -653,7 +653,9 @@ export const en = {
     backtestHistory: {
       title: "Run history",
       empty: "No previous run for the current filters.",
+      error: "This history page could not be loaded.",
       createdAt: "Run at {{date}}",
+      pagination: { label: "Backtest history pagination", total: "{{count}} runs", page: "Page {{page}} of {{totalPages}}", previous: "Previous page", next: "Next page" },
     },
   },
   desktop: {

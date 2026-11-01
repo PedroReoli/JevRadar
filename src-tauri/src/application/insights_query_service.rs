@@ -1,4 +1,4 @@
-use crate::domain::backtest::{BacktestReport, CalibrationReadinessOverview};
+use crate::domain::backtest::{BacktestHistoryPage, BacktestReport, CalibrationReadinessOverview};
 use crate::domain::insights::{AlertHistoryItem, CollectionRunSnapshot, JevUsageSnapshot};
 use crate::domain::signals::MarketSignalSnapshot;
 use crate::infrastructure::database::{Database, DatabaseError};
@@ -39,6 +39,23 @@ impl InsightsQueryService {
         database: &Database,
     ) -> Result<CalibrationReadinessOverview, DatabaseError> {
         database.calibration_readiness()
+    }
+
+    pub fn backtest_page(
+        database: &Database,
+        asset_id: Option<&str>,
+        page: u32,
+        page_size: u32,
+    ) -> Result<BacktestHistoryPage, DatabaseError> {
+        let offset = page.saturating_sub(1).saturating_mul(page_size);
+        let (items, total_items) = database.backtest_history_page(asset_id, page_size, offset)?;
+        Ok(BacktestHistoryPage {
+            items,
+            page,
+            page_size,
+            total_items,
+            total_pages: total_items.div_ceil(u64::from(page_size)).max(1) as u32,
+        })
     }
 
     pub fn jev_usage(database: &Database) -> Result<JevUsageSnapshot, DatabaseError> {

@@ -5,14 +5,18 @@ import { useSearchParams } from "react-router-dom";
 import { BacktestControls } from "@/features/backtest/components/BacktestControls";
 import { BacktestHistoryPanel } from "@/features/backtest/components/BacktestHistoryPanel";
 import { BacktestResults } from "@/features/backtest/components/BacktestResults";
-import { useBacktestHistory } from "@/features/insights/hooks/useInsights";
-import { useLatestBacktest, useRunBacktest } from "@/features/backtest/hooks/useBacktest";
+import { useBacktestHistoryPage, useLatestBacktest, useRunBacktest } from "@/features/backtest/hooks/useBacktest";
 import { useDefaultWatchlist } from "@/features/watchlist/hooks/useWatchlist";
 import styles from "@/pages/backtest/BacktestPage.module.css";
 
 function boundedParam(value: string | null, fallback: number) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? parsed : fallback;
+}
+
+function positivePage(value: string | null) {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 1;
 }
 
 export function BacktestPage() {
@@ -22,8 +26,9 @@ export function BacktestPage() {
   const assetId = params.get("asset") ?? "";
   const signalThreshold = boundedParam(params.get("signal"), 0.15);
   const confidenceThreshold = boundedParam(params.get("confidence"), 0.6);
+  const page = positivePage(params.get("page"));
   const reportQuery = useLatestBacktest(assetId);
-  const historyQuery = useBacktestHistory(assetId || undefined);
+  const historyQuery = useBacktestHistoryPage(assetId || undefined, page);
   const runMutation = useRunBacktest();
 
   useEffect(() => {
@@ -37,9 +42,19 @@ export function BacktestPage() {
     }
   }, [assetId, confidenceThreshold, params, setParams, signalThreshold, watchlistQuery.data?.assets]);
 
+  useEffect(() => {
+    const totalPages = historyQuery.data?.totalPages;
+    if (totalPages && page > totalPages) {
+      const next = new URLSearchParams(params);
+      next.set("page", String(totalPages));
+      setParams(next, { replace: true });
+    }
+  }, [historyQuery.data?.totalPages, page, params, setParams]);
+
   const updateParam = (key: string, value: string | number) => {
     const next = new URLSearchParams(params);
     next.set(key, String(value));
+    if (key !== "page") next.delete("page");
     setParams(next, { replace: true });
     runMutation.reset();
   };
@@ -67,7 +82,8 @@ export function BacktestPage() {
       {watchlistQuery.isPending || reportQuery.isPending ? <p className={styles.feedback}>{t("backtest.loading")}</p> : null}
       {watchlistQuery.isError || reportQuery.isError || runMutation.isError ? <p className={styles.error} role="alert">{t("backtest.error")}</p> : null}
       {reportQuery.data ? <BacktestResults report={reportQuery.data} /> : <p className={styles.empty}>{t("backtest.empty")}</p>}
-      <BacktestHistoryPanel reports={historyQuery.data ?? []} />
+      {historyQuery.isError ? <p className={styles.error} role="alert">{t("product.backtestHistory.error")}</p> : null}
+      <BacktestHistoryPanel onPageChange={(nextPage) => updateParam("page", nextPage)} page={historyQuery.data?.page ?? page} reports={historyQuery.data?.items ?? []} totalItems={historyQuery.data?.totalItems ?? 0} totalPages={historyQuery.data?.totalPages ?? 1} />
       <footer className={styles.disclosure}>{t("backtest.disclosure")}</footer>
     </div>
   );

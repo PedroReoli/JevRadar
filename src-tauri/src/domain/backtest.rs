@@ -81,6 +81,16 @@ pub struct BacktestReport {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct BacktestHistoryPage {
+    pub items: Vec<BacktestReport>,
+    pub page: u32,
+    pub page_size: u32,
+    pub total_items: u64,
+    pub total_pages: u32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HistoricalPatternItem {
     pub run_id: String,
     pub asset: Asset,

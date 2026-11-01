@@ -108,6 +108,8 @@ A central de prontidão não declara validade preditiva. Para cada ativo habilit
 
 O mesmo agregado fica disponível, sem mutações, em `GET /v1/calibration-readiness` quando a API local autenticada estiver habilitada. O contrato expõe os valores observados e não calcula validade estatística a partir do limiar visual.
 
+O histórico de execuções é paginado por ativo e sincroniza a página na URL da interface. A API mantém `GET /v1/backtests` por compatibilidade e oferece o contrato paginado em `GET /v1/backtest-history`.
+
 A central de padrões históricos usa apenas o último backtest concluído de cada ativo compatível com um mesmo contrato de metodologia, modelo, perguntas e limiares. Resultados podem ser filtrados por horizonte, classe, tamanho mínimo da amostra e desempenho contra o baseline. Contratos incompatíveis nunca são agregados silenciosamente.
 
 ## Privacidade e telemetria

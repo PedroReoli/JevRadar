@@ -57,6 +57,14 @@ struct BacktestHistoryQuery {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct BacktestHistoryPageQuery {
+    asset_id: Option<String>,
+    page: Option<u32>,
+    page_size: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct DocumentFeedQuery {
     query: Option<String>,
     source_kind: Option<String>,
@@ -191,6 +199,7 @@ impl From<SignalEvidenceSnapshot> for SignalEvidenceResponse {
         alert_history,
         collection_history,
         backtest_history,
+        backtest_history_page,
         latest_backtest,
         calibration_readiness,
         jev_usage
@@ -238,6 +247,7 @@ pub async fn serve(
         .route("/v1/alerts", get(alert_history))
         .route("/v1/collections", get(collection_history))
         .route("/v1/backtests", get(backtest_history))
+        .route("/v1/backtest-history", get(backtest_history_page))
         .route("/v1/backtests/{asset_id}", get(latest_backtest))
         .route("/v1/calibration-readiness", get(calibration_readiness))
         .route("/v1/jev/usage", get(jev_usage))
@@ -634,6 +644,38 @@ async fn backtest_history(
 
 #[utoipa::path(
     get,
+    path = "/v1/backtest-history",
+    params(
+        ("assetId" = Option<String>, Query, description = "ID local do ativo"),
+        ("page" = Option<u32>, Query, description = "Página a partir de 1"),
+        ("pageSize" = Option<u32>, Query, description = "1 a 50; padrão 10")
+    ),
+    security(("bearerAuth" = [])),
+    responses((status = 200, description = "Histórico paginado de backtests", body = Object), (status = 400), (status = 401))
+)]
+async fn backtest_history_page(
+    State(state): State<ApiState>,
+    Query(query): Query<BacktestHistoryPageQuery>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    authorize(&headers, &state.token)?;
+    let page = query.page.unwrap_or(1);
+    let page_size = query.page_size.unwrap_or(10);
+    if page == 0 || !(1..=50).contains(&page_size) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let reports = InsightsQueryService::backtest_page(
+        &state.database,
+        query.asset_id.as_deref(),
+        page,
+        page_size,
+    )
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    serialize_json(reports)
+}
+
+#[utoipa::path(
+    get,
     path = "/v1/backtests/{asset_id}",
     params(("asset_id" = String, Path, description = "ID local do ativo")),
     security(("bearerAuth" = [])),
@@ -807,6 +849,7 @@ mod tests {
             "/v1/alerts",
             "/v1/collections",
             "/v1/backtests",
+            "/v1/backtest-history",
             "/v1/calibration-readiness",
             "/v1/jev/usage",
         ] {

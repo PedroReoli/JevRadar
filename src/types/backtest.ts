@@ -30,6 +30,14 @@ export interface BacktestReport {
   results: BacktestHorizonResult[];
 }
 
+export interface BacktestHistoryPage {
+  items: BacktestReport[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
 export interface RunBacktestRequest {
   assetId: string;
   signalThreshold: number;

@@ -28,7 +28,7 @@ use crate::interface::commands::data::{export_local_data, export_market_report, 
 use crate::interface::commands::desktop::{resolve_close_request, send_test_notification};
 use crate::interface::commands::insights::{
     get_calibration_readiness, get_jev_usage, get_signal_report, list_alert_history,
-    list_backtest_history, list_collection_history,
+    list_backtest_history, list_backtest_history_page, list_collection_history,
 };
 use crate::interface::commands::market::{
     get_market_context_overview, get_market_overview, get_market_series, get_signal_evidence,
@@ -96,6 +96,7 @@ pub fn run() {
             list_alert_history,
             list_collection_history,
             list_backtest_history,
+            list_backtest_history_page,
             get_calibration_readiness,
             get_jev_usage,
             get_system_status,

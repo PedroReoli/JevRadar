@@ -242,6 +242,39 @@
   font: var(--font-body-sm);
 }
 
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  color: var(--color-text-muted);
+  font: var(--font-body-sm);
+}
+
+.pagination > div {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.pagination button {
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  background: var(--color-surface-raised);
+  cursor: pointer;
+}
+
+.pagination button:disabled {
+  cursor: default;
+  opacity: var(--opacity-disabled);
+}
+
 @media (max-width: 52rem) {
   .header,
   .panelHeader,

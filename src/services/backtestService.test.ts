@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke, isTauri: () => true }));
 
-import { getLatestBacktest, runBacktest } from "@/services/backtestService";
+import { getLatestBacktest, listBacktestHistoryPage, runBacktest } from "@/services/backtestService";
 
 const report = {
   runId: "backtest:1",
@@ -37,5 +37,12 @@ describe("backtestService", () => {
   it("aceita ausência de execução anterior", async () => {
     invoke.mockResolvedValueOnce(null);
     expect(await getLatestBacktest("asset:b3:PETR4")).toBeNull();
+  });
+
+  it("valida a página limitada do histórico", async () => {
+    invoke.mockResolvedValueOnce({ items: [report], page: 2, pageSize: 10, totalItems: 12, totalPages: 2 });
+    const page = await listBacktestHistoryPage("asset:b3:PETR4", 2);
+    expect(page.items[0]?.runId).toBe("backtest:1");
+    expect(invoke).toHaveBeenCalledWith("list_backtest_history_page", { assetId: "asset:b3:PETR4", page: 2, pageSize: 10 });
   });
 });

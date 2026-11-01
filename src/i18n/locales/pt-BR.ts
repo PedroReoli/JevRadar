@@ -653,7 +653,9 @@ export const ptBR = {
     backtestHistory: {
       title: "Histórico de execuções",
       empty: "Nenhuma execução anterior para os filtros atuais.",
+      error: "Não foi possível carregar esta página do histórico.",
       createdAt: "Executado em {{date}}",
+      pagination: { label: "Paginação do histórico de backtests", total: "{{count}} execuções", page: "Página {{page}} de {{totalPages}}", previous: "Página anterior", next: "Próxima página" },
     },
   },
   desktop: {

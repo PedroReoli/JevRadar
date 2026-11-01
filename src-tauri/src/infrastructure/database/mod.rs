@@ -2188,6 +2188,47 @@ impl Database {
         Ok(reports)
     }
 
+    pub fn backtest_history_page(
+        &self,
+        asset_id: Option<&str>,
+        limit: u32,
+        offset: u32,
+    ) -> Result<(Vec<BacktestReport>, u64), DatabaseError> {
+        let connection = self.connection.lock();
+        let total_items = connection.query_row(
+            "SELECT COUNT(*) FROM backtest_runs WHERE (?1 IS NULL OR asset_id = ?1)",
+            params![asset_id],
+            |row| row.get::<_, i64>(0),
+        )? as u64;
+        let mut statement = connection.prepare(
+            "SELECT br.id, a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency,
+                    a.country_code, br.methodology_version, br.signal_methodology_version,
+                    br.model_version, br.question_version, br.signal_threshold,
+                    br.confidence_threshold, br.calibration_started_at, br.calibration_ended_at,
+                    br.evaluation_started_at, br.evaluation_ended_at, br.created_at,
+                    br.completed_at, br.status
+             FROM backtest_runs br
+             JOIN assets a ON a.id = br.asset_id
+             WHERE (?1 IS NULL OR br.asset_id = ?1)
+             ORDER BY br.created_at DESC, br.id DESC
+             LIMIT ?2 OFFSET ?3",
+        )?;
+        let mut reports = statement
+            .query_map(params![asset_id, limit, offset], map_backtest_report)?
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut result_statement = connection.prepare(
+            "SELECT horizon_days, sample_size, mean_return, median_return, positive_rate,
+                    baseline_positive_rate, confidence_interval_low, confidence_interval_high
+             FROM backtest_results WHERE run_id = ?1 ORDER BY horizon_days",
+        )?;
+        for report in &mut reports {
+            report.results = result_statement
+                .query_map(params![report.run_id], map_backtest_result)?
+                .collect::<Result<Vec<_>, _>>()?;
+        }
+        Ok((reports, total_items))
+    }
+
     pub fn backtest_report_count(&self) -> Result<u64, DatabaseError> {
         let count =
             self.connection
@@ -3456,6 +3497,11 @@ mod tests {
             .expect("histórico de backtests");
         assert_eq!(history.len(), 1);
         assert_eq!(history[0].results[0].horizon_days, 1);
+        let (paged_history, history_total) = database
+            .backtest_history_page(Some("asset:b3:PETR4"), 10, 0)
+            .expect("histórico paginado");
+        assert_eq!(history_total, 1);
+        assert_eq!(paged_history[0].run_id, "backtest:test");
         let (patterns, pattern_total) = database
             .historical_pattern_page(Some("b3_equity"), 1, "outperformed", 1, 25, 0)
             .expect("padrões históricos");
