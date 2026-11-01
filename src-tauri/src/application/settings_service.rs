@@ -3,6 +3,7 @@ use tauri_plugin_autostart::ManagerExt;
 use crate::domain::settings::{
     AppSettings, CloseBehavior, SecretKind, SecretStatus, UpdateAppSettings,
 };
+use crate::infrastructure::background::BackgroundRuntime;
 use crate::infrastructure::database::{Database, DatabaseError};
 use crate::infrastructure::secrets::{KeyringSecretStore, SecretStoreError};
 
@@ -43,6 +44,7 @@ impl SettingsService {
     pub fn update<R: tauri::Runtime>(
         app: &tauri::AppHandle<R>,
         database: &Database,
+        background: &BackgroundRuntime,
         update: UpdateAppSettings,
     ) -> Result<AppSettings, SettingsServiceError> {
         update
@@ -57,6 +59,7 @@ impl SettingsService {
         };
         autostart_result.map_err(|_| SettingsServiceError::Autostart)?;
 
+        let background_collection_enabled = update.background_collection_enabled;
         database.write_settings(&[
             ("setup_completed", update.setup_completed.to_string()),
             ("language", update.language),
@@ -79,6 +82,7 @@ impl SettingsService {
             ("experience_level", update.experience_level),
             ("investment_range", update.investment_range),
         ])?;
+        background.reconfigure(background_collection_enabled);
 
         Self::read(database)
     }

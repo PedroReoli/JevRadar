@@ -4,6 +4,7 @@ use serde::Serialize;
 #[serde(rename_all = "lowercase")]
 pub enum ComponentStatus {
     Ready,
+    Pending,
     Disabled,
     Unavailable,
 }

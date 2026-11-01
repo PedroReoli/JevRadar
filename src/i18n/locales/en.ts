@@ -27,6 +27,16 @@ export const en = {
     openSettings: "Open settings",
     disclosure: "JevRadar presents data and historical relationships. It does not recommend buying or selling.",
   },
+  desktop: {
+    closeEyebrow: "Background application",
+    closeTitle: "What should happen when closing?",
+    closeDescription: "Minimizing keeps enabled collection running in the system tray. Quitting stops every local process.",
+    minimize: "Minimize to system tray",
+    quit: "Quit JevRadar",
+    cancel: "Cancel closing",
+    closePreferenceHint: "You can choose a default behavior in settings.",
+    closeError: "The action could not be completed. The window remains open.",
+  },
   settings: {
     eyebrow: "Local preferences",
     title: "Settings",

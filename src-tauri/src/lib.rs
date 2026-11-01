@@ -8,7 +8,9 @@ use tauri::Manager;
 use tracing_subscriber::EnvFilter;
 
 use crate::infrastructure::database::Database;
+use crate::infrastructure::desktop::{create_system_tray, register_main_window_lifecycle};
 use crate::infrastructure::secrets::KeyringSecretStore;
+use crate::interface::commands::desktop::resolve_close_request;
 use crate::interface::commands::settings::{
     delete_secret, get_app_settings, get_secret_status, save_secret, update_app_settings,
 };
@@ -28,6 +30,8 @@ pub fn run() {
             let app_data_dir = app.path().app_data_dir()?;
             let database = Database::open(app_data_dir.join("jevradar.sqlite3"))?;
             app.manage(AppState::new(database, KeyringSecretStore::new()));
+            create_system_tray(app)?;
+            register_main_window_lifecycle(app);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -36,7 +40,8 @@ pub fn run() {
             update_app_settings,
             get_secret_status,
             save_secret,
-            delete_secret
+            delete_secret,
+            resolve_close_request
         ])
         .run(tauri::generate_context!())
         .expect("falha ao executar o JevRadar");

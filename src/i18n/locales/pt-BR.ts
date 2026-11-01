@@ -27,6 +27,16 @@ export const ptBR = {
     openSettings: "Abrir configurações",
     disclosure: "O JevRadar apresenta dados e relações históricas. Não recomenda compra ou venda.",
   },
+  desktop: {
+    closeEyebrow: "Aplicativo em segundo plano",
+    closeTitle: "O que deseja fazer ao fechar?",
+    closeDescription: "Minimizar mantém a coleta habilitada na bandeja. Encerrar interrompe todos os processos locais.",
+    minimize: "Minimizar para a bandeja",
+    quit: "Encerrar JevRadar",
+    cancel: "Cancelar fechamento",
+    closePreferenceHint: "Você pode definir um comportamento padrão nas configurações.",
+    closeError: "Não foi possível concluir a ação. A janela continua aberta.",
+  },
   settings: {
     eyebrow: "Preferências locais",
     title: "Configurações",

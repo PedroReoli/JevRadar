@@ -10,6 +10,15 @@ pub struct CommandError {
     pub message: String,
 }
 
+impl CommandError {
+    pub fn internal(error: impl std::fmt::Display) -> Self {
+        Self {
+            code: "desktop_error",
+            message: error.to_string(),
+        }
+    }
+}
+
 impl From<SettingsServiceError> for CommandError {
     fn from(error: SettingsServiceError) -> Self {
         let code = match error {

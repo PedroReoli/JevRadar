@@ -1,0 +1,121 @@
+.dialog {
+  width: min(calc(100% - var(--space-8)), var(--layout-dialog-max));
+  padding: 0;
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-xl);
+  color: var(--color-text-primary);
+  background: var(--color-surface-panel);
+  box-shadow: var(--shadow-dialog);
+}
+
+.dialog::backdrop {
+  background: var(--color-backdrop);
+  backdrop-filter: blur(var(--backdrop-blur));
+}
+
+.content {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-6);
+}
+
+.content header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.content header div {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.content header span {
+  color: var(--color-accent-text);
+  font: var(--font-label-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.content h2,
+.content p {
+  margin: 0;
+}
+
+.content h2 {
+  font: var(--font-title-lg);
+}
+
+.content > p,
+.content small {
+  color: var(--color-text-secondary);
+  font: var(--font-body-sm);
+}
+
+.content header > button,
+.secondaryButton,
+.dangerButton {
+  min-height: var(--control-height-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border-radius: var(--radius-md);
+  font: var(--font-label-md);
+  cursor: pointer;
+}
+
+.content header > button {
+  width: var(--control-height-md);
+  padding: 0;
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  background: transparent;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.secondaryButton,
+.dangerButton {
+  padding: 0 var(--space-4);
+}
+
+.secondaryButton {
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  color: var(--color-text-primary);
+  background: var(--color-surface-canvas);
+}
+
+.dangerButton {
+  border: var(--border-width-thin) solid var(--color-negative-border);
+  color: var(--color-negative-text);
+  background: var(--color-negative-surface);
+}
+
+.content button:disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+
+.error {
+  padding: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-negative-border);
+  border-radius: var(--radius-md);
+  color: var(--color-negative-text) !important;
+  background: var(--color-negative-surface);
+}
+
+@media (max-width: 40rem) {
+  .content {
+    padding: var(--space-5);
+  }
+
+  .actions {
+    grid-template-columns: 1fr;
+  }
+}

@@ -6,5 +6,5 @@ use crate::state::AppState;
 
 #[tauri::command]
 pub fn get_system_status(state: State<'_, AppState>) -> SystemStatus {
-    SystemStatusService::read(&state.database)
+    SystemStatusService::read(&state.database, &state.background)
 }

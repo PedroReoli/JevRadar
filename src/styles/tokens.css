@@ -59,6 +59,7 @@
   --layout-content-narrow: 58rem;
   --layout-wizard-max: 48rem;
   --layout-wizard-min-height: 40rem;
+  --layout-dialog-max: 30rem;
   --layout-text-max: 32rem;
   --space-wizard-inline: clamp(2rem, 9vw, 6rem);
 
@@ -90,6 +91,7 @@
   --color-neutral-border: rgb(148 163 184 / 22%);
   --color-warning-surface: rgb(232 175 69 / 8%);
   --color-warning-border: #9e762d;
+  --color-backdrop: rgb(3 8 12 / 66%);
 
   --shadow-panel: 0 1.5rem 4rem rgb(0 0 0 / 18%);
   --shadow-accent: 0 0.5rem 1.75rem rgb(85 214 178 / 20%);
@@ -101,6 +103,7 @@
   --motion-lift-distance: -0.0625rem;
   --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
   --opacity-disabled: 0.45;
+  --backdrop-blur: 0.375rem;
   --z-sticky-actions: 10;
 }
 

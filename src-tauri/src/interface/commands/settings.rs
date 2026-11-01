@@ -16,7 +16,7 @@ pub fn update_app_settings(
     state: State<'_, AppState>,
     settings: UpdateAppSettings,
 ) -> Result<AppSettings, CommandError> {
-    SettingsService::update(&app, &state.database, settings).map_err(Into::into)
+    SettingsService::update(&app, &state.database, &state.background, settings).map_err(Into::into)
 }
 
 #[tauri::command]
