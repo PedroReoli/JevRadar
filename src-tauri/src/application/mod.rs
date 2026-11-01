@@ -2,6 +2,7 @@ pub mod alert_service;
 pub mod backtest_service;
 pub mod catalog_service;
 pub mod classification_service;
+pub mod comparison_query_service;
 pub mod content_collection_service;
 pub mod content_query_service;
 pub mod coverage_query_service;

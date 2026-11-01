@@ -14,6 +14,7 @@ use utoipa::{Modify, OpenApi, ToSchema};
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::application::backtest_service::BacktestService;
+use crate::application::comparison_query_service::{ComparisonQueryError, ComparisonQueryService};
 use crate::application::content_query_service::{
     ContentQueryService, ContentSourceManagementError,
 };
@@ -97,6 +98,14 @@ struct SignalExplorerQuery {
 #[serde(rename_all = "camelCase")]
 struct AssetDetailQuery {
     period_hours: Option<u16>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AssetComparisonQuery {
+    asset_ids: Option<String>,
+    period_hours: Option<u16>,
+    minimum_confidence: Option<f64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -225,6 +234,7 @@ impl From<SignalEvidenceSnapshot> for SignalEvidenceResponse {
         health,
         market_overview,
         asset_detail,
+        asset_comparison,
         signal_explorer,
         content_overview,
         document_feed,
@@ -278,6 +288,7 @@ pub async fn serve(
         .route("/health", get(health))
         .route("/v1/market", get(market_overview))
         .route("/v1/assets/{asset_id}/overview", get(asset_detail))
+        .route("/v1/comparison", get(asset_comparison))
         .route("/v1/signal-explorer", get(signal_explorer))
         .route("/v1/sources", get(content_overview))
         .route("/v1/documents", get(document_feed))
@@ -362,6 +373,43 @@ async fn asset_detail(
         query.period_hours.unwrap_or(720),
     )
     .map_err(asset_detail_query_status)?;
+    serialize_json(overview)
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/comparison",
+    params(
+        ("assetIds" = Option<String>, Query, description = "Até quatro IDs locais separados por vírgula"),
+        ("periodHours" = Option<u16>, Query, description = "Período entre 1 e 720 horas; padrão 168"),
+        ("minimumConfidence" = Option<f64>, Query, description = "Confiança mínima entre 0 e 1; padrão 0,5")
+    ),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Ativos disponíveis e linhas comparativas", body = Object),
+        (status = 400, description = "Filtros inválidos"),
+        (status = 401, description = "Token local ausente ou inválido"),
+        (status = 500, description = "Falha ao consultar o banco local")
+    )
+)]
+async fn asset_comparison(
+    State(state): State<ApiState>,
+    Query(query): Query<AssetComparisonQuery>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    authorize(&headers, &state.token)?;
+    let asset_ids = query
+        .asset_ids
+        .filter(|value| !value.is_empty())
+        .map(|value| value.split(',').map(str::to_owned).collect())
+        .unwrap_or_default();
+    let overview = ComparisonQueryService::overview(
+        &state.database,
+        asset_ids,
+        query.period_hours.unwrap_or(168),
+        query.minimum_confidence.unwrap_or(0.5),
+    )
+    .map_err(comparison_query_status)?;
     serialize_json(overview)
 }
 
@@ -975,6 +1023,13 @@ fn asset_detail_query_status(error: AssetDetailQueryError) -> StatusCode {
     }
 }
 
+fn comparison_query_status(error: ComparisonQueryError) -> StatusCode {
+    match error {
+        ComparisonQueryError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        ComparisonQueryError::InvalidFilter => StatusCode::BAD_REQUEST,
+    }
+}
+
 fn coverage_query_status(error: CoverageGapQueryError) -> StatusCode {
     match error {
         CoverageGapQueryError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -1031,7 +1086,11 @@ mod tests {
 
     use utoipa::OpenApi;
 
-    use super::{ApiDoc, asset_detail_query_status, authorize, bounded_limit, valid_signal_id};
+    use super::{
+        ApiDoc, asset_detail_query_status, authorize, bounded_limit, comparison_query_status,
+        valid_signal_id,
+    };
+    use crate::application::comparison_query_service::ComparisonQueryError;
     use crate::application::market_query_service::AssetDetailQueryError;
     use crate::infrastructure::database::DatabaseError;
 
@@ -1069,6 +1128,7 @@ mod tests {
         );
         for path in [
             "/v1/assets/{asset_id}/overview",
+            "/v1/comparison",
             "/v1/signal-explorer",
             "/v1/signals/{signal_id}",
             "/v1/documents",
@@ -1104,6 +1164,20 @@ mod tests {
         );
         assert_eq!(
             asset_detail_query_status(AssetDetailQueryError::Database(DatabaseError::Sqlite(
+                rusqlite::Error::InvalidQuery,
+            ))),
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    #[test]
+    fn maps_comparison_input_and_database_failures_without_leaking_details() {
+        assert_eq!(
+            comparison_query_status(ComparisonQueryError::InvalidFilter),
+            axum::http::StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            comparison_query_status(ComparisonQueryError::Database(DatabaseError::Sqlite(
                 rusqlite::Error::InvalidQuery,
             ))),
             axum::http::StatusCode::INTERNAL_SERVER_ERROR

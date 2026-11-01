@@ -17,6 +17,7 @@ use crate::domain::classification::{
     AnalysisCandidateAsset, DocumentAnalysisResult, PendingDocumentAnalysis,
 };
 use crate::domain::collection::{MarketObservationInput, SourceCollectionResult};
+use crate::domain::comparison::AssetComparisonRow;
 use crate::domain::content::{
     ContentOverview, ContentSource, ContentSourceResult, ContentSourceStatus, DocumentFeedItem,
     SourceDocumentInput,
@@ -74,6 +75,126 @@ pub enum DatabaseError {
 }
 
 impl Database {
+    pub fn asset_comparison_rows(
+        &self,
+        asset_ids: &[String],
+        cutoff: &str,
+        minimum_confidence: f64,
+    ) -> Result<Vec<AssetComparisonRow>, DatabaseError> {
+        if asset_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let requested_values = asset_ids
+            .iter()
+            .enumerate()
+            .map(|(index, _)| format!("({}, ?{})", index, index + 1))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let cutoff_parameter = asset_ids.len() + 1;
+        let confidence_parameter = asset_ids.len() + 2;
+        let sql = format!(
+            "WITH requested(position, asset_id) AS (VALUES {requested_values}),
+             series_ranked AS (
+                SELECT mo.*,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY mo.asset_id, mo.source_id, mo.interval
+                           ORDER BY mo.observed_at DESC, mo.collected_at DESC
+                       ) AS series_position
+                FROM market_observations mo
+                JOIN requested requested_observation ON requested_observation.asset_id = mo.asset_id
+             ), latest_series AS (
+                SELECT series_ranked.*,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY series_ranked.asset_id
+                           ORDER BY series_ranked.observed_at DESC, series_ranked.collected_at DESC
+                       ) AS asset_position
+                FROM series_ranked
+                WHERE series_ranked.series_position = 1
+                  AND EXISTS (
+                      SELECT 1 FROM series_ranked previous_candidate
+                      WHERE previous_candidate.asset_id = series_ranked.asset_id
+                        AND previous_candidate.source_id = series_ranked.source_id
+                        AND previous_candidate.interval = series_ranked.interval
+                        AND previous_candidate.series_position = 2
+                  )
+             ), ranked_signals AS (
+                SELECT ms.*,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY ms.asset_id
+                           ORDER BY ms.window_ended_at DESC, ms.calculated_at DESC
+                       ) AS signal_position
+                FROM market_signals ms
+                JOIN requested requested_signal ON requested_signal.asset_id = ms.asset_id
+                WHERE ms.window_ended_at >= ?{cutoff_parameter}
+             )
+             SELECT a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency, a.country_code,
+                    latest.close_value, previous.close_value,
+                    signal.signal_score, signal.confidence, signal.evidence_count,
+                    signal.independent_source_count, signal.hype_penalty,
+                    (
+                        SELECT COUNT(*) FROM event_asset_relations ear
+                        JOIN market_events me ON me.id = ear.event_id
+                        WHERE ear.asset_id = a.id
+                          AND me.started_at >= ?{cutoff_parameter}
+                          AND ear.confidence >= ?{confidence_parameter}
+                    ),
+                    latest.observed_at, source.name
+             FROM requested
+             JOIN watchlist_assets wa ON wa.asset_id = requested.asset_id
+                AND wa.watchlist_id = 'watchlist:default' AND wa.enabled = 1
+             JOIN assets a ON a.id = requested.asset_id AND a.active = 1
+             LEFT JOIN latest_series latest ON latest.asset_id = a.id AND latest.asset_position = 1
+             LEFT JOIN series_ranked previous ON previous.asset_id = latest.asset_id
+                AND previous.source_id = latest.source_id
+                AND previous.interval = latest.interval
+                AND previous.series_position = 2
+             LEFT JOIN sources source ON source.id = latest.source_id
+             LEFT JOIN ranked_signals signal ON signal.asset_id = a.id
+                AND signal.signal_position = 1 AND signal.confidence >= ?{confidence_parameter}
+             ORDER BY requested.position"
+        );
+        let mut parameters = asset_ids
+            .iter()
+            .cloned()
+            .map(rusqlite::types::Value::Text)
+            .collect::<Vec<_>>();
+        parameters.push(rusqlite::types::Value::Text(cutoff.to_owned()));
+        parameters.push(rusqlite::types::Value::Real(minimum_confidence));
+        let connection = self.connection.lock();
+        let mut statement = connection.prepare(&sql)?;
+        statement
+            .query_map(rusqlite::params_from_iter(parameters.iter()), |row| {
+                let close_value = row.get::<_, Option<f64>>(7)?;
+                let previous_close_value = row.get::<_, Option<f64>>(8)?;
+                let change_percent =
+                    close_value
+                        .zip(previous_close_value)
+                        .and_then(|(current, previous)| {
+                            if previous == 0.0 {
+                                None
+                            } else {
+                                Some(((current / previous) - 1.0) * 100.0)
+                            }
+                        });
+                Ok(AssetComparisonRow {
+                    asset: map_asset(row)?,
+                    change_percent,
+                    signal_score: row.get(9)?,
+                    confidence: row.get(10)?,
+                    evidence_count: row.get::<_, Option<i64>>(11)?.map(|value| value as usize),
+                    independent_source_count: row
+                        .get::<_, Option<i64>>(12)?
+                        .map(|value| value as usize),
+                    hype_penalty: row.get(13)?,
+                    event_count: row.get::<_, i64>(14)? as usize,
+                    observed_at: row.get(15)?,
+                    market_source_name: row.get(16)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(Into::into)
+    }
+
     pub fn open(path: PathBuf) -> Result<Self, DatabaseError> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
@@ -3782,6 +3903,13 @@ mod tests {
             .expect("último sinal por ativo")
             .expect("sinal existente");
         assert_eq!(latest_signal.id, "signal:test");
+        let comparison = database
+            .asset_comparison_rows(&["asset:b3:PETR4".to_owned()], "2026-11-01T00:00:00Z", 0.8)
+            .expect("comparação dedicada");
+        assert_eq!(comparison.len(), 1);
+        assert_eq!(comparison[0].asset.symbol, "PETR4");
+        assert_eq!(comparison[0].signal_score, Some(0.72));
+        assert_eq!(comparison[0].event_count, 1);
         assert!(
             database
                 .latest_market_signal_for_asset("asset:b3:PETR4", "2026-11-03T00:00:00Z")

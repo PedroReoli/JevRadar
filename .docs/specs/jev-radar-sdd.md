@@ -89,7 +89,7 @@ O explorador de sinais consulta no SQLite somente o último sinal de cada ativo 
 
 O dossiê de um ativo usa um read model dedicado ao item presente na watchlist. Ele reúne a última observação disponível, o sinal mais recente dentro da janela e até 200 eventos relacionados, sem carregar o painel completo para descartar os demais ativos no navegador. Série temporal e último backtest permanecem consultas independentes porque possuem ciclos e estados de ausência próprios. A API local autenticada expõe o agregado em `GET /v1/assets/{asset_id}/overview`.
 
-A comparação de ativos aceita de dois a quatro itens habilitados na watchlist. Preço e sentimento são exibidos em visualizações separadas, enquanto confiança, volume de evidências, diversidade, hype e eventos permanecem disponíveis como valores exatos. Seleção, período e confiança mínima ficam na URL; ausência de observação é mostrada como dado ausente, nunca como zero.
+A comparação de ativos aceita de dois a quatro itens habilitados na watchlist. Um read model dedicado aplica no SQLite a seleção, o período e a confiança mínima, retornando somente as linhas solicitadas e o catálogo habilitado para o seletor. Preço e sentimento são exibidos em visualizações separadas, enquanto confiança, volume de evidências, diversidade, hype e eventos permanecem disponíveis como valores exatos. Seleção e filtros ficam na URL; ausência de observação é mostrada como dado ausente, nunca como zero. A API local autenticada expõe o mesmo contrato em `GET /v1/comparison`.
 
 ## Alertas
 

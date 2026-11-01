@@ -12,3 +12,14 @@ export interface AssetComparisonRow {
   observedAt: string | null;
   marketSourceName: string | null;
 }
+
+export interface AssetComparisonRequest {
+  assetIds: string[];
+  periodHours: 24 | 168 | 720;
+  minimumConfidence: 0 | 0.5 | 0.7 | 0.85;
+}
+
+export interface AssetComparisonOverview {
+  availableAssets: Asset[];
+  rows: AssetComparisonRow[];
+}

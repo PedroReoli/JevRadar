@@ -1,10 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { getDefaultWatchlist } from "@/services/catalogService";
-import { getMarketOverview } from "@/services/marketService";
-import type { AssetComparisonRow } from "@/types/comparison";
+import { getAssetComparison } from "@/services/comparisonService";
 import type { MarketContextFilter } from "@/types/market";
 
 const MAXIMUM_ASSETS = 4;
@@ -23,39 +21,14 @@ export function useAssetComparison() {
   const periodHours = periods.has(periodCandidate) ? periodCandidate : 168;
   const minimumConfidence = confidenceLevels.has(confidenceCandidate) ? confidenceCandidate : 0.5;
   const requestedAssetIds = selectedAssetIds(params.get("assets"));
-  const watchlistQuery = useQuery({ queryKey: ["default-watchlist"], queryFn: getDefaultWatchlist });
-  const overviewQuery = useQuery({
-    queryKey: ["market-overview", { periodHours, assetClass: null, minimumConfidence }],
-    queryFn: () => getMarketOverview({ periodHours, assetClass: null, minimumConfidence }),
+  const comparisonQuery = useQuery({
+    queryKey: ["asset-comparison", { requestedAssetIds, periodHours, minimumConfidence }],
+    queryFn: () => getAssetComparison({ assetIds: requestedAssetIds, periodHours, minimumConfidence }),
     refetchInterval: 60_000,
   });
-  const availableAssets = useMemo(
-    () => watchlistQuery.data?.assets.filter((item) => item.enabled).map((item) => item.asset) ?? [],
-    [watchlistQuery.data],
-  );
-  const availableIds = useMemo(() => new Set(availableAssets.map((asset) => asset.id)), [availableAssets]);
+  const availableAssets = comparisonQuery.data?.availableAssets ?? [];
+  const availableIds = new Set(availableAssets.map((asset) => asset.id));
   const selectedIds = requestedAssetIds.filter((id) => availableIds.has(id));
-  const rows = useMemo<AssetComparisonRow[]>(() => {
-    if (!overviewQuery.data) return [];
-    return selectedIds.flatMap((assetId) => {
-      const asset = availableAssets.find((item) => item.id === assetId);
-      if (!asset) return [];
-      const snapshot = overviewQuery.data.snapshots.find((item) => item.asset.id === assetId);
-      const signal = overviewQuery.data.signals.find((item) => item.asset.id === assetId);
-      return [{
-        asset,
-        changePercent: snapshot?.changePercent ?? null,
-        signalScore: signal?.signalScore ?? null,
-        confidence: signal?.confidence ?? null,
-        evidenceCount: signal?.evidenceCount ?? null,
-        independentSourceCount: signal?.independentSourceCount ?? null,
-        hypePenalty: signal?.hypePenalty ?? null,
-        eventCount: overviewQuery.data.events.filter((item) => item.asset.id === assetId).length,
-        observedAt: snapshot?.observedAt ?? null,
-        marketSourceName: snapshot?.sourceName ?? null,
-      }];
-    });
-  }, [availableAssets, overviewQuery.data, selectedIds]);
 
   const updateFilter = useCallback((key: "period" | "confidence", value: string) => {
     const next = new URLSearchParams(params);
@@ -77,13 +50,13 @@ export function useAssetComparison() {
 
   return {
     availableAssets,
-    isError: watchlistQuery.isError || overviewQuery.isError,
-    isPending: watchlistQuery.isPending || overviewQuery.isPending,
+    isError: comparisonQuery.isError,
+    isPending: comparisonQuery.isPending,
     maximumAssets: MAXIMUM_ASSETS,
     minimumConfidence,
     periodHours,
-    refetch: async () => Promise.all([watchlistQuery.refetch(), overviewQuery.refetch()]),
-    rows,
+    refetch: comparisonQuery.refetch,
+    rows: comparisonQuery.data?.rows ?? [],
     selectedIds,
     toggleAsset,
     updateFilter,

@@ -3,6 +3,7 @@ pub mod assets;
 pub mod backtest;
 pub mod classification;
 pub mod collection;
+pub mod comparison;
 pub mod content;
 pub mod coverage;
 pub mod desktop;

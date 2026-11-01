@@ -19,6 +19,7 @@ use crate::interface::commands::catalog::{
 };
 use crate::interface::commands::classification::classify_pending_documents;
 use crate::interface::commands::collection::refresh_market_data;
+use crate::interface::commands::comparison::get_asset_comparison;
 use crate::interface::commands::content::{
     add_rss_source, get_content_overview, list_document_feed, refresh_content_sources,
     set_content_source_enabled,
@@ -81,6 +82,7 @@ pub fn run() {
             add_watchlist_asset,
             remove_watchlist_asset,
             refresh_market_data,
+            get_asset_comparison,
             refresh_content_sources,
             classify_pending_documents,
             get_content_overview,

@@ -2,6 +2,7 @@ pub mod backtest;
 pub mod catalog;
 pub mod classification;
 pub mod collection;
+pub mod comparison;
 pub mod content;
 pub mod coverage;
 pub mod data;
