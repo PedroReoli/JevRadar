@@ -10,15 +10,16 @@ O repositório está em **alpha para Windows**. O núcleo público funciona sem 
 
 - wizard inicial bilíngue, preferências locais e credenciais no Windows Credential Manager;
 - watchlist de até 50 ativos;
-- preços de Binance e brapi, indicadores do Banco Central e conteúdo via RSS e Reddit oficial;
+- preços de Binance e brapi, indicadores do Banco Central e conteúdo via RSS, Reddit oficial e X opcional BYOK;
+- feeds RSS personalizados para fóruns, blogs e publicações que exponham um feed público;
 - classificação Jev por ativo, sentimento, relevância, tipo, alegação factual, hype e contexto externo;
 - agregação auditável, alertas locais em quatro níveis e coleta em background configurável;
-- dashboard com filtros na URL, preço × sentimento, eventos e lacunas de cobertura;
+- dashboard com filtros na URL, mapa de calor, preço × sentimento, eventos, contexto educacional e lacunas de cobertura;
 - backtest cronológico em 1, 7 e 30 dias, com baseline, intervalo de confiança e separação calibração/avaliação;
-- API local opcional, autenticada e somente leitura, com Swagger em `http://127.0.0.1:47831/docs/`;
+- API local opcional, autenticada e somente leitura, com Swagger e evidências auditáveis em `http://127.0.0.1:47831/docs/`;
 - exportação do SQLite e exclusão confirmada do histórico local.
 
-X, scraping de fóruns e mercados internacionais são adapters planejados, não funcionalidades simuladas. Fontes pagas são sempre opcionais e usam credenciais do próprio usuário.
+Scraping de fóruns e mercados internacionais são adapters futuros, não funcionalidades simuladas. Novos scrapers exigem revisão individual de termos e `robots.txt`. Fontes pagas são sempre opcionais e usam credenciais do próprio usuário.
 
 ## Arquitetura
 
@@ -30,7 +31,7 @@ flowchart LR
   APP --> KEY[Credential Manager]
   APP --> JEV[Jev / System One]
   APP --> DATA[Binance · brapi · BCB]
-  APP --> CONTENT[RSS · Reddit]
+  APP --> CONTENT[RSS · Reddit · X opcional]
   APP --> API[API loopback + Swagger]
   APP --> BG[Worker em background]
   DB --> SIGNAL[Agregação auditável]
@@ -80,9 +81,10 @@ npm run build
 ## Segurança e dados
 
 - API local desligada por padrão, limitada a `127.0.0.1` e protegida por bearer token;
-- telemetria desligada por padrão;
+- nenhuma telemetria externa é enviada nesta release;
 - segredos armazenados pelo keychain do sistema;
 - teto diário e por lote para consumo do Jev;
+- conteúdo social bruto é anonimizado ao vencer a retenção, sem destruir a trilha agregada de auditoria;
 - exportação cria uma cópia consistente na pasta Downloads;
 - exclusão de histórico preserva preferências, catálogo e credenciais.
 
