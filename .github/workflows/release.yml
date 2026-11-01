@@ -26,6 +26,8 @@ jobs:
           workspaces: src-tauri
       - run: npm ci
       - run: npm run release:verify
+      - run: npm run build
+      - run: npm run test:e2e:desktop
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -8,11 +8,15 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ["scripts/**/*.js", "eslint.config.js"],
+    files: ["scripts/**/*.{js,mjs}", "eslint.config.js"],
     languageOptions: {
       globals: {
         console: "readonly",
+        document: "readonly",
+        fetch: "readonly",
         performance: "readonly",
+        setTimeout: "readonly",
+        URL: "readonly",
       },
     },
   },

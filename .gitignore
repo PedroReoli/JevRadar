@@ -22,6 +22,7 @@
 /src-tauri/target/
 /src-tauri/gen/
 /node_modules/
+/output/
 *.log
 
 # Ícones gerados para plataformas fora do roadmap atual

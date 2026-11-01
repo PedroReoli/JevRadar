@@ -16,7 +16,14 @@ if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(packageJson.version)) {
   console.error("A versão não segue SemVer.");
   process.exit(1);
 }
-for (const required of ["LICENSE", "README.md", ".env.example", ".docs/specs/jev-radar-sdd.md"]) {
+for (const required of [
+  "LICENSE",
+  "README.md",
+  ".env.example",
+  ".docs/specs/jev-radar-sdd.md",
+  "scripts/e2e-desktop.mjs",
+  ".github/workflows/release.yml",
+]) {
   if (!fs.existsSync(required)) {
     console.error(`Arquivo obrigatório ausente: ${required}`);
     process.exit(1);

@@ -74,9 +74,13 @@ npm run check
 npm run check:rust
 npm run build:web
 npm run build
+npm run test:e2e:desktop
+npm run release:smoke
 ```
 
-`npm run ops` oferece um menu para desenvolvimento, testes e builds. O build desktop inicial gera instalador NSIS para Windows.
+`npm run ops` oferece um menu para desenvolvimento, testes, E2E e builds. O E2E usa o
+executável compilado e o WebView2 real; rode `npm run build` antes dele. O build desktop
+gera o instalador NSIS para Windows.
 
 ## Segurança e dados
 
