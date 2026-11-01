@@ -28,6 +28,13 @@ export const ptBR = {
     enabledSources: "Fontes habilitadas",
     collectedDocuments: "Documentos únicos",
     awaitingClassification: "Aguardando classificação",
+    classificationEyebrow: "Jev · System One",
+    classificationTitle: "Classificação tipada",
+    classificationDescription: "{{count}} documentos únicos aguardam análise. Cada lote processa no máximo 25 itens para limitar consumo.",
+    classify: "Classificar com Jev",
+    classifying: "Classificando…",
+    classificationResult: "{{analyzed}} analisados; {{classified}} vinculados; {{uncertain}} sem vínculo confiável; {{failed}} falhas.",
+    classificationError: "A classificação não pôde ser iniciada. Nenhum resultado anterior foi removido.",
     coverageEyebrow: "Inventário local",
     coverageTitle: "Cobertura por fonte",
     sourceCount: "{{count}} fontes cadastradas",
@@ -39,6 +46,8 @@ export const ptBR = {
     error: {
       reddit_credentials_missing: "Credenciais do Reddit não configuradas",
       reddit_credential_store_unavailable: "Cofre de credenciais indisponível",
+      typesafe_api_key_missing: "Chave da TypeSafe não configurada",
+      typesafe_credential_store_unavailable: "Cofre da chave TypeSafe indisponível",
     },
   },
   watchlist: {

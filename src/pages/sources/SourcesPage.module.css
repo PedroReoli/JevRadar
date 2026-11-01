@@ -66,11 +66,83 @@
 }
 
 .metricCard,
-.sourcePanel {
+.sourcePanel,
+.classificationPanel {
   border: var(--border-width-thin) solid var(--color-border-subtle);
   border-radius: var(--radius-xl);
   background: var(--color-surface-panel);
   box-shadow: var(--shadow-panel);
+}
+
+.classificationPanel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+
+.classificationIcon {
+  width: var(--size-empty-icon);
+  height: var(--size-empty-icon);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  color: var(--color-accent-text);
+  background: var(--color-accent-surface);
+}
+
+.classificationCopy {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.classificationCopy > span {
+  color: var(--color-text-muted);
+  font: var(--font-label-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.classificationCopy h2,
+.classificationCopy p {
+  margin: 0;
+}
+
+.classificationCopy h2 {
+  color: var(--color-text-primary);
+  font: var(--font-title-lg);
+}
+
+.classificationCopy p,
+.classificationCopy small {
+  color: var(--color-text-secondary);
+  font: var(--font-body-sm);
+}
+
+.classificationCopy .inlineError {
+  color: var(--color-negative-text);
+}
+
+.classifyAction {
+  min-height: var(--control-height-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-on-accent);
+  background: var(--color-accent-strong);
+  font: var(--font-label-md);
+  cursor: pointer;
+}
+
+.classifyAction:disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
 }
 
 .metricCard {
@@ -220,6 +292,15 @@
 
   .metrics {
     grid-template-columns: 1fr;
+  }
+
+  .classificationPanel {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .classifyAction {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 
   .sourceRow {

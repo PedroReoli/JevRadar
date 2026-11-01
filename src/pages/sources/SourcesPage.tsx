@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { SourceList } from "@/features/sources/components/SourceList";
 import { SourceMetrics } from "@/features/sources/components/SourceMetrics";
+import { ClassificationPanel } from "@/features/sources/components/ClassificationPanel";
 import { useContentOverview, useRefreshContentSources } from "@/features/sources/hooks/useContentSources";
 import styles from "@/pages/sources/SourcesPage.module.css";
 
@@ -51,6 +52,7 @@ export function SourcesPage() {
             totalDocumentCount={overview.totalDocumentCount}
             unclassifiedDocumentCount={overview.unclassifiedDocumentCount}
           />
+          <ClassificationPanel pendingCount={overview.unclassifiedDocumentCount} />
           <SourceList sources={overview.sources} />
         </>
       ) : null}

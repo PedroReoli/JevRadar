@@ -28,6 +28,13 @@ export const en = {
     enabledSources: "Enabled sources",
     collectedDocuments: "Unique documents",
     awaitingClassification: "Awaiting classification",
+    classificationEyebrow: "Jev · System One",
+    classificationTitle: "Typed classification",
+    classificationDescription: "{{count}} unique documents await analysis. Each batch processes at most 25 items to limit usage.",
+    classify: "Classify with Jev",
+    classifying: "Classifying…",
+    classificationResult: "{{analyzed}} analyzed; {{classified}} linked; {{uncertain}} without a confident link; {{failed}} failures.",
+    classificationError: "Classification could not start. No previous result was removed.",
     coverageEyebrow: "Local inventory",
     coverageTitle: "Coverage by source",
     sourceCount: "{{count}} registered sources",
@@ -39,6 +46,8 @@ export const en = {
     error: {
       reddit_credentials_missing: "Reddit credentials are not configured",
       reddit_credential_store_unavailable: "Credential store is unavailable",
+      typesafe_api_key_missing: "TypeSafe key is not configured",
+      typesafe_credential_store_unavailable: "TypeSafe credential store is unavailable",
     },
   },
   watchlist: {
