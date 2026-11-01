@@ -1,0 +1,23 @@
+/.agents/
+/.privado/
+/.trello/
+/.reoli-central.local.json
+
+# Segredos e configuracao local
+.env
+.env.*
+!.env.example
+
+# Dados locais gerados pelo aplicativo
+/data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Artefatos locais
+/dist/
+/target/
+/node_modules/
+*.log
