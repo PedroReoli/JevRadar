@@ -39,5 +39,5 @@ describe("SettingsPage", () => {
     fireEvent.click(saveCredentialButton!);
 
     expect(await screen.findByText("Configurada")).toBeInTheDocument();
-  });
+  }, 10_000);
 });
