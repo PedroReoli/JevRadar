@@ -117,11 +117,51 @@
 .marketPanel,
 .signalPanel,
 .eventPanel,
-.chartPanel {
+.chartPanel,
+.attentionPanel {
   border: var(--border-width-thin) solid var(--color-border-subtle);
   border-radius: var(--radius-xl);
   background: var(--color-surface-panel);
   box-shadow: var(--shadow-panel);
+}
+
+.attentionPanel {
+  overflow: hidden;
+}
+
+.attentionList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attentionList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: var(--border-width-thin) solid var(--color-border-subtle);
+}
+
+.attentionList span {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font: var(--font-label-xs);
+}
+
+.attentionList strong {
+  color: var(--color-text-primary);
+  font: var(--font-label-md);
+}
+
+.attentionDisclosure {
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  color: var(--color-text-muted);
+  background: var(--color-warning-surface);
+  font: var(--font-body-sm);
 }
 
 .chartPanel {

@@ -6,6 +6,7 @@ import { useSearchParams } from "react-router-dom";
 import { CollectionStatusCard } from "@/features/dashboard/components/CollectionStatusCard";
 import { EventTimeline } from "@/features/dashboard/components/EventTimeline";
 import { MarketSnapshotPanel } from "@/features/dashboard/components/MarketSnapshotPanel";
+import { LowAttentionPanel } from "@/features/dashboard/components/LowAttentionPanel";
 import { PriceSentimentChart } from "@/features/dashboard/components/PriceSentimentChart";
 import { RadarFilters } from "@/features/dashboard/components/RadarFilters";
 import { SignalRadarPanel } from "@/features/dashboard/components/SignalRadarPanel";
@@ -98,6 +99,10 @@ export function DashboardPage() {
             onAssetChange={updateAsset}
             points={seriesQuery.data?.points ?? []}
             selectedAssetId={selectedAssetId}
+          />
+          <LowAttentionPanel
+            signals={marketQuery.data?.signals ?? []}
+            snapshots={marketQuery.data?.snapshots ?? []}
           />
           <SignalRadarPanel signals={marketQuery.data?.signals ?? []} />
           <EventTimeline events={marketQuery.data?.events ?? []} />
