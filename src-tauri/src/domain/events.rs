@@ -18,3 +18,15 @@ pub struct MarketEventSnapshot {
     pub source_name: String,
     pub source_url: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarketEventPage {
+    pub items: Vec<MarketEventSnapshot>,
+    pub available_assets: Vec<Asset>,
+    pub available_countries: Vec<String>,
+    pub page: u32,
+    pub page_size: u32,
+    pub total_items: u64,
+    pub total_pages: u32,
+}

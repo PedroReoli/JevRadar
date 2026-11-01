@@ -60,6 +60,25 @@ export interface MarketEventSnapshot {
   sourceUrl: string | null;
 }
 
+export interface MarketEventPage {
+  items: MarketEventSnapshot[];
+  availableAssets: Asset[];
+  availableCountries: string[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+export interface MarketEventFilter {
+  eventType: MarketEventSnapshot["eventType"] | "";
+  countryCode: string;
+  assetId: string;
+  relationType: MarketEventSnapshot["relationType"] | "";
+  minimumConfidence: 0 | 0.5 | 0.7 | 0.85;
+  page: number;
+}
+
 export interface MarketSignalSnapshot {
   id: string;
   asset: Asset;

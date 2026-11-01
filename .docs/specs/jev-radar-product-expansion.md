@@ -68,7 +68,7 @@ Rotas reproduzíveis:
 - `/assets/:assetId`
 - `/signals/:signalId`
 - `/alerts?level=&asset=`
-- `/events?type=&country=&asset=&confidence=`
+- `/events?type=&country=&asset=&relation=&confidence=&page=`
 - `/backtests?asset=&page=`
 - `/operations?status=&source=&page=`
 - `/sources/:sourceId`

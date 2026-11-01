@@ -2,7 +2,21 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { z } from "zod";
 
 import { assetSchema, marketSignalSchema, signalEvidenceSchema } from "@/services/contractSchemas";
-import type { CollectionSummary, MarketOverview, MarketOverviewFilter, MarketSeries, SignalEvidenceSnapshot } from "@/types/market";
+import type { CollectionSummary, MarketEventFilter, MarketEventPage, MarketOverview, MarketOverviewFilter, MarketSeries, SignalEvidenceSnapshot } from "@/types/market";
+const marketEventSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  observedFact: z.string(),
+  eventType: z.enum(["political", "economic", "regulatory", "climate", "health", "technology", "geopolitical", "other"]),
+  countryCode: z.string().nullable(),
+  startedAt: z.string(),
+  asset: assetSchema,
+  relationType: z.enum(["known", "correlation", "hypothesis", "unproven_causality"]),
+  confidence: z.number().min(0).max(1),
+  rationaleTemplateKey: z.string(),
+  sourceName: z.string(),
+  sourceUrl: z.string().nullable(),
+});
 const marketOverviewSchema = z.object({
   snapshots: z.array(
     z.object({
@@ -16,20 +30,7 @@ const marketOverviewSchema = z.object({
     }),
   ),
   signals: z.array(marketSignalSchema),
-  events: z.array(z.object({
-    id: z.string(),
-    title: z.string(),
-    observedFact: z.string(),
-    eventType: z.enum(["political", "economic", "regulatory", "climate", "health", "technology", "geopolitical", "other"]),
-    countryCode: z.string().nullable(),
-    startedAt: z.string(),
-    asset: assetSchema,
-    relationType: z.enum(["known", "correlation", "hypothesis", "unproven_causality"]),
-    confidence: z.number().min(0).max(1),
-    rationaleTemplateKey: z.string(),
-    sourceName: z.string(),
-    sourceUrl: z.string().nullable(),
-  })),
+  events: z.array(marketEventSchema),
   latestCollection: z
     .object({
       runId: z.string(),
@@ -65,6 +66,15 @@ const marketSeriesSchema = z.object({
     confidence: z.number().min(0).max(1).nullable(),
   })),
 });
+const marketEventPageSchema = z.object({
+  items: z.array(marketEventSchema),
+  availableAssets: z.array(assetSchema),
+  availableCountries: z.array(z.string()),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().min(1).max(50),
+  totalItems: z.number().int().nonnegative(),
+  totalPages: z.number().int().positive(),
+});
 
 function requireDesktopRuntime() {
   if (!isTauri()) throw new Error("desktop_runtime_required");
@@ -92,4 +102,18 @@ export async function getSignalEvidence(signalId: string): Promise<SignalEvidenc
   requireDesktopRuntime();
   const response: unknown = await invoke("get_signal_evidence", { signalId });
   return signalEvidenceSchema.parse(response);
+}
+
+export async function listMarketEvents(filter: MarketEventFilter): Promise<MarketEventPage> {
+  requireDesktopRuntime();
+  const response: unknown = await invoke("list_market_events", {
+    eventType: filter.eventType || null,
+    countryCode: filter.countryCode || null,
+    assetId: filter.assetId || null,
+    relationType: filter.relationType || null,
+    minimumConfidence: filter.minimumConfidence,
+    page: filter.page,
+    pageSize: 25,
+  });
+  return marketEventPageSchema.parse(response);
 }

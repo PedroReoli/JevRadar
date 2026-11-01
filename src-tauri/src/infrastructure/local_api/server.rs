@@ -18,7 +18,7 @@ use crate::application::content_query_service::{
     ContentQueryService, ContentSourceManagementError,
 };
 use crate::application::insights_query_service::InsightsQueryService;
-use crate::application::market_query_service::MarketQueryService;
+use crate::application::market_query_service::{MarketEventQueryError, MarketQueryService};
 use crate::domain::market::MarketOverviewFilter;
 use crate::domain::signals::SignalEvidenceSnapshot;
 use crate::infrastructure::database::Database;
@@ -59,6 +59,18 @@ struct DocumentFeedQuery {
     sentiment: Option<String>,
     analysis_status: Option<String>,
     asset_id: Option<String>,
+    minimum_confidence: Option<f64>,
+    page: Option<u32>,
+    page_size: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MarketEventQuery {
+    event_type: Option<String>,
+    country_code: Option<String>,
+    asset_id: Option<String>,
+    relation_type: Option<String>,
     minimum_confidence: Option<f64>,
     page: Option<u32>,
     page_size: Option<u32>,
@@ -131,6 +143,7 @@ impl From<SignalEvidenceSnapshot> for SignalEvidenceResponse {
         market_overview,
         content_overview,
         document_feed,
+        market_events,
         signal_report,
         signal_evidence,
         alert_history,
@@ -173,6 +186,7 @@ pub async fn serve(
         .route("/v1/market", get(market_overview))
         .route("/v1/sources", get(content_overview))
         .route("/v1/documents", get(document_feed))
+        .route("/v1/events", get(market_events))
         .route("/v1/signals/{signal_id}", get(signal_report))
         .route("/v1/signals/{signal_id}/evidence", get(signal_evidence))
         .route("/v1/alerts", get(alert_history))
@@ -276,6 +290,46 @@ async fn document_feed(
         query.page_size.unwrap_or(25),
     )
     .map_err(content_query_status)?;
+    serialize_json(page)
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/events",
+    params(
+        ("eventType" = Option<String>, Query, description = "political, economic, regulatory, climate, health, technology, geopolitical ou other"),
+        ("countryCode" = Option<String>, Query, description = "Código de país ou região em maiúsculas"),
+        ("assetId" = Option<String>, Query, description = "ID local do ativo"),
+        ("relationType" = Option<String>, Query, description = "known, correlation, hypothesis ou unproven_causality"),
+        ("minimumConfidence" = Option<f64>, Query, description = "0 a 1"),
+        ("page" = Option<u32>, Query, description = "Página a partir de 1"),
+        ("pageSize" = Option<u32>, Query, description = "1 a 50; padrão 25")
+    ),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Eventos e relações locais paginados", body = Object),
+        (status = 400, description = "Filtro ou paginação inválidos"),
+        (status = 401, description = "Token local ausente ou inválido"),
+        (status = 500, description = "Falha ao consultar o banco local")
+    )
+)]
+async fn market_events(
+    State(state): State<ApiState>,
+    Query(query): Query<MarketEventQuery>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    authorize(&headers, &state.token)?;
+    let page = MarketQueryService::events(
+        &state.database,
+        query.event_type,
+        query.country_code,
+        query.asset_id,
+        query.relation_type,
+        query.minimum_confidence.unwrap_or(0.0),
+        query.page.unwrap_or(1),
+        query.page_size.unwrap_or(25),
+    )
+    .map_err(event_query_status)?;
     serialize_json(page)
 }
 
@@ -449,6 +503,13 @@ fn content_query_status(error: ContentSourceManagementError) -> StatusCode {
     }
 }
 
+fn event_query_status(error: MarketEventQueryError) -> StatusCode {
+    match error {
+        MarketEventQueryError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        _ => StatusCode::BAD_REQUEST,
+    }
+}
+
 fn bounded_limit(value: Option<usize>, default: usize) -> usize {
     value.unwrap_or(default).clamp(1, 200)
 }
@@ -516,6 +577,7 @@ mod tests {
         for path in [
             "/v1/signals/{signal_id}",
             "/v1/documents",
+            "/v1/events",
             "/v1/alerts",
             "/v1/collections",
             "/v1/backtests",

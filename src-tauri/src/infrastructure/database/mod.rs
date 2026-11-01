@@ -41,6 +41,7 @@ const SIGNAL_WEIGHT_AUDIT_SCHEMA: &str = include_str!("migrations/0012_signal_we
 const VERSIONED_SIGNALS_SCHEMA: &str = include_str!("migrations/0013_versioned_signals.sql");
 const OFFICIAL_FEEDS_SCHEMA: &str = include_str!("migrations/0014_official_feeds.sql");
 const REDDIT_COMMUNITIES_SCHEMA: &str = include_str!("migrations/0015_reddit_communities.sql");
+const EVENT_QUERY_INDEXES_SCHEMA: &str = include_str!("migrations/0016_event_query_indexes.sql");
 
 pub struct Database {
     connection: Mutex<Connection>,
@@ -85,6 +86,7 @@ impl Database {
         apply_migration(&connection, 13, VERSIONED_SIGNALS_SCHEMA)?;
         apply_migration(&connection, 14, OFFICIAL_FEEDS_SCHEMA)?;
         apply_migration(&connection, 15, REDDIT_COMMUNITIES_SCHEMA)?;
+        apply_migration(&connection, 16, EVENT_QUERY_INDEXES_SCHEMA)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -1411,43 +1413,106 @@ impl Database {
              LIMIT ?1",
         )?;
         statement
-            .query_map(params![i64::try_from(limit).unwrap_or(i64::MAX)], |row| {
-                Ok(MarketEventSnapshot {
-                    id: row.get(0)?,
-                    title: row.get(1)?,
-                    observed_fact: row.get(2)?,
-                    event_type: row.get(3)?,
-                    country_code: row.get(4)?,
-                    started_at: row.get(5)?,
-                    asset: Asset {
-                        id: row.get(6)?,
-                        symbol: row.get(7)?,
-                        name: row.get(8)?,
-                        asset_class: AssetClass::from_storage_value(
-                            row.get::<_, String>(9)?.as_str(),
-                        )
-                        .ok_or_else(|| {
-                            rusqlite::Error::InvalidColumnType(
-                                9,
-                                "asset_class".to_owned(),
-                                rusqlite::types::Type::Text,
-                            )
-                        })?,
-                        exchange: row.get(10)?,
-                        currency: row.get(11)?,
-                        country_code: row.get(12)?,
-                    },
-                    relation_type: row.get(13)?,
-                    confidence: row.get(14)?,
-                    rationale_template_key: row.get(15)?,
-                    source_name: row
-                        .get::<_, Option<String>>(16)?
-                        .unwrap_or_else(|| "Fonte local".to_owned()),
-                    source_url: row.get(17)?,
-                })
-            })?
+            .query_map(
+                params![i64::try_from(limit).unwrap_or(i64::MAX)],
+                map_market_event,
+            )?
             .collect::<Result<Vec<_>, _>>()
             .map_err(Into::into)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_market_event_page(
+        &self,
+        event_type: Option<&str>,
+        country_code: Option<&str>,
+        asset_id: Option<&str>,
+        relation_type: Option<&str>,
+        minimum_confidence: f64,
+        started_after: &str,
+        limit: u32,
+        offset: u32,
+    ) -> Result<(Vec<MarketEventSnapshot>, u64), DatabaseError> {
+        let connection = self.connection.lock();
+        let joins = "JOIN event_asset_relations ear ON ear.event_id = me.id
+                     JOIN assets a ON a.id = ear.asset_id
+                     LEFT JOIN source_documents sd ON sd.id = me.source_document_id
+                     LEFT JOIN sources s ON s.id = sd.source_id";
+        let filters = "(?1 IS NULL OR me.event_type = ?1)
+                       AND (?2 IS NULL OR me.country_codes = ?2)
+                       AND (?3 IS NULL OR a.id = ?3)
+                       AND (?4 IS NULL OR ear.relation_type = ?4)
+                       AND ear.confidence >= ?5
+                       AND me.started_at >= ?6";
+        let count_sql = format!("SELECT COUNT(*) FROM market_events me {joins} WHERE {filters}");
+        let total_items = connection.query_row(
+            &count_sql,
+            params![
+                event_type,
+                country_code,
+                asset_id,
+                relation_type,
+                minimum_confidence,
+                started_after,
+            ],
+            |row| row.get::<_, i64>(0),
+        )? as u64;
+        let query_sql = format!(
+            "SELECT me.id, me.title, me.observed_fact, me.event_type, me.country_codes,
+                    me.started_at, a.id, a.symbol, a.name, a.asset_class, a.exchange,
+                    a.currency, a.country_code, ear.relation_type, ear.confidence,
+                    ear.rationale_template_key, s.name, sd.canonical_url
+             FROM market_events me {joins}
+             WHERE {filters}
+             ORDER BY me.started_at DESC, me.id DESC, a.id
+             LIMIT ?7 OFFSET ?8"
+        );
+        let mut statement = connection.prepare(&query_sql)?;
+        let items = statement
+            .query_map(
+                params![
+                    event_type,
+                    country_code,
+                    asset_id,
+                    relation_type,
+                    minimum_confidence,
+                    started_after,
+                    limit,
+                    offset,
+                ],
+                map_market_event,
+            )?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok((items, total_items))
+    }
+
+    pub fn market_event_filter_options(
+        &self,
+        started_after: &str,
+    ) -> Result<(Vec<Asset>, Vec<String>), DatabaseError> {
+        let connection = self.connection.lock();
+        let mut asset_statement = connection.prepare(
+            "SELECT DISTINCT a.id, a.symbol, a.name, a.asset_class, a.exchange,
+                    a.currency, a.country_code
+             FROM assets a
+             JOIN event_asset_relations ear ON ear.asset_id = a.id
+             JOIN market_events me ON me.id = ear.event_id
+             WHERE me.started_at >= ?1
+             ORDER BY a.symbol",
+        )?;
+        let assets = asset_statement
+            .query_map(params![started_after], map_asset)?
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut country_statement = connection.prepare(
+            "SELECT DISTINCT country_codes
+             FROM market_events
+             WHERE started_at >= ?1 AND country_codes IS NOT NULL
+             ORDER BY country_codes",
+        )?;
+        let countries = country_statement
+            .query_map(params![started_after], |row| row.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok((assets, countries))
     }
 
     pub fn backtest_dataset(&self, asset_id: &str) -> Result<BacktestDataset, DatabaseError> {
@@ -1878,6 +1943,25 @@ impl Database {
 
 fn map_asset(row: &rusqlite::Row<'_>) -> Result<Asset, rusqlite::Error> {
     map_asset_offset(row, 0)
+}
+
+fn map_market_event(row: &rusqlite::Row<'_>) -> Result<MarketEventSnapshot, rusqlite::Error> {
+    Ok(MarketEventSnapshot {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        observed_fact: row.get(2)?,
+        event_type: row.get(3)?,
+        country_code: row.get(4)?,
+        started_at: row.get(5)?,
+        asset: map_asset_offset(row, 6)?,
+        relation_type: row.get(13)?,
+        confidence: row.get(14)?,
+        rationale_template_key: row.get(15)?,
+        source_name: row
+            .get::<_, Option<String>>(16)?
+            .unwrap_or_else(|| "Fonte local".to_owned()),
+        source_url: row.get(17)?,
+    })
 }
 
 fn map_asset_offset(row: &rusqlite::Row<'_>, offset: usize) -> Result<Asset, rusqlite::Error> {
@@ -2400,6 +2484,20 @@ mod tests {
         let events = database.latest_market_events(10).expect("eventos");
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].relation_type, "known");
+        let (event_page, event_total) = database
+            .list_market_event_page(
+                Some("regulatory"),
+                Some("BR"),
+                Some("asset:b3:PETR4"),
+                Some("known"),
+                0.8,
+                "2026-10-01T00:00:00Z",
+                25,
+                0,
+            )
+            .expect("página de eventos");
+        assert_eq!(event_total, 1);
+        assert_eq!(event_page[0].source_name, "CVM — Decisões do Colegiado");
 
         let evidence = database
             .signal_evidence_between("2026-11-01T00:00:00Z", "2026-11-02T00:00:00Z")

@@ -1,6 +1,7 @@
 use tauri::State;
 
 use crate::application::market_query_service::MarketQueryService;
+use crate::domain::events::MarketEventPage;
 use crate::domain::market::{MarketOverview, MarketOverviewFilter, MarketSeries};
 use crate::domain::signals::SignalEvidenceSnapshot;
 use crate::interface::error::CommandError;
@@ -37,4 +38,29 @@ pub fn get_market_series(
     }
     MarketQueryService::series(&state.database, &asset_id, period_hours)
         .map_err(CommandError::internal)
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn list_market_events(
+    state: State<'_, AppState>,
+    event_type: Option<String>,
+    country_code: Option<String>,
+    asset_id: Option<String>,
+    relation_type: Option<String>,
+    minimum_confidence: f64,
+    page: u32,
+    page_size: u32,
+) -> Result<MarketEventPage, CommandError> {
+    MarketQueryService::events(
+        &state.database,
+        event_type,
+        country_code,
+        asset_id,
+        relation_type,
+        minimum_confidence,
+        page,
+        page_size,
+    )
+    .map_err(CommandError::internal)
 }

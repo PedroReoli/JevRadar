@@ -7,7 +7,7 @@ vi.mock("@tauri-apps/api/core", () => ({
   isTauri: () => true,
 }));
 
-import { getMarketOverview, getMarketSeries, getSignalEvidence, refreshMarketData } from "@/services/marketService";
+import { getMarketOverview, getMarketSeries, getSignalEvidence, listMarketEvents, refreshMarketData } from "@/services/marketService";
 
 const asset = {
   id: "asset:crypto:BTC",
@@ -143,5 +143,42 @@ describe("marketService", () => {
     const evidence = await getSignalEvidence("signal:1");
     expect(evidence[0]!.modelVersion).toBe("jev-latest");
     expect(invoke).toHaveBeenCalledWith("get_signal_evidence", { signalId: "signal:1" });
+  });
+
+  it("valida e pagina relações de eventos sem carregar o resumo do dashboard", async () => {
+    invoke.mockResolvedValueOnce({
+      items: [{
+        id: "event:1",
+        title: "CVM publica decisão",
+        observedFact: "A CVM publicou uma decisão relacionada à companhia.",
+        eventType: "regulatory",
+        countryCode: "BR",
+        startedAt: "2026-11-01T11:00:00Z",
+        asset,
+        relationType: "known",
+        confidence: 0.84,
+        rationaleTemplateKey: "event.regulatory.known",
+        sourceName: "CVM",
+        sourceUrl: "https://www.gov.br/cvm/example",
+      }],
+      availableAssets: [asset],
+      availableCountries: ["BR"],
+      page: 1,
+      pageSize: 25,
+      totalItems: 1,
+      totalPages: 1,
+    });
+    const filter = { eventType: "regulatory" as const, countryCode: "BR", assetId: asset.id, relationType: "known" as const, minimumConfidence: 0.7 as const, page: 1 };
+    const result = await listMarketEvents(filter);
+    expect(result.items[0]!.relationType).toBe("known");
+    expect(invoke).toHaveBeenCalledWith("list_market_events", {
+      eventType: "regulatory",
+      countryCode: "BR",
+      assetId: asset.id,
+      relationType: "known",
+      minimumConfidence: 0.7,
+      page: 1,
+      pageSize: 25,
+    });
   });
 });
