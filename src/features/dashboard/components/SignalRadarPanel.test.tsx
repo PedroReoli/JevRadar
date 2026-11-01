@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 
 import "@/i18n/config";
 
@@ -7,7 +8,7 @@ import { SignalRadarPanel } from "@/features/dashboard/components/SignalRadarPan
 
 describe("SignalRadarPanel", () => {
   it("mostra o viés como evidência e não como recomendação", () => {
-    render(<SignalRadarPanel signals={[{
+    render(<MemoryRouter><SignalRadarPanel signals={[{
       id: "signal:petr4",
       asset: {
         id: "asset:b3:PETR4",
@@ -29,7 +30,7 @@ describe("SignalRadarPanel", () => {
       methodologyVersion: "weighted-sentiment-v1",
       modelVersion: "jev-latest",
       questionVersion: "document-market-signal-v1",
-    }]} />);
+    }]} /></MemoryRouter>);
 
     expect(screen.getAllByText("Viés otimista")).toHaveLength(2);
     expect(screen.getByText("8")).toBeInTheDocument();

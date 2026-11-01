@@ -1,5 +1,6 @@
 import { Activity, ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import styles from "@/pages/dashboard/DashboardPage.module.css";
 import type { MarketSnapshot } from "@/types/market";
@@ -43,7 +44,7 @@ export function MarketSnapshotPanel({ snapshots }: MarketSnapshotPanelProps) {
                   : styles.changeNegative;
             return (
               <li className={styles.marketRow} key={snapshot.asset.id}>
-                <span className={styles.marketSymbol}>{snapshot.asset.symbol}</span>
+                <Link className={styles.marketSymbol} to={`/assets/${encodeURIComponent(snapshot.asset.id)}`}>{snapshot.asset.symbol}</Link>
                 <span className={styles.marketIdentity}>
                   <strong>{snapshot.asset.name}</strong>
                   <small>{snapshot.sourceName ?? t("dashboard.awaitingCollection")}</small>

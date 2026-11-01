@@ -462,6 +462,7 @@
   background: var(--color-accent-surface);
   font: var(--font-label-xs);
   cursor: pointer;
+  text-decoration: none;
 }
 
 .evidenceList {
@@ -577,6 +578,10 @@
 .marketValue {
   color: var(--color-text-primary);
   font: var(--font-code-label);
+}
+
+.marketSymbol {
+  text-decoration: none;
 }
 
 .marketIdentity {

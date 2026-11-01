@@ -1,5 +1,6 @@
 import { FileSearch, RadioTower } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import { SignalHeatmap } from "@/features/dashboard/components/SignalHeatmap";
 import { getSignalTone } from "@/features/dashboard/utils/signalPresentation";
@@ -60,6 +61,10 @@ export function SignalRadarPanel({ onSelect, selectedSignalId, signals }: Signal
                   <FileSearch aria-hidden="true" size="var(--icon-size-sm)" />
                   {selectedSignalId === signal.id ? t("dashboard.hideEvidence") : t("dashboard.inspectEvidence")}
                 </button>
+                <Link className={styles.evidenceAction} to={`/signals/${encodeURIComponent(signal.id)}`}>
+                  <FileSearch aria-hidden="true" size="var(--icon-size-sm)" />
+                  {t("product.open")}
+                </Link>
               </li>
               );
             })}
