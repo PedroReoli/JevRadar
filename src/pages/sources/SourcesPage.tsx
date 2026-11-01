@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { SourceList } from "@/features/sources/components/SourceList";
 import { SourceMetrics } from "@/features/sources/components/SourceMetrics";
 import { ClassificationPanel } from "@/features/sources/components/ClassificationPanel";
+import { CustomRssForm } from "@/features/sources/components/CustomRssForm";
 import {
   useContentOverview,
   useRefreshContentSources,
@@ -58,6 +59,7 @@ export function SourcesPage() {
             unclassifiedDocumentCount={overview.unclassifiedDocumentCount}
           />
           <ClassificationPanel pendingCount={overview.unclassifiedDocumentCount} />
+          <CustomRssForm />
           <SourceList
             disabled={sourceToggleMutation.isPending}
             onToggle={(sourceId, enabled) => sourceToggleMutation.mutate({ sourceId, enabled })}

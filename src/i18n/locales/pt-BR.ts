@@ -71,6 +71,13 @@ export const ptBR = {
     enabled: "Habilitada",
     disabled: "Desabilitada",
     disclosure: "O conteúdo permanece rastreável até a fonte. Coleta não implica validação, endosso ou recomendação.",
+    customRssTitle: "Adicionar feed RSS",
+    customRssDescription: "Conecte notícias, blogs ou fóruns que publiquem um feed HTTPS oficial. O JevRadar não contorna login ou paywall.",
+    customRssName: "Nome da fonte",
+    customRssUrl: "URL HTTPS do feed",
+    addRss: "Adicionar feed",
+    addingRss: "Adicionando…",
+    customRssError: "Não foi possível adicionar o feed. Confirme o nome e uma URL HTTPS válida.",
     kind: { rss: "Notícias e comunicados", reddit: "Comunidade", forum: "Fórum", x: "Rede social" },
     status: { completed: "Concluída", failed: "Falhou", skipped: "Ignorada", pending: "Pendente" },
     error: {

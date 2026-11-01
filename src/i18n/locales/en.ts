@@ -71,6 +71,13 @@ export const en = {
     enabled: "Enabled",
     disabled: "Disabled",
     disclosure: "Content remains traceable to its source. Collection does not imply validation, endorsement, or advice.",
+    customRssTitle: "Add RSS feed",
+    customRssDescription: "Connect news, blogs, or forums that publish an official HTTPS feed. JevRadar does not bypass login or paywalls.",
+    customRssName: "Source name",
+    customRssUrl: "Feed HTTPS URL",
+    addRss: "Add feed",
+    addingRss: "Adding…",
+    customRssError: "The feed could not be added. Confirm the name and a valid HTTPS URL.",
     kind: { rss: "News and releases", reddit: "Community", forum: "Forum", x: "Social network" },
     status: { completed: "Completed", failed: "Failed", skipped: "Skipped", pending: "Pending" },
     error: {

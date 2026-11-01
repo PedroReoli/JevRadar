@@ -8,6 +8,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 import {
+  addRssSource,
   getContentOverview,
   refreshContentSources,
   setContentSourceEnabled,
@@ -24,6 +25,7 @@ describe("contentService", () => {
         sourceKind: "reddit",
         collectionMethod: "official_api",
         enabled: true,
+        userManaged: false,
         documentCount: 0,
         status: "skipped",
         lastCollectedAt: "2026-11-01T12:00:00Z",
@@ -49,6 +51,15 @@ describe("contentService", () => {
       }],
     });
     expect((await refreshContentSources()).storedDocumentCount).toBe(8);
+  });
+
+  it("adiciona feeds RSS personalizados pela borda Tauri", async () => {
+    invoke.mockResolvedValueOnce({ sources: [], totalDocumentCount: 0, unclassifiedDocumentCount: 0 });
+    await addRssSource("Fórum oficial", "https://example.com/feed.xml");
+    expect(invoke).toHaveBeenCalledWith("add_rss_source", {
+      name: "Fórum oficial",
+      url: "https://example.com/feed.xml",
+    });
   });
 
   it("altera uma fonte sem perder a visão consolidada", async () => {

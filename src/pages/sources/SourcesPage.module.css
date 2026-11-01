@@ -67,11 +67,96 @@
 
 .metricCard,
 .sourcePanel,
-.classificationPanel {
+.classificationPanel,
+.customSourcePanel {
   border: var(--border-width-thin) solid var(--color-border-subtle);
   border-radius: var(--radius-xl);
   background: var(--color-surface-panel);
   box-shadow: var(--shadow-panel);
+}
+
+.customSourcePanel {
+  overflow: hidden;
+}
+
+.customSourcePanel > header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-bottom: var(--border-width-thin) solid var(--color-border-subtle);
+}
+
+.customSourcePanel > header > span {
+  width: var(--size-icon-surface);
+  height: var(--size-icon-surface);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  color: var(--color-accent-text);
+  background: var(--color-accent-surface);
+}
+
+.customSourcePanel h2,
+.customSourcePanel p {
+  margin: 0;
+}
+
+.customSourcePanel h2 {
+  color: var(--color-text-primary);
+  font: var(--font-title-lg);
+}
+
+.customSourcePanel p,
+.customSourcePanel label span {
+  color: var(--color-text-muted);
+  font: var(--font-body-sm);
+}
+
+.customSourcePanel form {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.6fr) auto;
+  align-items: end;
+  gap: var(--space-3);
+  padding: var(--space-5);
+}
+
+.customSourcePanel label {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.customSourcePanel input {
+  min-height: var(--control-height-md);
+  min-width: 0;
+  padding-inline: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  background: var(--color-surface-raised);
+  font: var(--font-body-sm);
+}
+
+.customSourcePanel button {
+  min-height: var(--control-height-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding-inline: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-on-accent);
+  background: var(--color-accent-strong);
+  font: var(--font-label-md);
+  cursor: pointer;
+}
+
+.customSourcePanel .inlineError {
+  padding: 0 var(--space-5) var(--space-5);
+  color: var(--color-negative-text);
+  font: var(--font-body-sm);
 }
 
 .classificationPanel {
@@ -310,6 +395,10 @@
 
   .classificationPanel {
     grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .customSourcePanel form {
+    grid-template-columns: 1fr;
   }
 
   .classifyAction {

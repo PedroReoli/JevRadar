@@ -10,6 +10,7 @@ const sourceSchema = z.object({
   sourceKind: z.enum(["rss", "reddit", "forum", "x"]),
   collectionMethod: z.string(),
   enabled: z.boolean(),
+  userManaged: z.boolean(),
   documentCount: z.number().int().nonnegative(),
   status: runStatusSchema.nullable(),
   lastCollectedAt: z.string().nullable(),
@@ -50,5 +51,11 @@ export async function refreshContentSources(): Promise<ContentCollectionSummary>
 export async function setContentSourceEnabled(sourceId: string, enabled: boolean): Promise<ContentOverview> {
   requireDesktopRuntime();
   const response: unknown = await invoke("set_content_source_enabled", { sourceId, enabled });
+  return overviewSchema.parse(response);
+}
+
+export async function addRssSource(name: string, url: string): Promise<ContentOverview> {
+  requireDesktopRuntime();
+  const response: unknown = await invoke("add_rss_source", { name, url });
   return overviewSchema.parse(response);
 }

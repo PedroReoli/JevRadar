@@ -23,6 +23,7 @@ describe("SourcesPage", () => {
         sourceKind: "rss",
         collectionMethod: "rss",
         enabled: true,
+        userManaged: false,
         documentCount: 18,
         status: "completed",
         lastCollectedAt: "2026-11-01T12:00:00Z",

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { getContentOverview, refreshContentSources, setContentSourceEnabled } from "@/services/contentService";
+import { addRssSource, getContentOverview, refreshContentSources, setContentSourceEnabled } from "@/services/contentService";
 
 const contentOverviewKey = ["content-overview"] as const;
 
@@ -20,6 +20,14 @@ export function useSetContentSourceEnabled() {
     onSuccess: (overview) => {
       queryClient.setQueryData(contentOverviewKey, overview);
     },
+  });
+}
+
+export function useAddRssSource() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name, url }: { name: string; url: string }) => addRssSource(name, url),
+    onSuccess: (overview) => queryClient.setQueryData(contentOverviewKey, overview),
   });
 }
 

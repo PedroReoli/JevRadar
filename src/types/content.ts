@@ -7,6 +7,7 @@ export interface ContentSourceStatus {
   sourceKind: ContentSourceKind;
   collectionMethod: string;
   enabled: boolean;
+  userManaged: boolean;
   documentCount: number;
   status: ContentSourceRunStatus | null;
   lastCollectedAt: string | null;

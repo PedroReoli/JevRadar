@@ -49,6 +49,7 @@ pub struct ContentSourceStatus {
     pub source_kind: String,
     pub collection_method: String,
     pub enabled: bool,
+    pub user_managed: bool,
     pub document_count: usize,
     pub status: Option<String>,
     pub last_collected_at: Option<String>,

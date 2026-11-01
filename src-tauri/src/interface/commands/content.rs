@@ -34,3 +34,13 @@ pub fn set_content_source_enabled(
     ContentQueryService::set_source_enabled(&state.database, &source_id, enabled)
         .map_err(CommandError::internal)
 }
+
+#[tauri::command]
+pub fn add_rss_source(
+    state: State<'_, AppState>,
+    name: String,
+    url: String,
+) -> Result<ContentOverview, CommandError> {
+    ContentQueryService::add_rss_source(&state.database, &name, &url)
+        .map_err(CommandError::internal)
+}

@@ -511,10 +511,29 @@ impl Database {
         enabled: bool,
     ) -> Result<bool, DatabaseError> {
         let changed = self.connection.lock().execute(
-            "UPDATE content_sources SET enabled = ?2 WHERE id = ?1",
+            "UPDATE sources SET enabled = ?2, updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
             params![source_id, enabled],
         )?;
         Ok(changed == 1)
+    }
+
+    pub fn upsert_custom_rss_source(
+        &self,
+        source_id: &str,
+        name: &str,
+        url: &str,
+    ) -> Result<(), DatabaseError> {
+        self.connection.lock().execute(
+            "INSERT INTO sources (id, name, source_kind, collection_method, base_url, enabled)
+             VALUES (?1, ?2, 'rss', 'rss', ?3, 1)
+             ON CONFLICT(id) DO UPDATE SET
+                 name = excluded.name,
+                 base_url = excluded.base_url,
+                 enabled = 1,
+                 updated_at = CURRENT_TIMESTAMP",
+            params![source_id, name, url],
+        )?;
+        Ok(())
     }
 
     pub fn store_source_documents(
@@ -602,6 +621,7 @@ impl Database {
         let connection = self.connection.lock();
         let mut statement = connection.prepare(
             "SELECT s.id, s.name, s.source_kind, s.collection_method, s.enabled,
+                    CASE WHEN s.id LIKE 'source:custom:rss:%' THEN 1 ELSE 0 END,
                     COUNT(sd.id) AS document_count,
                     scs.status, scs.last_collected_at, scs.error_code
              FROM sources s
@@ -619,10 +639,11 @@ impl Database {
                     source_kind: row.get(2)?,
                     collection_method: row.get(3)?,
                     enabled: row.get(4)?,
-                    document_count: row.get::<_, i64>(5)? as usize,
-                    status: row.get(6)?,
-                    last_collected_at: row.get(7)?,
-                    error_code: row.get(8)?,
+                    user_managed: row.get(5)?,
+                    document_count: row.get::<_, i64>(6)? as usize,
+                    status: row.get(7)?,
+                    last_collected_at: row.get(8)?,
+                    error_code: row.get(9)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -1597,6 +1618,33 @@ mod tests {
                 .filter(|source| source.source_kind == "rss")
                 .count()
                 >= 4
+        );
+        assert!(
+            database
+                .set_content_source_enabled("source:x", false)
+                .expect("desabilita")
+        );
+        assert!(
+            !database
+                .enabled_content_sources()
+                .expect("fontes")
+                .iter()
+                .any(|source| source.id == "source:x")
+        );
+        database
+            .upsert_custom_rss_source(
+                "source:custom:rss:test",
+                "Fórum com RSS",
+                "https://example.com/feed.xml",
+            )
+            .expect("feed personalizado");
+        assert!(
+            database
+                .content_overview()
+                .expect("inventário")
+                .sources
+                .iter()
+                .any(|source| source.id == "source:custom:rss:test" && source.user_managed)
         );
 
         let document = SourceDocumentInput {
