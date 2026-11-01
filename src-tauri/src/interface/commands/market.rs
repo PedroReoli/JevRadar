@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::application::market_query_service::MarketQueryService;
 use crate::domain::assets::AssetClass;
-use crate::domain::events::{MarketEventPage, MarketRelationPage};
+use crate::domain::events::{MarketContextOverview, MarketEventPage, MarketRelationPage};
 use crate::domain::market::{MarketOverview, MarketOverviewFilter, MarketSeries};
 use crate::domain::signals::SignalEvidenceSnapshot;
 use crate::interface::error::CommandError;
@@ -16,6 +16,16 @@ pub fn get_market_overview(
     let filter = filter.unwrap_or_default();
     filter.validate().map_err(CommandError::internal)?;
     MarketQueryService::overview(&state.database, filter).map_err(CommandError::internal)
+}
+
+#[tauri::command]
+pub fn get_market_context_overview(
+    state: State<'_, AppState>,
+    period_hours: u16,
+    minimum_confidence: f64,
+) -> Result<MarketContextOverview, CommandError> {
+    MarketQueryService::context(&state.database, period_hours, minimum_confidence)
+        .map_err(CommandError::internal)
 }
 
 #[tauri::command]

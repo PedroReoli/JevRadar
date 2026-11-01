@@ -1,7 +1,7 @@
 use chrono::{Duration, Utc};
 
 use crate::domain::assets::AssetClass;
-use crate::domain::events::{MarketEventPage, MarketRelationPage};
+use crate::domain::events::{MarketContextOverview, MarketEventPage, MarketRelationPage};
 use crate::domain::market::{MarketOverview, MarketOverviewFilter, MarketSeries};
 use crate::domain::signals::SignalEvidenceSnapshot;
 use crate::infrastructure::database::{Database, DatabaseError};
@@ -19,6 +19,23 @@ pub enum MarketEventQueryError {
 }
 
 impl MarketQueryService {
+    pub fn context(
+        database: &Database,
+        period_hours: u16,
+        minimum_confidence: f64,
+    ) -> Result<MarketContextOverview, MarketEventQueryError> {
+        if !(1..=720).contains(&period_hours)
+            || !minimum_confidence.is_finite()
+            || !(0.0..=1.0).contains(&minimum_confidence)
+        {
+            return Err(MarketEventQueryError::InvalidFilter);
+        }
+        let started_after = (Utc::now() - Duration::hours(i64::from(period_hours))).to_rfc3339();
+        database
+            .market_context_overview(period_hours, minimum_confidence, &started_after)
+            .map_err(Into::into)
+    }
+
     pub fn overview(
         database: &Database,
         filter: MarketOverviewFilter,
@@ -309,6 +326,13 @@ mod tests {
         .expect_err("relação e país inválidos devem falhar");
         assert!(matches!(
             invalid_relation,
+            MarketEventQueryError::InvalidFilter
+        ));
+
+        let invalid_context = MarketQueryService::context(&database, 721, f64::NAN)
+            .expect_err("contexto sem limite deve falhar");
+        assert!(matches!(
+            invalid_context,
             MarketEventQueryError::InvalidFilter
         ));
     }

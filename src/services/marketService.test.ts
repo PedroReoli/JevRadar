@@ -7,7 +7,7 @@ vi.mock("@tauri-apps/api/core", () => ({
   isTauri: () => true,
 }));
 
-import { getMarketOverview, getMarketSeries, getSignalEvidence, listMarketEvents, listMarketRelations, refreshMarketData } from "@/services/marketService";
+import { getMarketContextOverview, getMarketOverview, getMarketSeries, getSignalEvidence, listMarketEvents, listMarketRelations, refreshMarketData } from "@/services/marketService";
 
 const asset = {
   id: "asset:crypto:BTC",
@@ -213,6 +213,27 @@ describe("marketService", () => {
       minimumConfidence: 0.5,
       page: 1,
       pageSize: 25,
+    });
+  });
+
+  it("valida a central agregada de contexto sem inferir causalidade", async () => {
+    invoke.mockResolvedValueOnce({
+      periodHours: 168,
+      minimumConfidence: 0.5,
+      uniqueEventCount: 3,
+      relationCount: 4,
+      countryCount: 2,
+      assetCount: 1,
+      averageConfidence: 0.78,
+      eventTypes: [{ eventType: "geopolitical", eventCount: 3 }],
+      countries: [{ countryCode: "BR", relationCount: 4, assetCount: 1, averageConfidence: 0.78 }],
+      assets: [{ asset, relationCount: 4, countryCount: 2, averageConfidence: 0.78 }],
+    });
+    const result = await getMarketContextOverview({ periodHours: 168, minimumConfidence: 0.5 });
+    expect(result.eventTypes[0]!.eventType).toBe("geopolitical");
+    expect(invoke).toHaveBeenCalledWith("get_market_context_overview", {
+      periodHours: 168,
+      minimumConfidence: 0.5,
     });
   });
 });

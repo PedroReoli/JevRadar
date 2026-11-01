@@ -2,7 +2,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { z } from "zod";
 
 import { assetSchema, marketSignalSchema, signalEvidenceSchema } from "@/services/contractSchemas";
-import type { CollectionSummary, MarketEventFilter, MarketEventPage, MarketOverview, MarketOverviewFilter, MarketRelationFilter, MarketRelationPage, MarketSeries, SignalEvidenceSnapshot } from "@/types/market";
+import type { CollectionSummary, MarketContextFilter, MarketContextOverview, MarketEventFilter, MarketEventPage, MarketOverview, MarketOverviewFilter, MarketRelationFilter, MarketRelationPage, MarketSeries, SignalEvidenceSnapshot } from "@/types/market";
 const marketEventSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -94,6 +94,31 @@ const marketRelationPageSchema = z.object({
   totalPages: z.number().int().positive(),
   periodHours: z.number().int().min(1).max(720),
 });
+const marketContextOverviewSchema = z.object({
+  periodHours: z.number().int().min(1).max(720),
+  minimumConfidence: z.number().min(0).max(1),
+  uniqueEventCount: z.number().int().nonnegative(),
+  relationCount: z.number().int().nonnegative(),
+  countryCount: z.number().int().nonnegative(),
+  assetCount: z.number().int().nonnegative(),
+  averageConfidence: z.number().min(0).max(1),
+  eventTypes: z.array(z.object({
+    eventType: marketEventSchema.shape.eventType,
+    eventCount: z.number().int().nonnegative(),
+  })),
+  countries: z.array(z.object({
+    countryCode: z.string().nullable(),
+    relationCount: z.number().int().nonnegative(),
+    assetCount: z.number().int().nonnegative(),
+    averageConfidence: z.number().min(0).max(1),
+  })),
+  assets: z.array(z.object({
+    asset: assetSchema,
+    relationCount: z.number().int().nonnegative(),
+    countryCount: z.number().int().nonnegative(),
+    averageConfidence: z.number().min(0).max(1),
+  })),
+});
 
 function requireDesktopRuntime() {
   if (!isTauri()) throw new Error("desktop_runtime_required");
@@ -103,6 +128,15 @@ export async function getMarketOverview(filter: MarketOverviewFilter = { periodH
   requireDesktopRuntime();
   const response: unknown = await invoke("get_market_overview", { filter });
   return marketOverviewSchema.parse(response);
+}
+
+export async function getMarketContextOverview(filter: MarketContextFilter): Promise<MarketContextOverview> {
+  requireDesktopRuntime();
+  const response: unknown = await invoke("get_market_context_overview", {
+    periodHours: filter.periodHours,
+    minimumConfidence: filter.minimumConfidence,
+  });
+  return marketContextOverviewSchema.parse(response);
 }
 
 export async function refreshMarketData(): Promise<CollectionSummary> {

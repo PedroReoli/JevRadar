@@ -1,0 +1,215 @@
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-4);
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+
+.filters legend {
+  padding-inline: var(--space-2);
+  color: var(--color-text-secondary);
+  font: var(--font-label-sm);
+}
+
+.filters label {
+  flex: 1 1 var(--size-backtest-threshold);
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font: var(--font-label-sm);
+}
+
+.filters select {
+  min-height: var(--control-height-md);
+  padding-inline: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  background: var(--color-surface-panel);
+  font: var(--font-body-md);
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--size-collection-card-min), 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.kpis div {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-panel);
+}
+
+.kpis dt {
+  color: var(--color-text-muted);
+  font: var(--font-label-sm);
+}
+
+.kpis dd {
+  margin: 0;
+  color: var(--color-text-primary);
+  font: var(--font-display-md);
+  font-variant-numeric: tabular-nums;
+}
+
+.chartGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.chart,
+.assetPanel {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-5);
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-panel);
+  box-shadow: var(--shadow-panel);
+}
+
+.chart figcaption,
+.assetPanel h2 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font: var(--font-title-lg);
+}
+
+.chart > p,
+.assetPanel p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font: var(--font-body-sm);
+}
+
+.bars {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bars li {
+  display: grid;
+  grid-template-columns: var(--size-context-label) minmax(var(--size-context-bar-min), 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.barLabel {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font: var(--font-label-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.barTrack {
+  height: var(--size-progress-track);
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--color-neutral-surface-strong);
+}
+
+.barTrack span {
+  display: block;
+  width: var(--context-bar-share);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent-strong);
+}
+
+.bars strong {
+  color: var(--color-text-primary);
+  font: var(--font-code-label);
+  font-variant-numeric: tabular-nums;
+}
+
+.bars small {
+  grid-column: 2 / -1;
+  color: var(--color-text-muted);
+  font: var(--font-label-xs);
+}
+
+.dataTable summary {
+  cursor: pointer;
+  color: var(--color-accent-text);
+  font: var(--font-label-sm);
+}
+
+.tableScroll {
+  overflow-x: auto;
+}
+
+.tableScroll table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--color-text-secondary);
+  font: var(--font-body-sm);
+}
+
+.tableScroll th,
+.tableScroll td {
+  padding: var(--space-3);
+  border-bottom: var(--border-width-thin) solid var(--color-border-subtle);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+.tableScroll th {
+  color: var(--color-text-primary);
+  font: var(--font-label-sm);
+}
+
+.tableScroll tbody th span {
+  display: block;
+  color: var(--color-text-muted);
+  font: var(--font-body-sm);
+}
+
+.tableScroll a {
+  display: inline-flex;
+  color: var(--color-accent-text);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: var(--border-width-thin);
+  height: var(--border-width-thin);
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 64rem) {
+  .chartGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 32rem) {
+  .bars li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .barTrack {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .bars small {
+    grid-column: 1 / -1;
+  }
+}

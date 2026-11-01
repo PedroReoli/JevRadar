@@ -56,3 +56,43 @@ pub struct MarketRelationPage {
     pub total_pages: u32,
     pub period_hours: u16,
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextEventTypeSummary {
+    pub event_type: String,
+    pub event_count: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextCountrySummary {
+    pub country_code: Option<String>,
+    pub relation_count: u64,
+    pub asset_count: u64,
+    pub average_confidence: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextAssetSummary {
+    pub asset: Asset,
+    pub relation_count: u64,
+    pub country_count: u64,
+    pub average_confidence: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarketContextOverview {
+    pub period_hours: u16,
+    pub minimum_confidence: f64,
+    pub unique_event_count: u64,
+    pub relation_count: u64,
+    pub country_count: u64,
+    pub asset_count: u64,
+    pub average_confidence: f64,
+    pub event_types: Vec<ContextEventTypeSummary>,
+    pub countries: Vec<ContextCountrySummary>,
+    pub assets: Vec<ContextAssetSummary>,
+}

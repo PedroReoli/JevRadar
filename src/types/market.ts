@@ -110,6 +110,37 @@ export interface MarketRelationFilter {
   page: number;
 }
 
+export interface MarketContextFilter {
+  periodHours: 24 | 168 | 720;
+  minimumConfidence: 0 | 0.5 | 0.7 | 0.85;
+}
+
+export interface MarketContextOverview {
+  periodHours: number;
+  minimumConfidence: number;
+  uniqueEventCount: number;
+  relationCount: number;
+  countryCount: number;
+  assetCount: number;
+  averageConfidence: number;
+  eventTypes: Array<{
+    eventType: MarketEventSnapshot["eventType"];
+    eventCount: number;
+  }>;
+  countries: Array<{
+    countryCode: string | null;
+    relationCount: number;
+    assetCount: number;
+    averageConfidence: number;
+  }>;
+  assets: Array<{
+    asset: Asset;
+    relationCount: number;
+    countryCount: number;
+    averageConfidence: number;
+  }>;
+}
+
 export interface MarketSignalSnapshot {
   id: string;
   asset: Asset;

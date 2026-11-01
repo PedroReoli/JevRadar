@@ -79,6 +79,8 @@ Relatórios usam templates determinísticos e fontes rastreáveis. O produto dif
 
 O mapa de relações agrega eventos por país ou região e ativo, mostra volume, confiança média, recência e a distribuição dos tipos de relação. Toda agregação mantém acesso aos eventos de origem e nunca converte frequência em causalidade ou recomendação.
 
+A central de contexto resume o recorte completo, sem depender da página atualmente carregada: totaliza eventos únicos, relações, regiões e ativos; compara tipos de evento e países por barras com dados tabulares equivalentes; e ranqueia ativos apenas pela quantidade de relações observadas. Período e confiança mínima permanecem compartilháveis pela URL.
+
 ## Dashboard
 
 O dashboard oferece mapa de calor, timeline, preço com sentimento sobreposto, cobertura, confiança, diversidade de fontes, eventos, filtros, watchlists e metodologia. Todo estilo parte de design tokens centralizados; páginas são orquestradores enxutos e as responsabilidades seguem as camadas definidas nas regras de engenharia.

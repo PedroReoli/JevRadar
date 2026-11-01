@@ -21,7 +21,10 @@ use crate::domain::content::{
     SourceDocumentInput,
 };
 use crate::domain::coverage::CoverageGapItem;
-use crate::domain::events::{MarketEventSnapshot, MarketRelationSummary};
+use crate::domain::events::{
+    ContextAssetSummary, ContextCountrySummary, ContextEventTypeSummary, MarketContextOverview,
+    MarketEventSnapshot, MarketRelationSummary,
+};
 use crate::domain::insights::{AlertHistoryItem, CollectionRunSnapshot};
 use crate::domain::market::{LatestCollectionRun, MarketSeries, MarketSeriesPoint, MarketSnapshot};
 use crate::domain::signals::{
@@ -1781,6 +1784,107 @@ impl Database {
         Ok((items, total_items, countries))
     }
 
+    pub fn market_context_overview(
+        &self,
+        period_hours: u16,
+        minimum_confidence: f64,
+        started_after: &str,
+    ) -> Result<MarketContextOverview, DatabaseError> {
+        let connection = self.connection.lock();
+        let (unique_event_count, relation_count, country_count, asset_count, average_confidence) =
+            connection.query_row(
+                "SELECT COUNT(DISTINCT me.id), COUNT(*),
+                        COUNT(DISTINCT COALESCE(me.country_codes, '__global__')),
+                        COUNT(DISTINCT ear.asset_id), AVG(ear.confidence)
+                 FROM market_events me
+                 JOIN event_asset_relations ear ON ear.event_id = me.id
+                 WHERE ear.confidence >= ?1 AND me.started_at >= ?2",
+                params![minimum_confidence, started_after],
+                |row| {
+                    Ok((
+                        row.get::<_, i64>(0)? as u64,
+                        row.get::<_, i64>(1)? as u64,
+                        row.get::<_, i64>(2)? as u64,
+                        row.get::<_, i64>(3)? as u64,
+                        row.get::<_, Option<f64>>(4)?.unwrap_or(0.0),
+                    ))
+                },
+            )?;
+
+        let mut event_type_statement = connection.prepare(
+            "SELECT me.event_type, COUNT(DISTINCT me.id)
+             FROM market_events me
+             JOIN event_asset_relations ear ON ear.event_id = me.id
+             WHERE ear.confidence >= ?1 AND me.started_at >= ?2
+             GROUP BY me.event_type
+             ORDER BY COUNT(DISTINCT me.id) DESC, me.event_type",
+        )?;
+        let event_types = event_type_statement
+            .query_map(params![minimum_confidence, started_after], |row| {
+                Ok(ContextEventTypeSummary {
+                    event_type: row.get(0)?,
+                    event_count: row.get::<_, i64>(1)? as u64,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mut country_statement = connection.prepare(
+            "SELECT me.country_codes, COUNT(*), COUNT(DISTINCT ear.asset_id), AVG(ear.confidence)
+             FROM market_events me
+             JOIN event_asset_relations ear ON ear.event_id = me.id
+             WHERE ear.confidence >= ?1 AND me.started_at >= ?2
+             GROUP BY me.country_codes
+             ORDER BY COUNT(*) DESC, AVG(ear.confidence) DESC, me.country_codes
+             LIMIT 8",
+        )?;
+        let countries = country_statement
+            .query_map(params![minimum_confidence, started_after], |row| {
+                Ok(ContextCountrySummary {
+                    country_code: row.get(0)?,
+                    relation_count: row.get::<_, i64>(1)? as u64,
+                    asset_count: row.get::<_, i64>(2)? as u64,
+                    average_confidence: row.get(3)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mut asset_statement = connection.prepare(
+            "SELECT a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency, a.country_code,
+                    COUNT(*), COUNT(DISTINCT COALESCE(me.country_codes, '__global__')),
+                    AVG(ear.confidence)
+             FROM market_events me
+             JOIN event_asset_relations ear ON ear.event_id = me.id
+             JOIN assets a ON a.id = ear.asset_id
+             WHERE ear.confidence >= ?1 AND me.started_at >= ?2
+             GROUP BY a.id
+             ORDER BY COUNT(*) DESC, AVG(ear.confidence) DESC, a.symbol
+             LIMIT 10",
+        )?;
+        let assets = asset_statement
+            .query_map(params![minimum_confidence, started_after], |row| {
+                Ok(ContextAssetSummary {
+                    asset: map_asset_offset(row, 0)?,
+                    relation_count: row.get::<_, i64>(7)? as u64,
+                    country_count: row.get::<_, i64>(8)? as u64,
+                    average_confidence: row.get(9)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(MarketContextOverview {
+            period_hours,
+            minimum_confidence,
+            unique_event_count,
+            relation_count,
+            country_count,
+            asset_count,
+            average_confidence,
+            event_types,
+            countries,
+            assets,
+        })
+    }
+
     pub fn backtest_dataset(&self, asset_id: &str) -> Result<BacktestDataset, DatabaseError> {
         let connection = self.connection.lock();
         let asset = connection
@@ -3004,6 +3108,18 @@ mod tests {
         assert_eq!(relations[0].known_count, 1);
         assert_eq!(relations[0].correlation_count, 0);
         assert_eq!(countries, vec!["BR"]);
+        let context = database
+            .market_context_overview(720, 0.8, "2026-10-01T00:00:00Z")
+            .expect("contexto agregado");
+        assert_eq!(context.unique_event_count, 1);
+        assert_eq!(context.relation_count, 1);
+        assert_eq!(context.country_count, 1);
+        assert_eq!(context.asset_count, 1);
+        assert_eq!(context.event_types[0].event_type, "regulatory");
+        assert_eq!(context.event_types[0].event_count, 1);
+        assert_eq!(context.countries[0].country_code.as_deref(), Some("BR"));
+        assert_eq!(context.assets[0].asset.symbol, "PETR4");
+        assert!((context.average_confidence - 0.88).abs() < f64::EPSILON);
 
         let evidence = database
             .signal_evidence_between("2026-11-01T00:00:00Z", "2026-11-02T00:00:00Z")
