@@ -41,13 +41,20 @@ use crate::state::AppState;
 pub fn run() {
     init_tracing();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(
             tauri_plugin_autostart::Builder::new()
                 .app_name("JevRadar")
                 .build(),
         )
-        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_notification::init());
+    let builder = if option_env!("JEVRADAR_UPDATER_ENABLED") == Some("1") {
+        builder.plugin(tauri_plugin_updater::Builder::new().build())
+    } else {
+        builder
+    };
+
+    builder
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir()?;
             let database = Database::open(app_data_dir.join("jevradar.sqlite3"))?;

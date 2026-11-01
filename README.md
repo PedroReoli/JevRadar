@@ -76,11 +76,16 @@ npm run build:web
 npm run build
 npm run test:e2e:desktop
 npm run release:smoke
+npm run release:signed
 ```
 
 `npm run ops` oferece um menu para desenvolvimento, testes, E2E e builds. O E2E usa o
 executável compilado e o WebView2 real; rode `npm run build` antes dele. O build desktop
 gera o instalador NSIS para Windows.
+
+`release:signed` é o caminho de publicação: exige certificado Authenticode, chave do
+updater, endpoint HTTPS e servidor de timestamp. A ausência de qualquer pré-requisito
+interrompe o processo antes de publicar um artefato que pareça assinado.
 
 ## Segurança e dados
 

@@ -24,6 +24,7 @@ const commands = new Map([
   ["9", ["npm", ["run", "release:verify"], "Verificação de release"]],
   ["10", ["npm", ["run", "test:e2e:desktop"], "E2E do executável compilado"]],
   ["11", ["npm", ["run", "release:smoke"], "Build e smoke test da release"]],
+  ["12", ["npm", ["run", "release:signed"], "Release assinada com updater"]],
 ]);
 
 function run(program, args, label) {
@@ -73,6 +74,7 @@ async function main() {
     console.log("  [9] Verificação de release");
     console.log("  [10] E2E do executável compilado");
     console.log("  [11] Build e smoke test da release");
+    console.log("  [12] Release assinada com updater");
     console.log("  [0] Sair\n");
     const terminal = readline.createInterface({ input: process.stdin, output: process.stdout });
     choice = (await terminal.question(`${colors.cyan}Escolha [3]:${colors.reset} `)).trim() || "3";

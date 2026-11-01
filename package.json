@@ -20,6 +20,7 @@
     "fmt:rust:check": "node scripts/run-cargo.js fmt --manifest-path src-tauri/Cargo.toml --check",
     "release:verify": "node scripts/verify-release.js && npm run check:all",
     "release:smoke": "npm run build && npm run test:e2e:desktop",
+    "release:signed": "node scripts/build-signed-release.mjs",
     "test:unit": "vitest",
     "test:unit:coverage": "vitest run --coverage",
     "preview": "vite preview --host 127.0.0.1",
@@ -29,6 +30,7 @@
   "dependencies": {
     "@tanstack/react-query": "5.105.1",
     "@tauri-apps/api": "2.12.4",
+    "@tauri-apps/plugin-updater": "^2.14.1",
     "clsx": "2.1.1",
     "date-fns": "4.4.0",
     "i18next": "26.6.0",

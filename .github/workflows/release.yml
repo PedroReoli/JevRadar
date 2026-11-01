@@ -5,6 +5,11 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag SemVer já criada ou a criar, por exemplo v0.2.0-alpha.1"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -12,6 +17,8 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
+    env:
+      JEVRADAR_RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -28,12 +35,39 @@ jobs:
       - run: npm run release:verify
       - run: npm run build
       - run: npm run test:e2e:desktop
-      - uses: tauri-apps/tauri-action@v0
+      - name: Importar certificado Authenticode
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE)) { throw "Secret ausente: WINDOWS_CERTIFICATE" }
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)) { throw "Secret ausente: WINDOWS_CERTIFICATE_PASSWORD" }
+          $certificatePath = Join-Path $env:RUNNER_TEMP "jevradar-signing.pfx"
+          [IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          $securePassword = ConvertTo-SecureString $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+          $certificate = Import-PfxCertificate -FilePath $certificatePath -CertStoreLocation Cert:\CurrentUser\My -Password $securePassword
+          if ($null -eq $certificate) { throw "O certificado Authenticode não pôde ser importado." }
+          "WINDOWS_CERTIFICATE_THUMBPRINT=$($certificate.Thumbprint)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Preparar configuração assinada e updater
+        env:
+          JEVRADAR_TIMESTAMP_URL: ${{ vars.JEVRADAR_TIMESTAMP_URL }}
+          JEVRADAR_UPDATER_ENDPOINT: ${{ vars.JEVRADAR_UPDATER_ENDPOINT }}
+          JEVRADAR_UPDATER_PUBLIC_KEY: ${{ vars.JEVRADAR_UPDATER_PUBLIC_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: node scripts/prepare-release-config.mjs src-tauri/tauri.release.generated.conf.json
+      - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JEVRADAR_UPDATER_ENABLED: "1"
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "JevRadar ${{ github.ref_name }}"
+          args: --config src-tauri/tauri.release.generated.conf.json
+          tagName: ${{ env.JEVRADAR_RELEASE_TAG }}
+          releaseName: "JevRadar ${{ env.JEVRADAR_RELEASE_TAG }}"
           releaseBody: "Consulte as notas de versão e as limitações conhecidas antes de instalar. Este aplicativo apresenta sinais informativos e não recomenda investimentos."
           releaseDraft: true
           prerelease: true
+          updaterJsonPreferNsis: true
