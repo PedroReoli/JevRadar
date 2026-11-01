@@ -62,6 +62,7 @@ Estas regras são obrigatórias para toda implementação do JevRadar. Em confli
 
 - Fazer muitos commits úteis, mas nenhum commit artificial ou incompleto.
 - Cada commit representa uma entrega lógica concluída, revisável e validada.
+- Assim que uma entrega lógica satisfizer a Definition of Done, criar seu commit antes de iniciar outra demanda; não acumular entregas concluídas no working tree.
 - Não misturar demandas independentes no mesmo commit.
 - Não separar arquivos da mesma responsabilidade apenas para aumentar a quantidade de commits.
 - Usar Conventional Commits em PT-BR: `tipo(escopo): descrição`.
