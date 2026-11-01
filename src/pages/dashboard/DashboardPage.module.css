@@ -52,6 +52,31 @@
   font: var(--font-label-xs);
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.refreshAction {
+  min-height: var(--control-height-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border: var(--border-width-thin) solid var(--color-accent-border);
+  border-radius: var(--radius-md);
+  color: var(--color-accent-text);
+  background: var(--color-accent-surface);
+  font: var(--font-label-sm);
+  cursor: pointer;
+}
+
+.refreshAction:disabled {
+  cursor: wait;
+  opacity: var(--opacity-disabled);
+}
+
 .grid {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
@@ -59,11 +84,174 @@
 }
 
 .healthCard,
-.emptyCard {
+.emptyCard,
+.collectionCard,
+.marketPanel {
   border: var(--border-width-thin) solid var(--color-border-subtle);
   border-radius: var(--radius-xl);
   background: var(--color-surface-panel);
   box-shadow: var(--shadow-panel);
+}
+
+.collectionCard {
+  min-height: var(--size-collection-card-min);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: center;
+  gap: var(--space-4);
+  padding: var(--space-6);
+}
+
+.collectionCard h2,
+.marketHeader h2 {
+  margin: var(--space-1) 0 var(--space-2);
+  color: var(--color-text-primary);
+  font: var(--font-title-lg);
+}
+
+.collectionCard p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font: var(--font-body-sm);
+}
+
+.collectionIcon {
+  width: var(--size-empty-icon);
+  height: var(--size-empty-icon);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  color: var(--color-accent-text);
+  background: var(--color-accent-surface);
+}
+
+.cardEyebrow {
+  color: var(--color-text-muted);
+  font: var(--font-label-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.collectionTime {
+  grid-column: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font: var(--font-label-xs);
+}
+
+.marketPanel {
+  overflow: hidden;
+}
+
+.marketHeader {
+  min-height: var(--control-height-xl);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: var(--border-width-thin) solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+}
+
+.marketList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.marketRow {
+  min-height: var(--control-height-xl);
+  display: grid;
+  grid-template-columns: var(--size-asset-symbol) minmax(0, 1fr) minmax(var(--size-market-value), auto) minmax(var(--size-market-change), auto);
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: var(--border-width-thin) solid var(--color-border-subtle);
+}
+
+.marketRow:last-child {
+  border-bottom: 0;
+}
+
+.marketSymbol,
+.marketValue {
+  color: var(--color-text-primary);
+  font: var(--font-code-label);
+}
+
+.marketIdentity {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.marketIdentity strong,
+.marketIdentity small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marketIdentity strong {
+  color: var(--color-text-primary);
+  font: var(--font-label-md);
+}
+
+.marketIdentity small {
+  color: var(--color-text-muted);
+  font: var(--font-body-sm);
+}
+
+.marketValue {
+  justify-self: end;
+}
+
+.changePositive,
+.changeNegative,
+.changeNeutral {
+  min-height: var(--control-height-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  font: var(--font-label-xs);
+}
+
+.changePositive {
+  color: var(--color-positive-text);
+  background: var(--color-positive-surface);
+}
+
+.changeNegative {
+  color: var(--color-negative-text);
+  background: var(--color-negative-surface);
+}
+
+.changeNeutral {
+  color: var(--color-neutral-text);
+  background: var(--color-neutral-surface);
+}
+
+.marketEmpty {
+  margin: 0;
+  padding: var(--space-8);
+  color: var(--color-text-muted);
+  font: var(--font-body-md);
+  text-align: center;
+}
+
+.errorMessage {
+  padding: var(--space-4);
+  border: var(--border-width-thin) solid var(--color-negative-border);
+  border-radius: var(--radius-md);
+  color: var(--color-negative-text);
+  background: var(--color-negative-surface);
+  font: var(--font-body-sm);
 }
 
 .healthCard {
@@ -181,13 +369,35 @@
     flex-direction: column;
   }
 
+  .headerActions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
   .header h1 {
     font: var(--font-display-md);
   }
 
   .healthCard,
-  .emptyCard {
+  .emptyCard,
+  .collectionCard {
     padding: var(--space-5);
+  }
+
+  .marketRow {
+    grid-template-columns: var(--size-asset-symbol) minmax(0, 1fr) auto;
+    gap: var(--space-2) var(--space-3);
+    padding-inline: var(--space-4);
+  }
+
+  .marketValue {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .marketRow > :last-child {
+    grid-column: 3;
+    grid-row: 1 / span 2;
   }
 
   .healthItem {

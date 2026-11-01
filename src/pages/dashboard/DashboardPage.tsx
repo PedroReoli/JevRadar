@@ -1,33 +1,20 @@
-import { ArrowRight, CircleGauge, Database, RadioTower, Server } from "lucide-react";
+import { ArrowRight, CircleGauge, RadioTower, RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
-import { StatusPill } from "@/components/status/StatusPill";
+import { CollectionStatusCard } from "@/features/dashboard/components/CollectionStatusCard";
+import { MarketSnapshotPanel } from "@/features/dashboard/components/MarketSnapshotPanel";
+import { SystemHealthCard } from "@/features/dashboard/components/SystemHealthCard";
+import { useMarketOverview, useRefreshMarketData } from "@/features/dashboard/hooks/useMarketOverview";
 import { useSystemStatus } from "@/hooks/useSystemStatus";
 import styles from "@/pages/dashboard/DashboardPage.module.css";
 import type { ComponentStatus } from "@/types/system";
 
-interface HealthItemProps {
-  icon: typeof Database;
-  label: string;
-  status: ComponentStatus;
-}
-
-function HealthItem({ icon: Icon, label, status }: HealthItemProps) {
-  return (
-    <li className={styles.healthItem}>
-      <span className={styles.healthIcon}>
-        <Icon aria-hidden="true" size="var(--icon-size-md)" />
-      </span>
-      <span className={styles.healthLabel}>{label}</span>
-      <StatusPill status={status} />
-    </li>
-  );
-}
-
 export function DashboardPage() {
   const { t } = useTranslation();
   const statusQuery = useSystemStatus();
+  const marketQuery = useMarketOverview();
+  const refreshMutation = useRefreshMarketData();
   const fallbackStatus: ComponentStatus = statusQuery.isPending ? "pending" : "unavailable";
   const status = statusQuery.data;
 
@@ -39,31 +26,37 @@ export function DashboardPage() {
           <h1>{t("dashboard.title")}</h1>
           <p>{t("dashboard.description")}</p>
         </div>
-        <span className={styles.runtime}>
-          <CircleGauge aria-hidden="true" size="var(--icon-size-sm)" />
-          {status?.version ?? "—"}
-        </span>
+        <div className={styles.headerActions}>
+          <span className={styles.runtime}>
+            <CircleGauge aria-hidden="true" size="var(--icon-size-sm)" />
+            {status?.version ?? "—"}
+          </span>
+          <button
+            className={styles.refreshAction}
+            disabled={refreshMutation.isPending}
+            onClick={() => refreshMutation.mutate()}
+            type="button"
+          >
+            <RefreshCw aria-hidden="true" size="var(--icon-size-sm)" />
+            {refreshMutation.isPending ? t("dashboard.refreshing") : t("dashboard.refresh")}
+          </button>
+        </div>
       </header>
 
-      <section className={styles.grid} aria-label={t("dashboard.systemHealth")}>
-        <article className={styles.healthCard}>
-          <div className={styles.cardHeader}>
-            <div>
-              <h2>{t("dashboard.systemHealth")}</h2>
-              <p>{t("dashboard.systemHealthDescription")}</p>
-            </div>
-          </div>
-          <ul className={styles.healthList}>
-            <HealthItem icon={Database} label={t("dashboard.database")} status={status?.database ?? fallbackStatus} />
-            <HealthItem
-              icon={RadioTower}
-              label={t("dashboard.background")}
-              status={status?.backgroundCollection ?? fallbackStatus}
-            />
-            <HealthItem icon={Server} label={t("dashboard.api")} status={status?.localApi ?? fallbackStatus} />
-          </ul>
-        </article>
+      {refreshMutation.isError ? <div className={styles.errorMessage} role="alert">{t("dashboard.refreshError")}</div> : null}
 
+      <section className={styles.grid} aria-label={t("dashboard.systemHealth")}>
+        <SystemHealthCard fallbackStatus={fallbackStatus} status={status} />
+        <CollectionStatusCard collection={marketQuery.data?.latestCollection ?? null} />
+      </section>
+
+      {marketQuery.isError ? (
+        <div className={styles.errorMessage} role="alert">{t("dashboard.marketLoadError")}</div>
+      ) : (
+        <MarketSnapshotPanel snapshots={marketQuery.data?.snapshots ?? []} />
+      )}
+
+      {marketQuery.data?.snapshots.every((snapshot) => snapshot.closeValue === null) ? (
         <article className={styles.emptyCard}>
           <span className={styles.emptySignal} aria-hidden="true">
             <RadioTower size="var(--icon-size-xl)" strokeWidth={1.4} />
@@ -75,7 +68,7 @@ export function DashboardPage() {
             <ArrowRight aria-hidden="true" size="var(--icon-size-sm)" />
           </Link>
         </article>
-      </section>
+      ) : null}
 
       <footer className={styles.disclosure}>{t("dashboard.disclosure")}</footer>
     </div>

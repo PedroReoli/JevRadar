@@ -50,6 +50,9 @@
   --size-progress-track: 0.25rem;
   --size-asset-symbol: 4.5rem;
   --size-empty-list-min: 10rem;
+  --size-collection-card-min: 14rem;
+  --size-market-value: 6rem;
+  --size-market-change: 5.5rem;
   --size-toggle-width: 2.5rem;
   --size-toggle-height: 1.25rem;
   --icon-size-sm: 1rem;
