@@ -39,11 +39,15 @@
   --control-height-sm: 2rem;
   --control-height-md: 2.5rem;
   --control-height-lg: 3.75rem;
+  --control-height-xl: 4.75rem;
   --size-brand-mark: 2.25rem;
   --size-status-dot: 0.375rem;
   --size-icon-surface: 2.25rem;
   --size-empty-icon: 3rem;
   --size-empty-card-min: 20rem;
+  --size-progress-track: 0.25rem;
+  --size-toggle-width: 2.5rem;
+  --size-toggle-height: 1.25rem;
   --icon-size-sm: 1rem;
   --icon-size-md: 1.125rem;
   --icon-size-lg: 1.375rem;
@@ -52,6 +56,10 @@
   --layout-sidebar-width: 15rem;
   --layout-content-max: 76rem;
   --layout-content-narrow: 58rem;
+  --layout-wizard-max: 48rem;
+  --layout-wizard-min-height: 40rem;
+  --layout-text-max: 32rem;
+  --space-wizard-inline: clamp(2rem, 9vw, 6rem);
 
   --color-surface-canvas: #090d12;
   --color-surface-raised: #0d131a;
@@ -84,10 +92,14 @@
 
   --shadow-panel: 0 1.5rem 4rem rgb(0 0 0 / 18%);
   --shadow-accent: 0 0.5rem 1.75rem rgb(85 214 178 / 20%);
+  --shadow-dialog: 0 2rem 7rem rgb(0 0 0 / 32%);
 
   --motion-fast: 150ms;
+  --motion-medium: 260ms;
+  --motion-spinner: 900ms;
   --motion-lift-distance: -0.0625rem;
   --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --opacity-disabled: 0.45;
 }
 
 @media (prefers-color-scheme: light) {
