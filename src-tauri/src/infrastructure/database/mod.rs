@@ -32,6 +32,7 @@ const BACKTEST_PARAMETERS_SCHEMA: &str = include_str!("migrations/0007_backtest_
 const ALERT_DELIVERIES_SCHEMA: &str = include_str!("migrations/0008_alert_deliveries.sql");
 const JEV_USAGE_LIMITS_SCHEMA: &str = include_str!("migrations/0009_jev_usage_limits.sql");
 const X_SOURCE_SCHEMA: &str = include_str!("migrations/0010_x_source.sql");
+const ALERT_PREFERENCES_SCHEMA: &str = include_str!("migrations/0011_alert_preferences.sql");
 
 pub struct Database {
     connection: Mutex<Connection>,
@@ -71,6 +72,7 @@ impl Database {
         apply_migration(&connection, 8, ALERT_DELIVERIES_SCHEMA)?;
         apply_migration(&connection, 9, JEV_USAGE_LIMITS_SCHEMA)?;
         apply_migration(&connection, 10, X_SOURCE_SCHEMA)?;
+        apply_migration(&connection, 11, ALERT_PREFERENCES_SCHEMA)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -1278,6 +1280,7 @@ impl Database {
     pub fn pending_alert_candidates(
         &self,
         alert_level: u8,
+        cutoff: &str,
     ) -> Result<Vec<AlertCandidate>, DatabaseError> {
         let connection = self.connection.lock();
         let mut statement = connection.prepare(
@@ -1294,11 +1297,18 @@ impl Database {
                  FROM market_signals ms
                  JOIN assets a ON a.id = ms.asset_id
              )
-             SELECT sh.id, sh.symbol, sh.signal_score, sh.confidence,
+             SELECT sh.id, sh.asset_id, sh.symbol, sh.signal_score, sh.confidence,
                     sh.independent_source_count, sh.evidence_count, sh.hype_penalty,
-                    sh.previous_score
+                    sh.previous_score,
+                    (SELECT GROUP_CONCAT(DISTINCT sd.source_id)
+                     FROM signal_evidence se
+                     JOIN document_classifications dc ON dc.id = se.classification_id
+                     JOIN document_assets da ON da.id = dc.document_asset_id
+                     JOIN source_documents sd ON sd.id = da.document_id
+                     WHERE se.signal_id = sh.id) AS source_ids
              FROM signal_history sh
              WHERE sh.newest = 1
+               AND sh.window_ended_at >= ?2
                AND NOT EXISTS (
                    SELECT 1 FROM alert_deliveries ad
                    WHERE ad.signal_id = sh.id AND ad.alert_level = ?1
@@ -1306,16 +1316,21 @@ impl Database {
              ORDER BY ABS(sh.signal_score) DESC",
         )?;
         statement
-            .query_map(params![alert_level], |row| {
+            .query_map(params![alert_level, cutoff], |row| {
                 Ok(AlertCandidate {
                     signal_id: row.get(0)?,
-                    asset_symbol: row.get(1)?,
-                    signal_score: row.get(2)?,
-                    confidence: row.get(3)?,
-                    independent_source_count: row.get::<_, i64>(4)? as usize,
-                    evidence_count: row.get::<_, i64>(5)? as usize,
-                    hype_penalty: row.get(6)?,
-                    previous_score: row.get(7)?,
+                    asset_id: row.get(1)?,
+                    asset_symbol: row.get(2)?,
+                    signal_score: row.get(3)?,
+                    confidence: row.get(4)?,
+                    independent_source_count: row.get::<_, i64>(5)? as usize,
+                    evidence_count: row.get::<_, i64>(6)? as usize,
+                    hype_penalty: row.get(7)?,
+                    previous_score: row.get(8)?,
+                    source_ids: row
+                        .get::<_, Option<String>>(9)?
+                        .map(|value| value.split(',').map(str::to_owned).collect())
+                        .unwrap_or_default(),
                 })
             })?
             .collect::<Result<Vec<_>, _>>()
@@ -1694,7 +1709,7 @@ mod tests {
         assert_eq!((signal_count, evidence_count), (1, 1));
         drop(connection);
         let alert_candidates = database
-            .pending_alert_candidates(2)
+            .pending_alert_candidates(2, "2026-01-01T00:00:00Z")
             .expect("candidatos de alerta");
         assert_eq!(alert_candidates.len(), 1);
         database
@@ -1702,7 +1717,7 @@ mod tests {
             .expect("alerta registrado");
         assert!(
             database
-                .pending_alert_candidates(2)
+                .pending_alert_candidates(2, "2026-01-01T00:00:00Z")
                 .expect("alerta deduplicado")
                 .is_empty()
         );

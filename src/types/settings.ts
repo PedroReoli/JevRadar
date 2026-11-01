@@ -17,6 +17,13 @@ export interface AppSettings {
   localApiEnabled: boolean;
   telemetryEnabled: boolean;
   alertLevel: 1 | 2 | 3 | 4;
+  alertsEnabled: boolean;
+  alertWindowHours: number;
+  alertQuietHoursEnabled: boolean;
+  alertQuietStart: string;
+  alertQuietEnd: string;
+  alertAssetIds: string[];
+  alertSourceIds: string[];
   watchlistLimit: number;
   jevBatchLimit: number;
   jevDailyDocumentLimit: number;

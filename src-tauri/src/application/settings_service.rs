@@ -36,6 +36,13 @@ impl SettingsService {
             local_api_enabled: database.read_bool_setting("local_api_enabled")?,
             telemetry_enabled: database.read_bool_setting("telemetry_enabled")?,
             alert_level: database.read_u8_setting("alert_level", 2)?,
+            alerts_enabled: database.read_bool_setting("alerts_enabled")?,
+            alert_window_hours: database.read_u16_setting("alert_window_hours", 24)?,
+            alert_quiet_hours_enabled: database.read_bool_setting("alert_quiet_hours_enabled")?,
+            alert_quiet_start: database.read_setting_or("alert_quiet_start", "22:00")?,
+            alert_quiet_end: database.read_setting_or("alert_quiet_end", "08:00")?,
+            alert_asset_ids: read_string_list(database, "alert_asset_ids")?,
+            alert_source_ids: read_string_list(database, "alert_source_ids")?,
             watchlist_limit: database.read_u8_setting("watchlist_limit", 50)?,
             jev_batch_limit: database.read_u8_setting("jev_batch_limit", 25)?,
             jev_daily_document_limit: database.read_u16_setting("jev_daily_document_limit", 250)?,
@@ -83,6 +90,22 @@ impl SettingsService {
             ("local_api_enabled", update.local_api_enabled.to_string()),
             ("telemetry_enabled", update.telemetry_enabled.to_string()),
             ("alert_level", update.alert_level.to_string()),
+            ("alerts_enabled", update.alerts_enabled.to_string()),
+            ("alert_window_hours", update.alert_window_hours.to_string()),
+            (
+                "alert_quiet_hours_enabled",
+                update.alert_quiet_hours_enabled.to_string(),
+            ),
+            ("alert_quiet_start", update.alert_quiet_start),
+            ("alert_quiet_end", update.alert_quiet_end),
+            (
+                "alert_asset_ids",
+                serde_json::to_string(&update.alert_asset_ids).unwrap_or_else(|_| "[]".to_owned()),
+            ),
+            (
+                "alert_source_ids",
+                serde_json::to_string(&update.alert_source_ids).unwrap_or_else(|_| "[]".to_owned()),
+            ),
             ("watchlist_limit", update.watchlist_limit.to_string()),
             ("jev_batch_limit", update.jev_batch_limit.to_string()),
             (
@@ -107,4 +130,9 @@ impl SettingsService {
             brapi_token: secrets.exists(SecretKind::BrapiToken),
         }
     }
+}
+
+fn read_string_list(database: &Database, key: &str) -> Result<Vec<String>, DatabaseError> {
+    let stored = database.read_setting_or(key, "[]")?;
+    Ok(serde_json::from_str(&stored).unwrap_or_default())
 }

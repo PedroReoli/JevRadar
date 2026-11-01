@@ -28,19 +28,6 @@ export function InterfaceSettingsSection({ disabled, settings, update }: Interfa
         options={[["pt-BR", t("settings.portuguese")], ["en", t("settings.english")]]}
         value={settings.language}
       />
-      <SelectField
-        description={t("settings.alertLevelDescription")}
-        disabled={disabled}
-        label={t("settings.alertLevel")}
-        onChange={(value) => update("alertLevel", Number(value) as AppSettings["alertLevel"])}
-        options={[
-          ["1", t("settings.alertLevel1")],
-          ["2", t("settings.alertLevel2")],
-          ["3", t("settings.alertLevel3")],
-          ["4", t("settings.alertLevel4")],
-        ]}
-        value={String(settings.alertLevel)}
-      />
     </SettingsSection>
   );
 }

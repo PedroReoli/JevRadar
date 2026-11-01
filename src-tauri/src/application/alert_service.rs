@@ -1,7 +1,8 @@
-use chrono::Utc;
+use chrono::{Duration, Local, NaiveTime, Utc};
 use tauri::AppHandle;
 use tauri_plugin_notification::NotificationExt;
 
+use crate::application::settings_service::SettingsService;
 use crate::domain::alerts::AlertCandidate;
 use crate::infrastructure::database::{Database, DatabaseError};
 
@@ -11,6 +12,8 @@ pub struct AlertService;
 pub enum AlertServiceError {
     #[error(transparent)]
     Database(#[from] DatabaseError),
+    #[error("não foi possível ler as preferências de alerta")]
+    Settings,
     #[error("a notificação local não pôde ser exibida")]
     Notification,
 }
@@ -20,12 +23,26 @@ impl AlertService {
         database: &Database,
         app: &AppHandle,
     ) -> Result<usize, AlertServiceError> {
-        let level = database.read_u8_setting("alert_level", 2)?.clamp(1, 4);
-        let language = database.read_setting_or("language", "pt-BR")?;
-        let candidates = database.pending_alert_candidates(level)?;
+        let settings = SettingsService::read(database).map_err(|_| AlertServiceError::Settings)?;
+        if !settings.alerts_enabled
+            || (settings.alert_quiet_hours_enabled
+                && is_quiet_time(
+                    Local::now().time(),
+                    &settings.alert_quiet_start,
+                    &settings.alert_quiet_end,
+                ))
+        {
+            return Ok(0);
+        }
+        let level = settings.alert_level.clamp(1, 4);
+        let cutoff = Utc::now() - Duration::hours(i64::from(settings.alert_window_hours));
+        let candidates = database.pending_alert_candidates(level, &cutoff.to_rfc3339())?;
         let mut delivered = 0;
-        for candidate in candidates.into_iter().filter(|item| qualifies(item, level)) {
-            let (title, body) = message(&candidate, level, &language);
+        for candidate in candidates.into_iter().filter(|item| {
+            qualifies(item, level)
+                && matches_filters(item, &settings.alert_asset_ids, &settings.alert_source_ids)
+        }) {
+            let (title, body) = message(&candidate, level, &settings.language);
             app.notification()
                 .builder()
                 .title(title)
@@ -36,6 +53,37 @@ impl AlertService {
             delivered += 1;
         }
         Ok(delivered)
+    }
+}
+
+fn matches_filters(
+    candidate: &AlertCandidate,
+    asset_ids: &[String],
+    source_ids: &[String],
+) -> bool {
+    let asset_matches = asset_ids.is_empty() || asset_ids.contains(&candidate.asset_id);
+    let source_matches = source_ids.is_empty()
+        || candidate
+            .source_ids
+            .iter()
+            .any(|source_id| source_ids.contains(source_id));
+    asset_matches && source_matches
+}
+
+fn is_quiet_time(now: NaiveTime, start: &str, end: &str) -> bool {
+    let Ok(start) = NaiveTime::parse_from_str(start, "%H:%M") else {
+        return false;
+    };
+    let Ok(end) = NaiveTime::parse_from_str(end, "%H:%M") else {
+        return false;
+    };
+    if start == end {
+        return true;
+    }
+    if start < end {
+        now >= start && now < end
+    } else {
+        now >= start || now < end
     }
 }
 
@@ -106,12 +154,15 @@ fn message(candidate: &AlertCandidate, level: u8, language: &str) -> (String, St
 
 #[cfg(test)]
 mod tests {
-    use super::qualifies;
+    use chrono::NaiveTime;
+
+    use super::{is_quiet_time, matches_filters, qualifies};
     use crate::domain::alerts::AlertCandidate;
 
     fn candidate() -> AlertCandidate {
         AlertCandidate {
             signal_id: "signal:test".to_owned(),
+            asset_id: "asset:b3:PETR4".to_owned(),
             asset_symbol: "PETR4".to_owned(),
             signal_score: 0.56,
             confidence: 0.76,
@@ -119,6 +170,7 @@ mod tests {
             evidence_count: 4,
             hype_penalty: 0.12,
             previous_score: Some(0.20),
+            source_ids: vec!["source:reddit".to_owned(), "source:x".to_owned()],
         }
     }
 
@@ -135,5 +187,27 @@ mod tests {
         let mut item = candidate();
         item.previous_score = Some(0.52);
         assert!(!qualifies(&item, 2));
+    }
+
+    #[test]
+    fn filters_candidates_by_asset_and_source() {
+        let item = candidate();
+        assert!(matches_filters(&item, &[], &[]));
+        assert!(matches_filters(
+            &item,
+            &["asset:b3:PETR4".to_owned()],
+            &["source:x".to_owned()]
+        ));
+        assert!(!matches_filters(&item, &["asset:b3:VALE3".to_owned()], &[]));
+    }
+
+    #[test]
+    fn quiet_hours_support_ranges_that_cross_midnight() {
+        let late = NaiveTime::from_hms_opt(23, 30, 0).expect("horário");
+        let early = NaiveTime::from_hms_opt(7, 30, 0).expect("horário");
+        let daytime = NaiveTime::from_hms_opt(12, 0, 0).expect("horário");
+        assert!(is_quiet_time(late, "22:00", "08:00"));
+        assert!(is_quiet_time(early, "22:00", "08:00"));
+        assert!(!is_quiet_time(daytime, "22:00", "08:00"));
     }
 }

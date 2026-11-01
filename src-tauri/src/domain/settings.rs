@@ -37,6 +37,13 @@ pub struct AppSettings {
     pub local_api_enabled: bool,
     pub telemetry_enabled: bool,
     pub alert_level: u8,
+    pub alerts_enabled: bool,
+    pub alert_window_hours: u16,
+    pub alert_quiet_hours_enabled: bool,
+    pub alert_quiet_start: String,
+    pub alert_quiet_end: String,
+    pub alert_asset_ids: Vec<String>,
+    pub alert_source_ids: Vec<String>,
     pub watchlist_limit: u8,
     pub jev_batch_limit: u8,
     pub jev_daily_document_limit: u16,
@@ -55,6 +62,13 @@ pub struct UpdateAppSettings {
     pub local_api_enabled: bool,
     pub telemetry_enabled: bool,
     pub alert_level: u8,
+    pub alerts_enabled: bool,
+    pub alert_window_hours: u16,
+    pub alert_quiet_hours_enabled: bool,
+    pub alert_quiet_start: String,
+    pub alert_quiet_end: String,
+    pub alert_asset_ids: Vec<String>,
+    pub alert_source_ids: Vec<String>,
     pub watchlist_limit: u8,
     pub jev_batch_limit: u8,
     pub jev_daily_document_limit: u16,
@@ -69,6 +83,26 @@ impl UpdateAppSettings {
         }
         if !(1..=4).contains(&self.alert_level) {
             return Err("nível de alerta deve estar entre 1 e 4");
+        }
+        if !(1..=720).contains(&self.alert_window_hours) {
+            return Err("janela de alertas deve estar entre 1 e 720 horas");
+        }
+        if !valid_clock_time(&self.alert_quiet_start) || !valid_clock_time(&self.alert_quiet_end) {
+            return Err("horário silencioso deve usar HH:MM");
+        }
+        if self.alert_asset_ids.len() > 50 || self.alert_source_ids.len() > 100 {
+            return Err("filtros de alerta excedem o limite suportado");
+        }
+        if self
+            .alert_asset_ids
+            .iter()
+            .any(|id| !id.starts_with("asset:"))
+            || self
+                .alert_source_ids
+                .iter()
+                .any(|id| !id.starts_with("source:"))
+        {
+            return Err("identificador de filtro de alerta inválido");
         }
         if !(1..=50).contains(&self.watchlist_limit) {
             return Err("limite da watchlist deve estar entre 1 e 50");
@@ -93,6 +127,15 @@ impl UpdateAppSettings {
         }
         Ok(())
     }
+}
+
+fn valid_clock_time(value: &str) -> bool {
+    let mut parts = value.split(':');
+    let hour = parts.next().and_then(|part| part.parse::<u8>().ok());
+    let minute = parts.next().and_then(|part| part.parse::<u8>().ok());
+    parts.next().is_none()
+        && hour.is_some_and(|value| value < 24)
+        && minute.is_some_and(|value| value < 60)
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -151,6 +194,13 @@ mod tests {
             local_api_enabled: false,
             telemetry_enabled: false,
             alert_level: 2,
+            alerts_enabled: true,
+            alert_window_hours: 24,
+            alert_quiet_hours_enabled: false,
+            alert_quiet_start: "22:00".to_owned(),
+            alert_quiet_end: "08:00".to_owned(),
+            alert_asset_ids: Vec::new(),
+            alert_source_ids: Vec::new(),
             watchlist_limit: 50,
             jev_batch_limit: 25,
             jev_daily_document_limit: 250,
