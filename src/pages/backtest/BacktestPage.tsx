@@ -3,7 +3,9 @@ import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
 import { BacktestControls } from "@/features/backtest/components/BacktestControls";
+import { BacktestHistoryPanel } from "@/features/backtest/components/BacktestHistoryPanel";
 import { BacktestResults } from "@/features/backtest/components/BacktestResults";
+import { useBacktestHistory } from "@/features/insights/hooks/useInsights";
 import { useLatestBacktest, useRunBacktest } from "@/features/backtest/hooks/useBacktest";
 import { useDefaultWatchlist } from "@/features/watchlist/hooks/useWatchlist";
 import styles from "@/pages/backtest/BacktestPage.module.css";
@@ -21,6 +23,7 @@ export function BacktestPage() {
   const signalThreshold = boundedParam(params.get("signal"), 0.15);
   const confidenceThreshold = boundedParam(params.get("confidence"), 0.6);
   const reportQuery = useLatestBacktest(assetId);
+  const historyQuery = useBacktestHistory(assetId || undefined);
   const runMutation = useRunBacktest();
 
   useEffect(() => {
@@ -64,6 +67,7 @@ export function BacktestPage() {
       {watchlistQuery.isPending || reportQuery.isPending ? <p className={styles.feedback}>{t("backtest.loading")}</p> : null}
       {watchlistQuery.isError || reportQuery.isError || runMutation.isError ? <p className={styles.error} role="alert">{t("backtest.error")}</p> : null}
       {reportQuery.data ? <BacktestResults report={reportQuery.data} /> : <p className={styles.empty}>{t("backtest.empty")}</p>}
+      <BacktestHistoryPanel reports={historyQuery.data ?? []} />
       <footer className={styles.disclosure}>{t("backtest.disclosure")}</footer>
     </div>
   );
