@@ -192,6 +192,7 @@ impl From<SignalEvidenceSnapshot> for SignalEvidenceResponse {
         collection_history,
         backtest_history,
         latest_backtest,
+        calibration_readiness,
         jev_usage
     ),
     components(schemas(HealthResponse, SignalEvidenceResponse)),
@@ -238,6 +239,7 @@ pub async fn serve(
         .route("/v1/collections", get(collection_history))
         .route("/v1/backtests", get(backtest_history))
         .route("/v1/backtests/{asset_id}", get(latest_backtest))
+        .route("/v1/calibration-readiness", get(calibration_readiness))
         .route("/v1/jev/usage", get(jev_usage))
         .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
         .with_state(state);
@@ -652,6 +654,25 @@ async fn latest_backtest(
 
 #[utoipa::path(
     get,
+    path = "/v1/calibration-readiness",
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Prontidão operacional dos ativos monitorados", body = Object),
+        (status = 401)
+    )
+)]
+async fn calibration_readiness(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    authorize(&headers, &state.token)?;
+    let overview = InsightsQueryService::calibration_readiness(&state.database)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    serialize_json(overview)
+}
+
+#[utoipa::path(
+    get,
     path = "/v1/jev/usage",
     security(("bearerAuth" = [])),
     responses((status = 200, description = "Limites e uso local do Jev", body = Object), (status = 401))
@@ -786,6 +807,7 @@ mod tests {
             "/v1/alerts",
             "/v1/collections",
             "/v1/backtests",
+            "/v1/calibration-readiness",
             "/v1/jev/usage",
         ] {
             assert!(
