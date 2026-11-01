@@ -23,6 +23,23 @@ export interface CollectionRunSnapshot {
   sources: SourceCollectionResult[];
 }
 
+export type CollectionRunStatus = CollectionRunSnapshot["status"];
+
+export interface CollectionHistoryFilter {
+  status: CollectionRunStatus | null;
+  sourceId: string | null;
+  page: number;
+}
+
+export interface CollectionHistoryPage {
+  items: CollectionRunSnapshot[];
+  sourceIds: string[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
 export interface JevUsageSnapshot {
   analyzedToday: number;
   dailyLimit: number;

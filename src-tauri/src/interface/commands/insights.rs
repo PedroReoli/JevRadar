@@ -2,7 +2,9 @@ use tauri::State;
 
 use crate::application::insights_query_service::InsightsQueryService;
 use crate::domain::backtest::{BacktestHistoryPage, BacktestReport, CalibrationReadinessOverview};
-use crate::domain::insights::{AlertHistoryItem, CollectionRunSnapshot, JevUsageSnapshot};
+use crate::domain::insights::{
+    AlertHistoryItem, CollectionHistoryPage, CollectionRunSnapshot, JevUsageSnapshot,
+};
 use crate::domain::signals::MarketSignalSnapshot;
 use crate::interface::error::CommandError;
 use crate::state::AppState;
@@ -50,6 +52,37 @@ pub fn list_collection_history(
 ) -> Result<Vec<CollectionRunSnapshot>, CommandError> {
     InsightsQueryService::collections(&state.database, bounded_limit(limit, 50)?)
         .map_err(CommandError::internal)
+}
+
+#[tauri::command]
+pub fn list_collection_history_page(
+    state: State<'_, AppState>,
+    status: Option<String>,
+    source_id: Option<String>,
+    page: Option<u32>,
+    page_size: Option<u32>,
+) -> Result<CollectionHistoryPage, CommandError> {
+    if let Some(status) = status.as_deref()
+        && !["running", "completed", "partial", "failed"].contains(&status)
+    {
+        return Err(CommandError::internal("status de coleta inválido"));
+    }
+    if let Some(source_id) = source_id.as_deref() {
+        validate_id(source_id)?;
+    }
+    let page = page.unwrap_or(1);
+    let page_size = page_size.unwrap_or(10);
+    if page == 0 || !(1..=50).contains(&page_size) {
+        return Err(CommandError::internal("paginação inválida"));
+    }
+    InsightsQueryService::collection_page(
+        &state.database,
+        status.as_deref(),
+        source_id.as_deref(),
+        page,
+        page_size,
+    )
+    .map_err(CommandError::internal)
 }
 
 #[tauri::command]

@@ -573,6 +573,7 @@ export const ptBR = {
       eyebrow: "Observabilidade local",
       title: "Operação e coletas",
       description: "Acompanhe execuções, falhas por fonte e uso do Jev sem expor credenciais ou texto bruto.",
+      filters: "Filtros do histórico operacional",
       analyzedToday: "Analisados hoje",
       dailyLimit: "Limite diário",
       inputTokensToday: "Tokens de entrada hoje",
@@ -587,6 +588,7 @@ export const ptBR = {
       observations: "{{count}} observações",
       errors: "{{count}} erros de fonte",
       trigger: { manual: "Manual", background: "Segundo plano" },
+      pagination: { label: "Paginação das coletas", total: "{{count}} execuções", page: "Página {{page}} de {{totalPages}}", previous: "Página anterior", next: "Próxima página" },
     },
     reports: {
       eyebrow: "Evidências exportáveis",

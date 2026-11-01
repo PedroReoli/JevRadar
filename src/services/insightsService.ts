@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { assetSchema, backtestReportSchema, marketSignalSchema } from "@/services/contractSchemas";
 import type { BacktestReport } from "@/types/backtest";
-import type { AlertHistoryItem, CollectionRunSnapshot, JevUsageSnapshot } from "@/types/insights";
+import type { AlertHistoryItem, CollectionHistoryFilter, CollectionHistoryPage, CollectionRunSnapshot, JevUsageSnapshot } from "@/types/insights";
 import type { MarketSignalSnapshot } from "@/types/market";
 
 const alertHistorySchema = z.array(z.object({
@@ -25,7 +25,7 @@ const sourceResultSchema = z.object({
   errorCode: z.string().nullable(),
 });
 
-const collectionHistorySchema = z.array(z.object({
+const collectionRunSchema = z.object({
   runId: z.string(),
   triggerKind: z.enum(["manual", "background"]),
   status: z.enum(["running", "completed", "partial", "failed"]),
@@ -34,7 +34,16 @@ const collectionHistorySchema = z.array(z.object({
   storedObservationCount: z.number().int().nonnegative(),
   sourceErrorCount: z.number().int().nonnegative(),
   sources: z.array(sourceResultSchema),
-}));
+});
+const collectionHistorySchema = z.array(collectionRunSchema);
+const collectionHistoryPageSchema = z.object({
+  items: z.array(collectionRunSchema),
+  sourceIds: z.array(z.string()),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().min(1).max(50),
+  totalItems: z.number().int().nonnegative(),
+  totalPages: z.number().int().positive(),
+});
 
 const jevUsageSchema = z.object({
   analyzedToday: z.number().int().nonnegative(),
@@ -62,6 +71,17 @@ export async function listAlertHistory(limit = 50): Promise<AlertHistoryItem[]> 
 export async function listCollectionHistory(limit = 50): Promise<CollectionRunSnapshot[]> {
   requireDesktopRuntime();
   return collectionHistorySchema.parse(await invoke("list_collection_history", { limit }));
+}
+
+export async function listCollectionHistoryPage(filter: CollectionHistoryFilter): Promise<CollectionHistoryPage> {
+  requireDesktopRuntime();
+  const response: unknown = await invoke("list_collection_history_page", {
+    status: filter.status,
+    sourceId: filter.sourceId,
+    page: filter.page,
+    pageSize: 10,
+  });
+  return collectionHistoryPageSchema.parse(response);
 }
 
 export async function listBacktestHistory(assetId?: string, limit = 25): Promise<BacktestReport[]> {

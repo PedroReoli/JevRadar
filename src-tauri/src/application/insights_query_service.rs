@@ -1,5 +1,7 @@
 use crate::domain::backtest::{BacktestHistoryPage, BacktestReport, CalibrationReadinessOverview};
-use crate::domain::insights::{AlertHistoryItem, CollectionRunSnapshot, JevUsageSnapshot};
+use crate::domain::insights::{
+    AlertHistoryItem, CollectionHistoryPage, CollectionRunSnapshot, JevUsageSnapshot,
+};
 use crate::domain::signals::MarketSignalSnapshot;
 use crate::infrastructure::database::{Database, DatabaseError};
 
@@ -25,6 +27,26 @@ impl InsightsQueryService {
         limit: usize,
     ) -> Result<Vec<CollectionRunSnapshot>, DatabaseError> {
         database.collection_history(limit)
+    }
+
+    pub fn collection_page(
+        database: &Database,
+        status: Option<&str>,
+        source_id: Option<&str>,
+        page: u32,
+        page_size: u32,
+    ) -> Result<CollectionHistoryPage, DatabaseError> {
+        let offset = page.saturating_sub(1).saturating_mul(page_size);
+        let (items, source_ids, total_items) =
+            database.collection_history_page(status, source_id, page_size, offset)?;
+        Ok(CollectionHistoryPage {
+            items,
+            source_ids,
+            page,
+            page_size,
+            total_items,
+            total_pages: total_items.div_ceil(u64::from(page_size)).max(1) as u32,
+        })
     }
 
     pub fn backtests(

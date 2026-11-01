@@ -1,16 +1,16 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
 import "@/i18n/config";
 
-const { getJevUsage, listCollectionHistory } = vi.hoisted(() => ({
+const { getJevUsage, listCollectionHistoryPage } = vi.hoisted(() => ({
   getJevUsage: vi.fn(),
-  listCollectionHistory: vi.fn(),
+  listCollectionHistoryPage: vi.fn(),
 }));
 
-vi.mock("@/services/insightsService", () => ({ getJevUsage, listCollectionHistory }));
+vi.mock("@/services/insightsService", () => ({ getJevUsage, listCollectionHistoryPage }));
 
 import { OperationsPage } from "@/pages/operations/OperationsPage";
 
@@ -24,7 +24,7 @@ describe("OperationsPage", () => {
       inputTokensToday: 18420,
       outputTokensToday: 2160,
     });
-    listCollectionHistory.mockResolvedValue([{
+    listCollectionHistoryPage.mockResolvedValue({ items: [{
       runId: "run:1",
       triggerKind: "manual",
       status: "partial",
@@ -39,12 +39,12 @@ describe("OperationsPage", () => {
         skippedAssetCount: 0,
         errorCode: "provider_request_failed",
       }],
-    }]);
+    }], sourceIds: ["source:brapi"], page: 1, pageSize: 10, totalItems: 1, totalPages: 1 });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
     render(
       <QueryClientProvider client={client}>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={["/operations?status=partial&source=source%3Abrapi"]}>
           <OperationsPage />
         </MemoryRouter>
       </QueryClientProvider>,
@@ -55,5 +55,8 @@ describe("OperationsPage", () => {
     expect(screen.getByText("18.420")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /source:brapi/ })).toBeInTheDocument();
     expect(screen.getAllByText("Concluída parcialmente").length).toBeGreaterThan(0);
+    expect(listCollectionHistoryPage).toHaveBeenCalledWith({ status: "partial", sourceId: "source:brapi", page: 1 });
+    fireEvent.change(screen.getByRole("combobox", { name: "Status" }), { target: { value: "failed" } });
+    await waitFor(() => expect(listCollectionHistoryPage).toHaveBeenLastCalledWith({ status: "failed", sourceId: "source:brapi", page: 1 }));
   });
 });

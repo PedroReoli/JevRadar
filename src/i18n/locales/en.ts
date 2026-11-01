@@ -573,6 +573,7 @@ export const en = {
       eyebrow: "Local observability",
       title: "Operations and collections",
       description: "Track runs, per-source failures, and Jev usage without exposing credentials or raw text.",
+      filters: "Operational history filters",
       analyzedToday: "Analyzed today",
       dailyLimit: "Daily limit",
       inputTokensToday: "Input tokens today",
@@ -587,6 +588,7 @@ export const en = {
       observations: "{{count}} observations",
       errors: "{{count}} source errors",
       trigger: { manual: "Manual", background: "Background" },
+      pagination: { label: "Collection pagination", total: "{{count}} runs", page: "Page {{page}} of {{totalPages}}", previous: "Previous page", next: "Next page" },
     },
     reports: {
       eyebrow: "Exportable evidence",

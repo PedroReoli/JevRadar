@@ -50,6 +50,15 @@ struct ListQuery {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct CollectionHistoryPageQuery {
+    status: Option<String>,
+    source_id: Option<String>,
+    page: Option<u32>,
+    page_size: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct BacktestHistoryQuery {
     asset_id: Option<String>,
     limit: Option<usize>,
@@ -198,6 +207,7 @@ impl From<SignalEvidenceSnapshot> for SignalEvidenceResponse {
         signal_evidence,
         alert_history,
         collection_history,
+        collection_history_page,
         backtest_history,
         backtest_history_page,
         latest_backtest,
@@ -246,6 +256,7 @@ pub async fn serve(
         .route("/v1/signals/{signal_id}/evidence", get(signal_evidence))
         .route("/v1/alerts", get(alert_history))
         .route("/v1/collections", get(collection_history))
+        .route("/v1/collection-history", get(collection_history_page))
         .route("/v1/backtests", get(backtest_history))
         .route("/v1/backtest-history", get(backtest_history_page))
         .route("/v1/backtests/{asset_id}", get(latest_backtest))
@@ -619,6 +630,47 @@ async fn collection_history(
 
 #[utoipa::path(
     get,
+    path = "/v1/collection-history",
+    params(
+        ("status" = Option<String>, Query, description = "running, completed, partial ou failed"),
+        ("sourceId" = Option<String>, Query, description = "ID local da fonte"),
+        ("page" = Option<u32>, Query, description = "Página a partir de 1"),
+        ("pageSize" = Option<u32>, Query, description = "1 a 50; padrão 10")
+    ),
+    security(("bearerAuth" = [])),
+    responses((status = 200, description = "Histórico operacional paginado", body = Object), (status = 400), (status = 401))
+)]
+async fn collection_history_page(
+    State(state): State<ApiState>,
+    Query(query): Query<CollectionHistoryPageQuery>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    authorize(&headers, &state.token)?;
+    if query
+        .status
+        .as_deref()
+        .is_some_and(|status| !["running", "completed", "partial", "failed"].contains(&status))
+    {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let page = query.page.unwrap_or(1);
+    let page_size = query.page_size.unwrap_or(10);
+    if page == 0 || !(1..=50).contains(&page_size) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let history = InsightsQueryService::collection_page(
+        &state.database,
+        query.status.as_deref(),
+        query.source_id.as_deref(),
+        page,
+        page_size,
+    )
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    serialize_json(history)
+}
+
+#[utoipa::path(
+    get,
     path = "/v1/backtests",
     params(
         ("assetId" = Option<String>, Query, description = "ID local do ativo"),
@@ -848,6 +900,7 @@ mod tests {
             "/v1/historical-patterns",
             "/v1/alerts",
             "/v1/collections",
+            "/v1/collection-history",
             "/v1/backtests",
             "/v1/backtest-history",
             "/v1/calibration-readiness",

@@ -31,6 +31,17 @@ pub struct CollectionRunSnapshot {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CollectionHistoryPage {
+    pub items: Vec<CollectionRunSnapshot>,
+    pub source_ids: Vec<String>,
+    pub page: u32,
+    pub page_size: u32,
+    pub total_items: u64,
+    pub total_pages: u32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct JevUsageSnapshot {
     pub analyzed_today: usize,
     pub daily_limit: usize,

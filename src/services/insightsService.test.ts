@@ -8,6 +8,7 @@ import {
   getSignalReport,
   listAlertHistory,
   listCollectionHistory,
+  listCollectionHistoryPage,
 } from "@/services/insightsService";
 
 const asset = {
@@ -76,6 +77,13 @@ describe("insightsService", () => {
     }]);
     const history = await listCollectionHistory();
     expect(history[0]?.sources[0]?.errorCode).toBe("provider_request_failed");
+  });
+
+  it("valida filtros e paginação do histórico operacional", async () => {
+    invoke.mockResolvedValueOnce({ items: [], sourceIds: ["source:brapi"], page: 2, pageSize: 10, totalItems: 12, totalPages: 2 });
+    const filter = { status: "partial" as const, sourceId: "source:brapi", page: 2 };
+    expect((await listCollectionHistoryPage(filter)).totalPages).toBe(2);
+    expect(invoke).toHaveBeenCalledWith("list_collection_history_page", { status: "partial", sourceId: "source:brapi", page: 2, pageSize: 10 });
   });
 
   it("valida limites locais do Jev sem expor a chave", async () => {

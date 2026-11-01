@@ -52,6 +52,8 @@ const JEV_TOKEN_USAGE_SCHEMA: &str = include_str!("migrations/0017_jev_token_usa
 const BACKTEST_PATTERN_INDEXES_SCHEMA: &str =
     include_str!("migrations/0018_backtest_pattern_indexes.sql");
 const US_MARKET_SCHEMA: &str = include_str!("migrations/0019_us_market.sql");
+const COLLECTION_QUERY_INDEXES_SCHEMA: &str =
+    include_str!("migrations/0020_collection_query_indexes.sql");
 
 pub struct Database {
     connection: Mutex<Connection>,
@@ -100,6 +102,7 @@ impl Database {
         apply_migration(&connection, 17, JEV_TOKEN_USAGE_SCHEMA)?;
         apply_migration(&connection, 18, BACKTEST_PATTERN_INDEXES_SCHEMA)?;
         apply_migration(&connection, 19, US_MARKET_SCHEMA)?;
+        apply_migration(&connection, 20, COLLECTION_QUERY_INDEXES_SCHEMA)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -734,6 +737,71 @@ impl Database {
                 .collect::<Result<Vec<_>, _>>()?;
         }
         Ok(runs)
+    }
+
+    pub fn collection_history_page(
+        &self,
+        status: Option<&str>,
+        source_id: Option<&str>,
+        limit: u32,
+        offset: u32,
+    ) -> Result<(Vec<CollectionRunSnapshot>, Vec<String>, u64), DatabaseError> {
+        let connection = self.connection.lock();
+        let filters = "(?1 IS NULL OR cr.status = ?1)
+                       AND (?2 IS NULL OR EXISTS (
+                           SELECT 1 FROM collection_run_sources selected_source
+                           WHERE selected_source.run_id = cr.id AND selected_source.source_id = ?2
+                       ))";
+        let total_items = connection.query_row(
+            &format!("SELECT COUNT(*) FROM collection_runs cr WHERE {filters}"),
+            params![status, source_id],
+            |row| row.get::<_, i64>(0),
+        )? as u64;
+        let mut statement = connection.prepare(&format!(
+            "SELECT cr.id, cr.trigger_kind, cr.status, cr.started_at, cr.completed_at,
+                    cr.stored_observation_count, cr.source_error_count
+             FROM collection_runs cr
+             WHERE {filters}
+             ORDER BY cr.started_at DESC, cr.id DESC
+             LIMIT ?3 OFFSET ?4"
+        ))?;
+        let mut runs = statement
+            .query_map(params![status, source_id, limit, offset], |row| {
+                Ok(CollectionRunSnapshot {
+                    run_id: row.get(0)?,
+                    trigger_kind: row.get(1)?,
+                    status: row.get(2)?,
+                    started_at: row.get(3)?,
+                    completed_at: row.get(4)?,
+                    stored_observation_count: row.get::<_, i64>(5)? as usize,
+                    source_error_count: row.get::<_, i64>(6)? as usize,
+                    sources: Vec::new(),
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut source_statement = connection.prepare(
+            "SELECT source_id, status, stored_observation_count, skipped_asset_count, error_code
+             FROM collection_run_sources WHERE run_id = ?1 ORDER BY source_id",
+        )?;
+        for run in &mut runs {
+            run.sources = source_statement
+                .query_map(params![run.run_id], |row| {
+                    Ok(SourceCollectionResult {
+                        source_id: row.get(0)?,
+                        status: row.get(1)?,
+                        stored_observation_count: row.get::<_, i64>(2)? as usize,
+                        skipped_asset_count: row.get::<_, i64>(3)? as usize,
+                        error_code: row.get(4)?,
+                    })
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
+        }
+        let mut available_sources = connection
+            .prepare("SELECT DISTINCT source_id FROM collection_run_sources ORDER BY source_id")?;
+        let source_ids = available_sources
+            .query_map([], |row| row.get(0))?
+            .collect::<Result<Vec<String>, _>>()?;
+        Ok((runs, source_ids, total_items))
     }
 
     pub fn enabled_content_sources(&self) -> Result<Vec<ContentSource>, DatabaseError> {
@@ -3545,6 +3613,19 @@ mod tests {
         assert_eq!(history.len(), 1);
         assert_eq!(history[0].status, "partial");
         assert_eq!(history[0].sources[0].source_id, "source:binance");
+        let (page, source_ids, total_items) = database
+            .collection_history_page(Some("partial"), Some("source:binance"), 10, 0)
+            .expect("histórico filtrado");
+        assert_eq!(total_items, 1);
+        assert_eq!(page[0].run_id, "run:test");
+        assert_eq!(source_ids, vec!["source:binance"]);
+        assert_eq!(
+            database
+                .collection_history_page(Some("completed"), None, 10, 0)
+                .expect("filtro vazio")
+                .2,
+            0
+        );
     }
 
     #[test]
