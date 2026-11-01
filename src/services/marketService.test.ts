@@ -7,7 +7,7 @@ vi.mock("@tauri-apps/api/core", () => ({
   isTauri: () => true,
 }));
 
-import { getMarketContextOverview, getMarketOverview, getMarketSeries, getSignalEvidence, listMarketEvents, listMarketRelations, refreshMarketData } from "@/services/marketService";
+import { getAssetDetail, getMarketContextOverview, getMarketOverview, getMarketSeries, getSignalEvidence, listMarketEvents, listMarketRelations, refreshMarketData } from "@/services/marketService";
 
 const asset = {
   id: "asset:crypto:BTC",
@@ -77,6 +77,28 @@ describe("marketService", () => {
     expect(overview.signals[0]!.signalScore).toBe(0.64);
     expect(overview.events[0]!.relationType).toBe("known");
     expect(invoke).toHaveBeenCalledWith("get_market_overview", { filter });
+  });
+
+  it("valida o detalhe agregado de um único ativo", async () => {
+    invoke.mockResolvedValueOnce({
+      asset,
+      snapshot: null,
+      signal: null,
+      events: [],
+    });
+
+    const detail = await getAssetDetail(asset.id, 720);
+
+    expect(detail?.asset.symbol).toBe("BTC");
+    expect(invoke).toHaveBeenCalledWith("get_asset_detail", {
+      assetId: asset.id,
+      periodHours: 720,
+    });
+  });
+
+  it("rejeita identificador de ativo inseguro antes de invocar o core", async () => {
+    await expect(getAssetDetail("asset:<script>", 720)).rejects.toThrow("invalid_asset_id");
+    expect(invoke).not.toHaveBeenCalled();
   });
 
   it("valida o resultado parcial sem mascarar erros de fonte", async () => {

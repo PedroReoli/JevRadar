@@ -87,6 +87,8 @@ O dashboard oferece mapa de calor, timeline, preço com sentimento sobreposto, c
 
 O explorador de sinais consulta no SQLite somente o último sinal de cada ativo habilitado na watchlist, limitado aos 50 ativos monitorados. Período, confiança mínima, direção e ativo são aplicados na fonte real e sincronizados na URL; os totais exibidos correspondem ao mesmo recorte filtrado. A API local autenticada expõe esse read model em `GET /v1/signal-explorer`.
 
+O dossiê de um ativo usa um read model dedicado ao item presente na watchlist. Ele reúne a última observação disponível, o sinal mais recente dentro da janela e até 200 eventos relacionados, sem carregar o painel completo para descartar os demais ativos no navegador. Série temporal e último backtest permanecem consultas independentes porque possuem ciclos e estados de ausência próprios. A API local autenticada expõe o agregado em `GET /v1/assets/{asset_id}/overview`.
+
 A comparação de ativos aceita de dois a quatro itens habilitados na watchlist. Preço e sentimento são exibidos em visualizações separadas, enquanto confiança, volume de evidências, diversidade, hype e eventos permanecem disponíveis como valores exatos. Seleção, período e confiança mínima ficam na URL; ausência de observação é mostrada como dado ausente, nunca como zero.
 
 ## Alertas

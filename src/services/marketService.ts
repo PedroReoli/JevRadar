@@ -2,7 +2,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { z } from "zod";
 
 import { assetSchema, marketSignalSchema, signalEvidenceSchema } from "@/services/contractSchemas";
-import type { CollectionSummary, MarketContextFilter, MarketContextOverview, MarketEventFilter, MarketEventPage, MarketOverview, MarketOverviewFilter, MarketRelationFilter, MarketRelationPage, MarketSeries, SignalEvidenceSnapshot } from "@/types/market";
+import type { AssetDetailOverview, CollectionSummary, MarketContextFilter, MarketContextOverview, MarketEventFilter, MarketEventPage, MarketOverview, MarketOverviewFilter, MarketRelationFilter, MarketRelationPage, MarketSeries, SignalEvidenceSnapshot } from "@/types/market";
 const marketEventSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -42,6 +42,13 @@ const marketOverviewSchema = z.object({
     })
     .nullable(),
 });
+const marketSnapshotSchema = marketOverviewSchema.shape.snapshots.element;
+const assetDetailOverviewSchema = z.object({
+  asset: assetSchema,
+  snapshot: marketSnapshotSchema.nullable(),
+  signal: marketSignalSchema.nullable(),
+  events: z.array(marketEventSchema),
+}).nullable();
 const collectionSummarySchema = z.object({
   runId: z.string(),
   status: z.enum(["completed", "partial", "failed"]),
@@ -128,6 +135,18 @@ export async function getMarketOverview(filter: MarketOverviewFilter = { periodH
   requireDesktopRuntime();
   const response: unknown = await invoke("get_market_overview", { filter });
   return marketOverviewSchema.parse(response);
+}
+
+export async function getAssetDetail(assetId: string, periodHours = 720): Promise<AssetDetailOverview | null> {
+  requireDesktopRuntime();
+  if (!/^asset:[A-Za-z0-9:+._-]+$/.test(assetId) || assetId.length > 240) {
+    throw new Error("invalid_asset_id");
+  }
+  if (!Number.isInteger(periodHours) || periodHours < 1 || periodHours > 720) {
+    throw new Error("invalid_period_hours");
+  }
+  const response: unknown = await invoke("get_asset_detail", { assetId, periodHours });
+  return assetDetailOverviewSchema.parse(response);
 }
 
 export async function getMarketContextOverview(filter: MarketContextFilter): Promise<MarketContextOverview> {

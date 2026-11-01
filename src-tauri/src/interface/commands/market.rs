@@ -3,7 +3,9 @@ use tauri::State;
 use crate::application::market_query_service::MarketQueryService;
 use crate::domain::assets::AssetClass;
 use crate::domain::events::{MarketContextOverview, MarketEventPage, MarketRelationPage};
-use crate::domain::market::{MarketOverview, MarketOverviewFilter, MarketSeries};
+use crate::domain::market::{
+    AssetDetailOverview, MarketOverview, MarketOverviewFilter, MarketSeries,
+};
 use crate::domain::signals::{SignalEvidenceSnapshot, SignalExplorerOverview};
 use crate::interface::error::CommandError;
 use crate::state::AppState;
@@ -16,6 +18,16 @@ pub fn get_market_overview(
     let filter = filter.unwrap_or_default();
     filter.validate().map_err(CommandError::internal)?;
     MarketQueryService::overview(&state.database, filter).map_err(CommandError::internal)
+}
+
+#[tauri::command]
+pub fn get_asset_detail(
+    state: State<'_, AppState>,
+    asset_id: String,
+    period_hours: u16,
+) -> Result<Option<AssetDetailOverview>, CommandError> {
+    MarketQueryService::asset_detail(&state.database, &asset_id, period_hours)
+        .map_err(CommandError::internal)
 }
 
 #[tauri::command]

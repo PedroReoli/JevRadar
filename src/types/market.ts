@@ -33,6 +33,13 @@ export interface MarketOverview {
   latestCollection: LatestCollectionRun | null;
 }
 
+export interface AssetDetailOverview {
+  asset: Asset;
+  snapshot: MarketSnapshot | null;
+  signal: MarketSignalSnapshot | null;
+  events: MarketEventSnapshot[];
+}
+
 export interface MarketSeriesPoint {
   observedAt: string;
   closeValue: number | null;

@@ -23,7 +23,7 @@ use crate::application::historical_pattern_query_service::{
 };
 use crate::application::insights_query_service::InsightsQueryService;
 use crate::application::market_query_service::{
-    MarketEventQueryError, MarketQueryService, SignalExplorerQueryError,
+    AssetDetailQueryError, MarketEventQueryError, MarketQueryService, SignalExplorerQueryError,
 };
 use crate::application::report_query_service::ReportQueryService;
 use crate::domain::assets::AssetClass;
@@ -91,6 +91,12 @@ struct SignalExplorerQuery {
     minimum_confidence: Option<f64>,
     direction: Option<String>,
     asset_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AssetDetailQuery {
+    period_hours: Option<u16>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -218,6 +224,7 @@ impl From<SignalEvidenceSnapshot> for SignalEvidenceResponse {
     paths(
         health,
         market_overview,
+        asset_detail,
         signal_explorer,
         content_overview,
         document_feed,
@@ -270,6 +277,7 @@ pub async fn serve(
     let app = Router::new()
         .route("/health", get(health))
         .route("/v1/market", get(market_overview))
+        .route("/v1/assets/{asset_id}/overview", get(asset_detail))
         .route("/v1/signal-explorer", get(signal_explorer))
         .route("/v1/sources", get(content_overview))
         .route("/v1/documents", get(document_feed))
@@ -324,6 +332,37 @@ async fn market_overview(
     serde_json::to_value(overview)
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/assets/{asset_id}/overview",
+    params(
+        ("asset_id" = String, Path, description = "ID local de um ativo da watchlist"),
+        ("periodHours" = Option<u16>, Query, description = "Período entre 1 e 720 horas; padrão 720")
+    ),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Detalhe agregado do ativo ou null quando ausente", body = Object),
+        (status = 400, description = "ID ou período inválido"),
+        (status = 401, description = "Token local ausente ou inválido"),
+        (status = 500, description = "Falha ao consultar o banco local")
+    )
+)]
+async fn asset_detail(
+    State(state): State<ApiState>,
+    Path(asset_id): Path<String>,
+    Query(query): Query<AssetDetailQuery>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    authorize(&headers, &state.token)?;
+    let overview = MarketQueryService::asset_detail(
+        &state.database,
+        &asset_id,
+        query.period_hours.unwrap_or(720),
+    )
+    .map_err(asset_detail_query_status)?;
+    serialize_json(overview)
 }
 
 #[utoipa::path(
@@ -929,6 +968,13 @@ fn signal_explorer_query_status(error: SignalExplorerQueryError) -> StatusCode {
     }
 }
 
+fn asset_detail_query_status(error: AssetDetailQueryError) -> StatusCode {
+    match error {
+        AssetDetailQueryError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        AssetDetailQueryError::InvalidFilter => StatusCode::BAD_REQUEST,
+    }
+}
+
 fn coverage_query_status(error: CoverageGapQueryError) -> StatusCode {
     match error {
         CoverageGapQueryError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -985,7 +1031,9 @@ mod tests {
 
     use utoipa::OpenApi;
 
-    use super::{ApiDoc, authorize, bounded_limit, valid_signal_id};
+    use super::{ApiDoc, asset_detail_query_status, authorize, bounded_limit, valid_signal_id};
+    use crate::application::market_query_service::AssetDetailQueryError;
+    use crate::infrastructure::database::DatabaseError;
 
     #[test]
     fn requires_an_exact_bearer_token() {
@@ -1020,6 +1068,7 @@ mod tests {
                 .contains_key("/v1/signals/{signal_id}/evidence")
         );
         for path in [
+            "/v1/assets/{asset_id}/overview",
             "/v1/signal-explorer",
             "/v1/signals/{signal_id}",
             "/v1/documents",
@@ -1045,5 +1094,19 @@ mod tests {
         assert_eq!(bounded_limit(None, 25), 25);
         assert_eq!(bounded_limit(Some(0), 25), 1);
         assert_eq!(bounded_limit(Some(999), 25), 200);
+    }
+
+    #[test]
+    fn maps_asset_detail_input_and_database_failures_without_leaking_details() {
+        assert_eq!(
+            asset_detail_query_status(AssetDetailQueryError::InvalidFilter),
+            axum::http::StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            asset_detail_query_status(AssetDetailQueryError::Database(DatabaseError::Sqlite(
+                rusqlite::Error::InvalidQuery,
+            ))),
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 }

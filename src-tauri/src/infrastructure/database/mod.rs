@@ -525,31 +525,55 @@ impl Database {
              ORDER BY a.asset_class, a.symbol",
         )?;
         let snapshots = statement
-            .query_map([], |row| {
-                let close_value = row.get::<_, Option<f64>>(7)?;
-                let previous_close_value = row.get::<_, Option<f64>>(8)?;
-                let change_percent =
-                    close_value
-                        .zip(previous_close_value)
-                        .and_then(|(current, previous)| {
-                            if previous == 0.0 {
-                                None
-                            } else {
-                                Some(((current / previous) - 1.0) * 100.0)
-                            }
-                        });
-                Ok(MarketSnapshot {
-                    asset: map_asset(row)?,
-                    close_value,
-                    previous_close_value,
-                    change_percent,
-                    observed_at: row.get(9)?,
-                    source_name: row.get(10)?,
-                    interval: row.get(11)?,
-                })
-            })?
+            .query_map([], map_market_snapshot)?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(snapshots)
+    }
+
+    pub fn market_snapshot(&self, asset_id: &str) -> Result<Option<MarketSnapshot>, DatabaseError> {
+        self.connection
+            .lock()
+            .query_row(
+                "WITH series_ranked AS (
+                    SELECT mo.*,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY mo.asset_id, mo.source_id, mo.interval
+                               ORDER BY mo.observed_at DESC, mo.collected_at DESC
+                           ) AS position
+                    FROM market_observations mo
+                    WHERE mo.asset_id = ?1
+                 ), latest_series AS (
+                    SELECT series_ranked.*,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY series_ranked.asset_id
+                               ORDER BY series_ranked.observed_at DESC, series_ranked.collected_at DESC
+                           ) AS asset_position
+                    FROM series_ranked
+                    WHERE series_ranked.position = 1
+                      AND EXISTS (
+                          SELECT 1 FROM series_ranked previous_candidate
+                          WHERE previous_candidate.asset_id = series_ranked.asset_id
+                            AND previous_candidate.source_id = series_ranked.source_id
+                            AND previous_candidate.interval = series_ranked.interval
+                            AND previous_candidate.position = 2
+                      )
+                 )
+                 SELECT a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency,
+                        a.country_code, latest.close_value, previous.close_value,
+                        latest.observed_at, source.name, latest.interval
+                 FROM assets a
+                 LEFT JOIN latest_series latest ON latest.asset_id = a.id AND latest.asset_position = 1
+                 LEFT JOIN series_ranked previous ON previous.asset_id = latest.asset_id
+                    AND previous.source_id = latest.source_id
+                    AND previous.interval = latest.interval
+                    AND previous.position = 2
+                 LEFT JOIN sources source ON source.id = latest.source_id
+                 WHERE a.id = ?1 AND a.active = 1",
+                params![asset_id],
+                map_market_snapshot,
+            )
+            .optional()
+            .map_err(Into::into)
     }
 
     pub fn list_coverage_gap_page(
@@ -1636,6 +1660,31 @@ impl Database {
                         question_version: row.get(18)?,
                     })
                 },
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
+    pub fn latest_market_signal_for_asset(
+        &self,
+        asset_id: &str,
+        cutoff: &str,
+    ) -> Result<Option<MarketSignalSnapshot>, DatabaseError> {
+        self.connection
+            .lock()
+            .query_row(
+                "SELECT ms.id, a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency,
+                        a.country_code, ms.signal_score, ms.confidence, ms.source_count,
+                        ms.independent_source_count, ms.evidence_count, ms.hype_penalty,
+                        ms.window_started_at, ms.window_ended_at, ms.methodology_version,
+                        ms.model_version, ms.question_version
+                 FROM market_signals ms
+                 JOIN assets a ON a.id = ms.asset_id
+                 WHERE ms.asset_id = ?1 AND ms.window_ended_at >= ?2
+                 ORDER BY ms.window_ended_at DESC, ms.calculated_at DESC
+                 LIMIT 1",
+                params![asset_id, cutoff],
+                map_market_signal,
             )
             .optional()
             .map_err(Into::into)
@@ -2873,6 +2922,29 @@ fn map_asset_offset(row: &rusqlite::Row<'_>, offset: usize) -> Result<Asset, rus
     })
 }
 
+fn map_market_snapshot(row: &rusqlite::Row<'_>) -> Result<MarketSnapshot, rusqlite::Error> {
+    let close_value = row.get::<_, Option<f64>>(7)?;
+    let previous_close_value = row.get::<_, Option<f64>>(8)?;
+    let change_percent = close_value
+        .zip(previous_close_value)
+        .and_then(|(current, previous)| {
+            if previous == 0.0 {
+                None
+            } else {
+                Some(((current / previous) - 1.0) * 100.0)
+            }
+        });
+    Ok(MarketSnapshot {
+        asset: map_asset(row)?,
+        close_value,
+        previous_close_value,
+        change_percent,
+        observed_at: row.get(9)?,
+        source_name: row.get(10)?,
+        interval: row.get(11)?,
+    })
+}
+
 fn map_market_signal(row: &rusqlite::Row<'_>) -> Result<MarketSignalSnapshot, rusqlite::Error> {
     Ok(MarketSignalSnapshot {
         id: row.get(0)?,
@@ -3448,6 +3520,13 @@ mod tests {
                 },
             ])
             .expect("preços persistidos");
+        let snapshot = database
+            .market_snapshot("asset:b3:PETR4")
+            .expect("snapshot dedicado")
+            .expect("ativo existente");
+        assert_eq!(snapshot.close_value, Some(32.0));
+        assert_eq!(snapshot.previous_close_value, Some(30.0));
+        assert!((snapshot.change_percent.expect("variação") - 6.666_666_666_666_665).abs() < 1e-10);
         database.connection.lock().execute(
             "INSERT INTO market_signals (
                 id, asset_id, window_started_at, window_ended_at, signal_score, confidence,
@@ -3698,6 +3777,17 @@ mod tests {
         assert_eq!(explorer_signals[0].id, "signal:test");
         assert_eq!(explorer_assets.len(), 1);
         assert_eq!(explorer_assets[0].symbol, "PETR4");
+        let latest_signal = database
+            .latest_market_signal_for_asset("asset:b3:PETR4", "2026-11-01T00:00:00Z")
+            .expect("último sinal por ativo")
+            .expect("sinal existente");
+        assert_eq!(latest_signal.id, "signal:test");
+        assert!(
+            database
+                .latest_market_signal_for_asset("asset:b3:PETR4", "2026-11-03T00:00:00Z")
+                .expect("sinal fora da janela")
+                .is_none()
+        );
         assert!(
             database
                 .signal_explorer("2026-11-01T00:00:00Z", 0.0, Some("negative"), None)

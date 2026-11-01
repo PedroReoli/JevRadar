@@ -38,6 +38,15 @@ pub struct MarketOverview {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AssetDetailOverview {
+    pub asset: Asset,
+    pub snapshot: Option<MarketSnapshot>,
+    pub signal: Option<MarketSignalSnapshot>,
+    pub events: Vec<MarketEventSnapshot>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MarketSeriesPoint {
     pub observed_at: String,
     pub close_value: Option<f64>,

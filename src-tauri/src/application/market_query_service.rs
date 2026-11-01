@@ -2,7 +2,9 @@ use chrono::{Duration, Utc};
 
 use crate::domain::assets::AssetClass;
 use crate::domain::events::{MarketContextOverview, MarketEventPage, MarketRelationPage};
-use crate::domain::market::{MarketOverview, MarketOverviewFilter, MarketSeries};
+use crate::domain::market::{
+    AssetDetailOverview, MarketOverview, MarketOverviewFilter, MarketSeries,
+};
 use crate::domain::signals::{
     SignalDirectionSummary, SignalEvidenceSnapshot, SignalExplorerOverview,
 };
@@ -28,7 +30,53 @@ pub enum SignalExplorerQueryError {
     Database(#[from] DatabaseError),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum AssetDetailQueryError {
+    #[error("filtro do ativo inválido")]
+    InvalidFilter,
+    #[error(transparent)]
+    Database(#[from] DatabaseError),
+}
+
 impl MarketQueryService {
+    pub fn asset_detail(
+        database: &Database,
+        asset_id: &str,
+        period_hours: u16,
+    ) -> Result<Option<AssetDetailOverview>, AssetDetailQueryError> {
+        if !(1..=720).contains(&period_hours) || !valid_asset_id(asset_id) {
+            return Err(AssetDetailQueryError::InvalidFilter);
+        }
+        let watchlist = database.default_watchlist(50)?;
+        let Some(asset) = watchlist
+            .assets
+            .into_iter()
+            .find(|item| item.asset.id == asset_id)
+            .map(|item| item.asset)
+        else {
+            return Ok(None);
+        };
+        let cutoff = (Utc::now() - Duration::hours(i64::from(period_hours))).to_rfc3339();
+        let snapshot = database.market_snapshot(asset_id)?;
+        let signal = database.latest_market_signal_for_asset(asset_id, &cutoff)?;
+        let (events, _) = database.list_market_event_page(
+            None,
+            None,
+            Some(asset_id),
+            None,
+            0.0,
+            &cutoff,
+            200,
+            0,
+        )?;
+        Ok(Some(AssetDetailOverview {
+            asset,
+            snapshot,
+            signal,
+            events,
+        }))
+    }
+
     pub fn signals(
         database: &Database,
         period_hours: u16,
@@ -312,11 +360,22 @@ fn validate_optional_filter(
     Ok(())
 }
 
+fn valid_asset_id(value: &str) -> bool {
+    value.starts_with("asset:")
+        && value.len() > "asset:".len()
+        && value.len() <= 240
+        && value
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || ":+-_.".contains(character))
+}
+
 #[cfg(test)]
 mod tests {
     use tempfile::tempdir;
 
-    use super::{MarketEventQueryError, MarketQueryService, SignalExplorerQueryError};
+    use super::{
+        AssetDetailQueryError, MarketEventQueryError, MarketQueryService, SignalExplorerQueryError,
+    };
     use crate::infrastructure::database::Database;
 
     fn database() -> Database {
@@ -409,5 +468,37 @@ mod tests {
                 Err(SignalExplorerQueryError::InvalidFilter)
             ));
         }
+    }
+
+    #[test]
+    fn rejects_invalid_asset_detail_filters() {
+        let database = database();
+        for result in [
+            MarketQueryService::asset_detail(&database, "asset:b3:PETR4", 0),
+            MarketQueryService::asset_detail(&database, "PETR4", 720),
+            MarketQueryService::asset_detail(&database, "asset:", 720),
+            MarketQueryService::asset_detail(&database, "asset:<script>", 720),
+        ] {
+            assert!(matches!(result, Err(AssetDetailQueryError::InvalidFilter)));
+        }
+    }
+
+    #[test]
+    fn returns_only_assets_from_the_local_watchlist() {
+        let database = database();
+        assert!(
+            MarketQueryService::asset_detail(&database, "asset:b3:PETR4", 720)
+                .expect("consulta vazia")
+                .is_none()
+        );
+        database
+            .add_default_watchlist_asset("asset:b3:PETR4", 50)
+            .expect("ativo monitorado");
+        let detail = MarketQueryService::asset_detail(&database, "asset:b3:PETR4", 720)
+            .expect("detalhe")
+            .expect("ativo encontrado");
+        assert_eq!(detail.asset.symbol, "PETR4");
+        assert!(detail.signal.is_none());
+        assert!(detail.events.is_empty());
     }
 }

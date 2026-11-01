@@ -34,8 +34,8 @@ use crate::interface::commands::insights::{
     list_collection_history, list_collection_history_page,
 };
 use crate::interface::commands::market::{
-    get_market_context_overview, get_market_overview, get_market_series, get_signal_evidence,
-    get_signal_explorer, list_market_events, list_market_relations,
+    get_asset_detail, get_market_context_overview, get_market_overview, get_market_series,
+    get_signal_evidence, get_signal_explorer, list_market_events, list_market_relations,
 };
 use crate::interface::commands::patterns::list_historical_patterns;
 use crate::interface::commands::settings::{
@@ -89,6 +89,7 @@ pub fn run() {
             list_document_feed,
             list_coverage_gaps,
             get_market_overview,
+            get_asset_detail,
             get_market_context_overview,
             get_market_series,
             get_signal_evidence,
