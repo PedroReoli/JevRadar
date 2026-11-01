@@ -10,7 +10,7 @@ import styles from "@/styles/ProductPage.module.css";
 
 export function SignalsPage() {
   const { t } = useTranslation();
-  const { overviewQuery, state, updateFilter } = useSignalExplorer();
+  const { signalsQuery, state, updateFilter } = useSignalExplorer();
 
   return (
     <main className={styles.page}>
@@ -26,16 +26,16 @@ export function SignalsPage() {
       <SignalFilters onChange={updateFilter} state={state} />
       <SignalSummary summary={state.summary} />
 
-      {overviewQuery.isPending ? <PageState kind="loading" message={t("product.loading")} /> : null}
-      {overviewQuery.isError ? (
+      {signalsQuery.isPending ? <PageState kind="loading" message={t("product.loading")} /> : null}
+      {signalsQuery.isError ? (
         <PageState
           actionLabel={t("product.retry")}
           kind="error"
           message={t("product.loadError")}
-          onAction={() => void overviewQuery.refetch()}
+          onAction={() => void signalsQuery.refetch()}
         />
       ) : null}
-      {!overviewQuery.isPending && !overviewQuery.isError && state.filteredSignals.length === 0 ? (
+      {!signalsQuery.isPending && !signalsQuery.isError && state.filteredSignals.length === 0 ? (
         <PageState kind="empty" message={t("product.signals.empty")} />
       ) : null}
       {state.filteredSignals.length > 0 ? <SignalExplorerList signals={state.filteredSignals} /> : null}

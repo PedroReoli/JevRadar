@@ -1,6 +1,6 @@
 import { useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 
-import { useMarketOverview } from "@/features/dashboard/hooks/useMarketOverview";
 import type {
   SignalConfidence,
   SignalDirection,
@@ -8,7 +8,7 @@ import type {
   SignalExplorerState,
   SignalPeriodHours,
 } from "@/features/signals/types";
-import type { MarketSignalSnapshot } from "@/types/market";
+import { getSignalExplorer } from "@/services/signalService";
 
 const periods = new Set<SignalPeriodHours>([24, 168, 720]);
 const confidenceLevels = new Set<SignalConfidence>([0, 0.5, 0.7, 0.85]);
@@ -33,38 +33,24 @@ function parseFilters(params: URLSearchParams): SignalExplorerFilters {
   };
 }
 
-function buildExplorerState(
-  signals: MarketSignalSnapshot[],
-  filters: SignalExplorerFilters,
-): SignalExplorerState {
-  const assets = Array.from(new Map(signals.map((signal) => [signal.asset.id, signal.asset])).values())
-    .sort((left, right) => left.symbol.localeCompare(right.symbol));
-  const filteredSignals = signals
-    .filter((signal) => !filters.assetId || signal.asset.id === filters.assetId)
-    .filter((signal) => filters.direction === "all" || getSignalDirection(signal.signalScore) === filters.direction)
-    .filter((signal) => signal.confidence >= filters.minimumConfidence)
-    .sort((left, right) => right.windowEndedAt.localeCompare(left.windowEndedAt));
-  const summary = filteredSignals.reduce<SignalExplorerState["summary"]>(
-    (result, signal) => {
-      result.total += 1;
-      result[getSignalDirection(signal.signalScore)] += 1;
-      return result;
-    },
-    { total: 0, positive: 0, neutral: 0, negative: 0 },
-  );
-
-  return { assets, filteredSignals, filters, summary };
-}
-
 export function useSignalExplorer() {
   const [params, setParams] = useSearchParams();
   const filters = parseFilters(params);
-  const overviewQuery = useMarketOverview({
-    periodHours: filters.periodHours,
-    assetClass: null,
-    minimumConfidence: filters.minimumConfidence,
+  const signalsQuery = useQuery({
+    queryKey: ["signal-explorer", filters],
+    queryFn: () => getSignalExplorer({
+      periodHours: filters.periodHours,
+      minimumConfidence: filters.minimumConfidence,
+      direction: filters.direction === "all" ? null : filters.direction,
+      assetId: filters.assetId || null,
+    }),
   });
-  const state = buildExplorerState(overviewQuery.data?.signals ?? [], filters);
+  const state: SignalExplorerState = {
+    assets: signalsQuery.data?.assets ?? [],
+    filteredSignals: signalsQuery.data?.signals ?? [],
+    filters,
+    summary: signalsQuery.data?.summary ?? { total: 0, positive: 0, neutral: 0, negative: 0 },
+  };
 
   const updateFilter = (key: "period" | "confidence" | "direction" | "asset", value: string) => {
     const next = new URLSearchParams(params);
@@ -78,5 +64,5 @@ export function useSignalExplorer() {
     setParams(next, { replace: true });
   };
 
-  return { overviewQuery, state, updateFilter };
+  return { signalsQuery, state, updateFilter };
 }

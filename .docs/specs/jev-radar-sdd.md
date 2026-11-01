@@ -85,6 +85,8 @@ A central de contexto resume o recorte completo, sem depender da página atualme
 
 O dashboard oferece mapa de calor, timeline, preço com sentimento sobreposto, cobertura, confiança, diversidade de fontes, eventos, filtros, watchlists e metodologia. Todo estilo parte de design tokens centralizados; páginas são orquestradores enxutos e as responsabilidades seguem as camadas definidas nas regras de engenharia.
 
+O explorador de sinais consulta no SQLite somente o último sinal de cada ativo habilitado na watchlist, limitado aos 50 ativos monitorados. Período, confiança mínima, direção e ativo são aplicados na fonte real e sincronizados na URL; os totais exibidos correspondem ao mesmo recorte filtrado. A API local autenticada expõe esse read model em `GET /v1/signal-explorer`.
+
 A comparação de ativos aceita de dois a quatro itens habilitados na watchlist. Preço e sentimento são exibidos em visualizações separadas, enquanto confiança, volume de evidências, diversidade, hype e eventos permanecem disponíveis como valores exatos. Seleção, período e confiança mínima ficam na URL; ausência de observação é mostrada como dado ausente, nunca como zero.
 
 ## Alertas

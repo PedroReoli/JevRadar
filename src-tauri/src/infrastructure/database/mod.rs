@@ -1549,6 +1549,60 @@ impl Database {
             .map_err(Into::into)
     }
 
+    pub fn signal_explorer(
+        &self,
+        cutoff: &str,
+        minimum_confidence: f64,
+        direction: Option<&str>,
+        asset_id: Option<&str>,
+    ) -> Result<(Vec<MarketSignalSnapshot>, Vec<Asset>), DatabaseError> {
+        let connection = self.connection.lock();
+        let latest_signal_filter = "ms.id = (SELECT latest.id FROM market_signals latest
+                       WHERE latest.asset_id = ms.asset_id
+                       ORDER BY latest.window_ended_at DESC, latest.calculated_at DESC
+                       LIMIT 1)";
+        let mut statement = connection.prepare(&format!(
+            "SELECT ms.id, a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency,
+                    a.country_code, ms.signal_score, ms.confidence, ms.source_count,
+                    ms.independent_source_count, ms.evidence_count, ms.hype_penalty,
+                    ms.window_started_at, ms.window_ended_at, ms.methodology_version,
+                    ms.model_version, ms.question_version
+             FROM market_signals ms
+             JOIN assets a ON a.id = ms.asset_id
+             JOIN watchlist_assets wa ON wa.asset_id = ms.asset_id
+             WHERE wa.watchlist_id = 'watchlist:default' AND wa.enabled = 1
+               AND {latest_signal_filter}
+               AND ms.window_ended_at >= ?1 AND ms.confidence >= ?2
+               AND (?3 IS NULL OR ms.asset_id = ?3)
+               AND (?4 IS NULL
+                    OR (?4 = 'positive' AND ms.signal_score >= 0.15)
+                    OR (?4 = 'negative' AND ms.signal_score <= -0.15)
+                    OR (?4 = 'neutral' AND ms.signal_score > -0.15 AND ms.signal_score < 0.15))
+             ORDER BY ABS(ms.signal_score) DESC, ms.confidence DESC, a.symbol
+             LIMIT 50"
+        ))?;
+        let signals = statement
+            .query_map(
+                params![cutoff, minimum_confidence, asset_id, direction],
+                map_market_signal,
+            )?
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut assets_statement = connection.prepare(&format!(
+            "SELECT a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency, a.country_code
+             FROM market_signals ms
+             JOIN assets a ON a.id = ms.asset_id
+             JOIN watchlist_assets wa ON wa.asset_id = ms.asset_id
+             WHERE wa.watchlist_id = 'watchlist:default' AND wa.enabled = 1
+               AND {latest_signal_filter} AND ms.window_ended_at >= ?1
+             ORDER BY a.symbol, a.id
+             LIMIT 50"
+        ))?;
+        let assets = assets_statement
+            .query_map(params![cutoff], |row| map_asset_offset(row, 0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok((signals, assets))
+    }
+
     pub fn market_signal(
         &self,
         signal_id: &str,
@@ -2819,6 +2873,24 @@ fn map_asset_offset(row: &rusqlite::Row<'_>, offset: usize) -> Result<Asset, rus
     })
 }
 
+fn map_market_signal(row: &rusqlite::Row<'_>) -> Result<MarketSignalSnapshot, rusqlite::Error> {
+    Ok(MarketSignalSnapshot {
+        id: row.get(0)?,
+        asset: map_asset_offset(row, 1)?,
+        signal_score: row.get(8)?,
+        confidence: row.get(9)?,
+        source_count: row.get::<_, i64>(10)? as usize,
+        independent_source_count: row.get::<_, i64>(11)? as usize,
+        evidence_count: row.get::<_, i64>(12)? as usize,
+        hype_penalty: row.get(13)?,
+        window_started_at: row.get(14)?,
+        window_ended_at: row.get(15)?,
+        methodology_version: row.get(16)?,
+        model_version: row.get(17)?,
+        question_version: row.get(18)?,
+    })
+}
+
 fn query_version_inventory(
     connection: &Connection,
     union_query: &str,
@@ -3614,6 +3686,25 @@ mod tests {
             .expect("contagem de contribuições");
         assert_eq!((signal_count, evidence_count), (1, 1));
         drop(connection);
+        let (explorer_signals, explorer_assets) = database
+            .signal_explorer(
+                "2026-11-01T00:00:00Z",
+                0.8,
+                Some("positive"),
+                Some("asset:b3:PETR4"),
+            )
+            .expect("explorador de sinais");
+        assert_eq!(explorer_signals.len(), 1);
+        assert_eq!(explorer_signals[0].id, "signal:test");
+        assert_eq!(explorer_assets.len(), 1);
+        assert_eq!(explorer_assets[0].symbol, "PETR4");
+        assert!(
+            database
+                .signal_explorer("2026-11-01T00:00:00Z", 0.0, Some("negative"), None)
+                .expect("direção sem resultados")
+                .0
+                .is_empty()
+        );
         let snapshots = database
             .signal_evidence("signal:test")
             .expect("rastreabilidade");

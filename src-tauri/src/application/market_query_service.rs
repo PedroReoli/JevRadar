@@ -3,7 +3,9 @@ use chrono::{Duration, Utc};
 use crate::domain::assets::AssetClass;
 use crate::domain::events::{MarketContextOverview, MarketEventPage, MarketRelationPage};
 use crate::domain::market::{MarketOverview, MarketOverviewFilter, MarketSeries};
-use crate::domain::signals::SignalEvidenceSnapshot;
+use crate::domain::signals::{
+    SignalDirectionSummary, SignalEvidenceSnapshot, SignalExplorerOverview,
+};
 use crate::infrastructure::database::{Database, DatabaseError};
 
 pub struct MarketQueryService;
@@ -18,7 +20,63 @@ pub enum MarketEventQueryError {
     Database(#[from] DatabaseError),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum SignalExplorerQueryError {
+    #[error("filtro de sinais inválido")]
+    InvalidFilter,
+    #[error(transparent)]
+    Database(#[from] DatabaseError),
+}
+
 impl MarketQueryService {
+    pub fn signals(
+        database: &Database,
+        period_hours: u16,
+        minimum_confidence: f64,
+        direction: Option<String>,
+        asset_id: Option<String>,
+    ) -> Result<SignalExplorerOverview, SignalExplorerQueryError> {
+        if !(1..=720).contains(&period_hours)
+            || !minimum_confidence.is_finite()
+            || !(0.0..=1.0).contains(&minimum_confidence)
+            || direction
+                .as_deref()
+                .is_some_and(|value| !["positive", "neutral", "negative"].contains(&value))
+            || asset_id
+                .as_deref()
+                .is_some_and(|value| !value.starts_with("asset:") || value.len() > 240)
+        {
+            return Err(SignalExplorerQueryError::InvalidFilter);
+        }
+        let cutoff = (Utc::now() - Duration::hours(i64::from(period_hours))).to_rfc3339();
+        let (signals, assets) = database.signal_explorer(
+            &cutoff,
+            minimum_confidence,
+            direction.as_deref(),
+            asset_id.as_deref(),
+        )?;
+        let mut summary = SignalDirectionSummary {
+            total: signals.len(),
+            positive: 0,
+            neutral: 0,
+            negative: 0,
+        };
+        for signal in &signals {
+            if signal.signal_score >= 0.15 {
+                summary.positive += 1;
+            } else if signal.signal_score <= -0.15 {
+                summary.negative += 1;
+            } else {
+                summary.neutral += 1;
+            }
+        }
+        Ok(SignalExplorerOverview {
+            signals,
+            assets,
+            summary,
+        })
+    }
+
     pub fn context(
         database: &Database,
         period_hours: u16,
@@ -258,7 +316,7 @@ fn validate_optional_filter(
 mod tests {
     use tempfile::tempdir;
 
-    use super::{MarketEventQueryError, MarketQueryService};
+    use super::{MarketEventQueryError, MarketQueryService, SignalExplorerQueryError};
     use crate::infrastructure::database::Database;
 
     fn database() -> Database {
@@ -335,5 +393,21 @@ mod tests {
             invalid_context,
             MarketEventQueryError::InvalidFilter
         ));
+    }
+
+    #[test]
+    fn rejects_invalid_signal_explorer_filters() {
+        let database = database();
+        for result in [
+            MarketQueryService::signals(&database, 0, 0.0, None, None),
+            MarketQueryService::signals(&database, 24, f64::NAN, None, None),
+            MarketQueryService::signals(&database, 24, 0.0, Some("bullish".to_owned()), None),
+            MarketQueryService::signals(&database, 24, 0.0, None, Some("PETR4".to_owned())),
+        ] {
+            assert!(matches!(
+                result,
+                Err(SignalExplorerQueryError::InvalidFilter)
+            ));
+        }
     }
 }

@@ -1,4 +1,7 @@
 import type { MarketSignalSnapshot } from "@/types/market";
+import type { SignalDirectionSummary } from "@/types/signals";
+
+export type { SignalDirectionSummary } from "@/types/signals";
 
 export type SignalDirection = "all" | "positive" | "neutral" | "negative";
 export type SignalPeriodHours = 24 | 168 | 720;
@@ -9,13 +12,6 @@ export interface SignalExplorerFilters {
   minimumConfidence: SignalConfidence;
   direction: SignalDirection;
   assetId: string;
-}
-
-export interface SignalDirectionSummary {
-  total: number;
-  positive: number;
-  neutral: number;
-  negative: number;
 }
 
 export interface SignalExplorerState {

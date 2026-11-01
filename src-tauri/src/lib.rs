@@ -35,7 +35,7 @@ use crate::interface::commands::insights::{
 };
 use crate::interface::commands::market::{
     get_market_context_overview, get_market_overview, get_market_series, get_signal_evidence,
-    list_market_events, list_market_relations,
+    get_signal_explorer, list_market_events, list_market_relations,
 };
 use crate::interface::commands::patterns::list_historical_patterns;
 use crate::interface::commands::settings::{
@@ -92,6 +92,7 @@ pub fn run() {
             get_market_context_overview,
             get_market_series,
             get_signal_evidence,
+            get_signal_explorer,
             list_market_events,
             list_market_relations,
             list_historical_patterns,

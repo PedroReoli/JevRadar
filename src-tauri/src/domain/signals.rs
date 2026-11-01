@@ -72,6 +72,23 @@ pub struct MarketSignalSnapshot {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SignalDirectionSummary {
+    pub total: usize,
+    pub positive: usize,
+    pub neutral: usize,
+    pub negative: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SignalExplorerOverview {
+    pub signals: Vec<MarketSignalSnapshot>,
+    pub assets: Vec<Asset>,
+    pub summary: SignalDirectionSummary,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SignalEvidenceSnapshot {
     pub classification_id: String,
     pub source_name: String,

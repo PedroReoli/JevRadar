@@ -22,7 +22,9 @@ use crate::application::historical_pattern_query_service::{
     HistoricalPatternQueryError, HistoricalPatternQueryService,
 };
 use crate::application::insights_query_service::InsightsQueryService;
-use crate::application::market_query_service::{MarketEventQueryError, MarketQueryService};
+use crate::application::market_query_service::{
+    MarketEventQueryError, MarketQueryService, SignalExplorerQueryError,
+};
 use crate::application::report_query_service::ReportQueryService;
 use crate::domain::assets::AssetClass;
 use crate::domain::market::MarketOverviewFilter;
@@ -80,6 +82,15 @@ struct BacktestHistoryPageQuery {
     asset_id: Option<String>,
     page: Option<u32>,
     page_size: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SignalExplorerQuery {
+    period_hours: Option<u16>,
+    minimum_confidence: Option<f64>,
+    direction: Option<String>,
+    asset_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -207,6 +218,7 @@ impl From<SignalEvidenceSnapshot> for SignalEvidenceResponse {
     paths(
         health,
         market_overview,
+        signal_explorer,
         content_overview,
         document_feed,
         market_events,
@@ -258,6 +270,7 @@ pub async fn serve(
     let app = Router::new()
         .route("/health", get(health))
         .route("/v1/market", get(market_overview))
+        .route("/v1/signal-explorer", get(signal_explorer))
         .route("/v1/sources", get(content_overview))
         .route("/v1/documents", get(document_feed))
         .route("/v1/events", get(market_events))
@@ -311,6 +324,40 @@ async fn market_overview(
     serde_json::to_value(overview)
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/signal-explorer",
+    params(
+        ("periodHours" = Option<u16>, Query, description = "Período entre 1 e 720 horas; padrão 24"),
+        ("minimumConfidence" = Option<f64>, Query, description = "Confiança mínima entre 0 e 1; padrão 0"),
+        ("direction" = Option<String>, Query, description = "positive, neutral ou negative"),
+        ("assetId" = Option<String>, Query, description = "ID local de um ativo da watchlist")
+    ),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Últimos sinais filtrados da watchlist local", body = Object),
+        (status = 400, description = "Filtro inválido"),
+        (status = 401, description = "Token local ausente ou inválido"),
+        (status = 500, description = "Falha ao consultar o banco local")
+    )
+)]
+async fn signal_explorer(
+    State(state): State<ApiState>,
+    Query(query): Query<SignalExplorerQuery>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    authorize(&headers, &state.token)?;
+    let overview = MarketQueryService::signals(
+        &state.database,
+        query.period_hours.unwrap_or(24),
+        query.minimum_confidence.unwrap_or(0.0),
+        query.direction,
+        query.asset_id,
+    )
+    .map_err(signal_explorer_query_status)?;
+    serialize_json(overview)
 }
 
 #[utoipa::path(
@@ -875,6 +922,13 @@ fn event_query_status(error: MarketEventQueryError) -> StatusCode {
     }
 }
 
+fn signal_explorer_query_status(error: SignalExplorerQueryError) -> StatusCode {
+    match error {
+        SignalExplorerQueryError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        SignalExplorerQueryError::InvalidFilter => StatusCode::BAD_REQUEST,
+    }
+}
+
 fn coverage_query_status(error: CoverageGapQueryError) -> StatusCode {
     match error {
         CoverageGapQueryError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -966,6 +1020,7 @@ mod tests {
                 .contains_key("/v1/signals/{signal_id}/evidence")
         );
         for path in [
+            "/v1/signal-explorer",
             "/v1/signals/{signal_id}",
             "/v1/documents",
             "/v1/events",
