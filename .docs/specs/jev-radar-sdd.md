@@ -112,6 +112,8 @@ O histórico de execuções é paginado por ativo e sincroniza a página na URL 
 
 A central operacional consulta o histórico no SQLite por status, fonte e página, sem filtrar apenas uma amostra carregada no navegador. A API mantém `GET /v1/collections` por compatibilidade e expõe o contrato paginado em `GET /v1/collection-history`.
 
+A central de alertas consulta o histórico no SQLite por nível, ativo e página. O seletor de ativos vem do conjunto completo de alertas persistidos, não apenas da página atual. A API mantém `GET /v1/alerts` por compatibilidade e expõe o contrato paginado em `GET /v1/alert-history`.
+
 A central de padrões históricos usa apenas o último backtest concluído de cada ativo compatível com um mesmo contrato de metodologia, modelo, perguntas e limiares. Resultados podem ser filtrados por horizonte, classe, tamanho mínimo da amostra e desempenho contra o baseline. Contratos incompatíveis nunca são agregados silenciosamente.
 
 ## Privacidade e telemetria

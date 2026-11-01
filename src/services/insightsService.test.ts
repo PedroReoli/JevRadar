@@ -7,6 +7,7 @@ import {
   getJevUsage,
   getSignalReport,
   listAlertHistory,
+  listAlertHistoryPage,
   listCollectionHistory,
   listCollectionHistoryPage,
 } from "@/services/insightsService";
@@ -56,6 +57,13 @@ describe("insightsService", () => {
       independentSourceCount: 4,
     }]);
     expect((await listAlertHistory())[0]?.alertLevel).toBe(3);
+  });
+
+  it("valida filtros e paginação do histórico de alertas", async () => {
+    invoke.mockResolvedValueOnce({ items: [], assets: [asset], page: 2, pageSize: 10, totalItems: 12, totalPages: 2 });
+    const filter = { alertLevel: 3 as const, assetId: asset.id, page: 2 };
+    expect((await listAlertHistoryPage(filter)).assets[0]?.symbol).toBe("PETR4");
+    expect(invoke).toHaveBeenCalledWith("list_alert_history_page", { alertLevel: 3, assetId: asset.id, page: 2, pageSize: 10 });
   });
 
   it("preserva falhas isoladas no histórico de coleta", async () => {

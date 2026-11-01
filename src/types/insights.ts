@@ -12,6 +12,23 @@ export interface AlertHistoryItem {
   independentSourceCount: number;
 }
 
+export type AlertLevel = 1 | 2 | 3 | 4;
+
+export interface AlertHistoryFilter {
+  alertLevel: AlertLevel | null;
+  assetId: string | null;
+  page: number;
+}
+
+export interface AlertHistoryPage {
+  items: AlertHistoryItem[];
+  assets: Asset[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
 export interface CollectionRunSnapshot {
   runId: string;
   triggerKind: "manual" | "background";

@@ -18,6 +18,17 @@ pub struct AlertHistoryItem {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AlertHistoryPage {
+    pub items: Vec<AlertHistoryItem>,
+    pub assets: Vec<Asset>,
+    pub page: u32,
+    pub page_size: u32,
+    pub total_items: u64,
+    pub total_pages: u32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CollectionRunSnapshot {
     pub run_id: String,
     pub trigger_kind: String,

@@ -54,6 +54,7 @@ const BACKTEST_PATTERN_INDEXES_SCHEMA: &str =
 const US_MARKET_SCHEMA: &str = include_str!("migrations/0019_us_market.sql");
 const COLLECTION_QUERY_INDEXES_SCHEMA: &str =
     include_str!("migrations/0020_collection_query_indexes.sql");
+const ALERT_QUERY_INDEXES_SCHEMA: &str = include_str!("migrations/0021_alert_query_indexes.sql");
 
 pub struct Database {
     connection: Mutex<Connection>,
@@ -103,6 +104,7 @@ impl Database {
         apply_migration(&connection, 18, BACKTEST_PATTERN_INDEXES_SCHEMA)?;
         apply_migration(&connection, 19, US_MARKET_SCHEMA)?;
         apply_migration(&connection, 20, COLLECTION_QUERY_INDEXES_SCHEMA)?;
+        apply_migration(&connection, 21, ALERT_QUERY_INDEXES_SCHEMA)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -2570,6 +2572,64 @@ impl Database {
             .map_err(Into::into)
     }
 
+    pub fn alert_history_page(
+        &self,
+        alert_level: Option<u8>,
+        asset_id: Option<&str>,
+        limit: u32,
+        offset: u32,
+    ) -> Result<(Vec<AlertHistoryItem>, Vec<Asset>, u64), DatabaseError> {
+        let connection = self.connection.lock();
+        let total_items = connection.query_row(
+            "SELECT COUNT(*)
+             FROM alert_deliveries ad
+             JOIN market_signals ms ON ms.id = ad.signal_id
+             WHERE (?1 IS NULL OR ad.alert_level = ?1)
+               AND (?2 IS NULL OR ms.asset_id = ?2)",
+            params![alert_level, asset_id],
+            |row| row.get::<_, i64>(0),
+        )? as u64;
+        let mut statement = connection.prepare(
+            "SELECT ad.signal_id, ad.alert_level, ad.delivered_at,
+                    a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency,
+                    a.country_code, ms.signal_score, ms.confidence, ms.evidence_count,
+                    ms.independent_source_count
+             FROM alert_deliveries ad
+             JOIN market_signals ms ON ms.id = ad.signal_id
+             JOIN assets a ON a.id = ms.asset_id
+             WHERE (?1 IS NULL OR ad.alert_level = ?1)
+               AND (?2 IS NULL OR ms.asset_id = ?2)
+             ORDER BY ad.delivered_at DESC, ad.signal_id
+             LIMIT ?3 OFFSET ?4",
+        )?;
+        let items = statement
+            .query_map(params![alert_level, asset_id, limit, offset], |row| {
+                Ok(AlertHistoryItem {
+                    signal_id: row.get(0)?,
+                    alert_level: row.get(1)?,
+                    delivered_at: row.get(2)?,
+                    asset: map_asset_offset(row, 3)?,
+                    signal_score: row.get(10)?,
+                    confidence: row.get(11)?,
+                    evidence_count: row.get::<_, i64>(12)? as usize,
+                    independent_source_count: row.get::<_, i64>(13)? as usize,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut assets_statement = connection.prepare(
+            "SELECT DISTINCT a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency,
+                    a.country_code
+             FROM alert_deliveries ad
+             JOIN market_signals ms ON ms.id = ad.signal_id
+             JOIN assets a ON a.id = ms.asset_id
+             ORDER BY a.symbol, a.id",
+        )?;
+        let assets = assets_statement
+            .query_map([], |row| map_asset_offset(row, 0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok((items, assets, total_items))
+    }
+
     pub fn pending_alert_candidates(
         &self,
         alert_level: u8,
@@ -3508,6 +3568,17 @@ mod tests {
         let alert_history = database.alert_history(10).expect("histórico de alertas");
         assert_eq!(alert_history.len(), 1);
         assert_eq!(alert_history[0].alert_level, 2);
+        let (alert_page, alert_assets, alert_total) = database
+            .alert_history_page(Some(2), Some("asset:b3:PETR4"), 10, 0)
+            .expect("histórico de alertas paginado");
+        assert_eq!(alert_total, 1);
+        assert_eq!(alert_page[0].signal_id, "signal:test");
+        assert_eq!(alert_assets[0].symbol, "PETR4");
+        let (empty_alert_page, _, empty_alert_total) = database
+            .alert_history_page(Some(3), None, 10, 0)
+            .expect("filtro de alertas vazio");
+        assert_eq!(empty_alert_total, 0);
+        assert!(empty_alert_page.is_empty());
         assert!(
             database
                 .pending_alert_candidates(2, "2026-01-01T00:00:00Z")

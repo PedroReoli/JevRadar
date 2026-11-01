@@ -409,6 +409,7 @@ export const en = {
       eyebrow: "Local history",
       title: "Alert center",
       description: "Review delivered notifications and the evidence available at that moment.",
+      filters: "Alert history filters",
       level: "Level",
       allLevels: "All levels",
       asset: "Asset",
@@ -416,6 +417,7 @@ export const en = {
       empty: "No alerts were delivered with the current filters.",
       deliveredAt: "Delivered at {{date}}",
       levelLabel: "Level {{level}}",
+      pagination: { label: "Alert history pagination", total: "{{count}} alerts", page: "Page {{page}} of {{totalPages}}", previous: "Previous page", next: "Next page" },
     },
     events: {
       eyebrow: "External context",

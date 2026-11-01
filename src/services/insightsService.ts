@@ -3,10 +3,10 @@ import { z } from "zod";
 
 import { assetSchema, backtestReportSchema, marketSignalSchema } from "@/services/contractSchemas";
 import type { BacktestReport } from "@/types/backtest";
-import type { AlertHistoryItem, CollectionHistoryFilter, CollectionHistoryPage, CollectionRunSnapshot, JevUsageSnapshot } from "@/types/insights";
+import type { AlertHistoryFilter, AlertHistoryItem, AlertHistoryPage, CollectionHistoryFilter, CollectionHistoryPage, CollectionRunSnapshot, JevUsageSnapshot } from "@/types/insights";
 import type { MarketSignalSnapshot } from "@/types/market";
 
-const alertHistorySchema = z.array(z.object({
+const alertHistoryItemSchema = z.object({
   signalId: z.string(),
   alertLevel: z.number().int().min(1).max(4),
   deliveredAt: z.string(),
@@ -15,7 +15,16 @@ const alertHistorySchema = z.array(z.object({
   confidence: z.number().min(0).max(1),
   evidenceCount: z.number().int().nonnegative(),
   independentSourceCount: z.number().int().nonnegative(),
-}));
+});
+const alertHistorySchema = z.array(alertHistoryItemSchema);
+const alertHistoryPageSchema = z.object({
+  items: z.array(alertHistoryItemSchema),
+  assets: z.array(assetSchema),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().min(1).max(50),
+  totalItems: z.number().int().nonnegative(),
+  totalPages: z.number().int().positive(),
+});
 
 const sourceResultSchema = z.object({
   sourceId: z.string(),
@@ -66,6 +75,17 @@ export async function getSignalReport(signalId: string): Promise<MarketSignalSna
 export async function listAlertHistory(limit = 50): Promise<AlertHistoryItem[]> {
   requireDesktopRuntime();
   return alertHistorySchema.parse(await invoke("list_alert_history", { limit }));
+}
+
+export async function listAlertHistoryPage(filter: AlertHistoryFilter): Promise<AlertHistoryPage> {
+  requireDesktopRuntime();
+  const response: unknown = await invoke("list_alert_history_page", {
+    alertLevel: filter.alertLevel,
+    assetId: filter.assetId,
+    page: filter.page,
+    pageSize: 10,
+  });
+  return alertHistoryPageSchema.parse(response);
 }
 
 export async function listCollectionHistory(limit = 50): Promise<CollectionRunSnapshot[]> {

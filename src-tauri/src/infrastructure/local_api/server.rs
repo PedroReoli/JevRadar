@@ -50,6 +50,15 @@ struct ListQuery {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct AlertHistoryPageQuery {
+    alert_level: Option<u8>,
+    asset_id: Option<String>,
+    page: Option<u32>,
+    page_size: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct CollectionHistoryPageQuery {
     status: Option<String>,
     source_id: Option<String>,
@@ -206,6 +215,7 @@ impl From<SignalEvidenceSnapshot> for SignalEvidenceResponse {
         signal_report,
         signal_evidence,
         alert_history,
+        alert_history_page,
         collection_history,
         collection_history_page,
         backtest_history,
@@ -255,6 +265,7 @@ pub async fn serve(
         .route("/v1/signals/{signal_id}", get(signal_report))
         .route("/v1/signals/{signal_id}/evidence", get(signal_evidence))
         .route("/v1/alerts", get(alert_history))
+        .route("/v1/alert-history", get(alert_history_page))
         .route("/v1/collections", get(collection_history))
         .route("/v1/collection-history", get(collection_history_page))
         .route("/v1/backtests", get(backtest_history))
@@ -611,6 +622,50 @@ async fn alert_history(
 
 #[utoipa::path(
     get,
+    path = "/v1/alert-history",
+    params(
+        ("alertLevel" = Option<u8>, Query, description = "Nível entre 1 e 4"),
+        ("assetId" = Option<String>, Query, description = "ID local do ativo"),
+        ("page" = Option<u32>, Query, description = "Página a partir de 1"),
+        ("pageSize" = Option<u32>, Query, description = "1 a 50; padrão 10")
+    ),
+    security(("bearerAuth" = [])),
+    responses((status = 200, description = "Histórico paginado de alertas", body = Object), (status = 400), (status = 401))
+)]
+async fn alert_history_page(
+    State(state): State<ApiState>,
+    Query(query): Query<AlertHistoryPageQuery>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    authorize(&headers, &state.token)?;
+    if query
+        .alert_level
+        .is_some_and(|level| !(1..=4).contains(&level))
+        || query
+            .asset_id
+            .as_deref()
+            .is_some_and(|value| value.is_empty() || value.len() > 240)
+    {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let page = query.page.unwrap_or(1);
+    let page_size = query.page_size.unwrap_or(10);
+    if page == 0 || !(1..=50).contains(&page_size) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let history = InsightsQueryService::alert_page(
+        &state.database,
+        query.alert_level,
+        query.asset_id.as_deref(),
+        page,
+        page_size,
+    )
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    serialize_json(history)
+}
+
+#[utoipa::path(
+    get,
     path = "/v1/collections",
     params(("limit" = Option<usize>, Query, description = "1 a 200; padrão 50")),
     security(("bearerAuth" = [])),
@@ -899,6 +954,7 @@ mod tests {
             "/v1/coverage-gaps",
             "/v1/historical-patterns",
             "/v1/alerts",
+            "/v1/alert-history",
             "/v1/collections",
             "/v1/collection-history",
             "/v1/backtests",

@@ -409,6 +409,7 @@ export const ptBR = {
       eyebrow: "Histórico local",
       title: "Central de alertas",
       description: "Revise notificações entregues e a evidência que existia naquele instante.",
+      filters: "Filtros do histórico de alertas",
       level: "Nível",
       allLevels: "Todos os níveis",
       asset: "Ativo",
@@ -416,6 +417,7 @@ export const ptBR = {
       empty: "Nenhum alerta foi entregue com os filtros atuais.",
       deliveredAt: "Entregue em {{date}}",
       levelLabel: "Nível {{level}}",
+      pagination: { label: "Paginação do histórico de alertas", total: "{{count}} alertas", page: "Página {{page}} de {{totalPages}}", previous: "Página anterior", next: "Próxima página" },
     },
     events: {
       eyebrow: "Contexto externo",

@@ -3,7 +3,8 @@ use tauri::State;
 use crate::application::insights_query_service::InsightsQueryService;
 use crate::domain::backtest::{BacktestHistoryPage, BacktestReport, CalibrationReadinessOverview};
 use crate::domain::insights::{
-    AlertHistoryItem, CollectionHistoryPage, CollectionRunSnapshot, JevUsageSnapshot,
+    AlertHistoryItem, AlertHistoryPage, CollectionHistoryPage, CollectionRunSnapshot,
+    JevUsageSnapshot,
 };
 use crate::domain::signals::MarketSignalSnapshot;
 use crate::interface::error::CommandError;
@@ -43,6 +44,35 @@ pub fn list_alert_history(
 ) -> Result<Vec<AlertHistoryItem>, CommandError> {
     InsightsQueryService::alerts(&state.database, bounded_limit(limit, 50)?)
         .map_err(CommandError::internal)
+}
+
+#[tauri::command]
+pub fn list_alert_history_page(
+    state: State<'_, AppState>,
+    alert_level: Option<u8>,
+    asset_id: Option<String>,
+    page: Option<u32>,
+    page_size: Option<u32>,
+) -> Result<AlertHistoryPage, CommandError> {
+    if alert_level.is_some_and(|level| !(1..=4).contains(&level)) {
+        return Err(CommandError::internal("nível de alerta inválido"));
+    }
+    if let Some(asset_id) = asset_id.as_deref() {
+        validate_id(asset_id)?;
+    }
+    let page = page.unwrap_or(1);
+    let page_size = page_size.unwrap_or(10);
+    if page == 0 || !(1..=50).contains(&page_size) {
+        return Err(CommandError::internal("paginação inválida"));
+    }
+    InsightsQueryService::alert_page(
+        &state.database,
+        alert_level,
+        asset_id.as_deref(),
+        page,
+        page_size,
+    )
+    .map_err(CommandError::internal)
 }
 
 #[tauri::command]
