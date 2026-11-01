@@ -14,6 +14,7 @@ use crate::domain::content::{
     ContentOverview, ContentSource, ContentSourceResult, ContentSourceStatus, SourceDocumentInput,
 };
 use crate::domain::market::{LatestCollectionRun, MarketSnapshot};
+use crate::domain::signals::{CalculatedSignal, SignalEvidenceInput};
 
 const INITIAL_SCHEMA: &str = include_str!("migrations/0001_initial.sql");
 const SETTINGS_SCHEMA: &str = include_str!("migrations/0002_settings.sql");
@@ -710,6 +711,94 @@ impl Database {
         Ok(inserted > 0)
     }
 
+    pub fn signal_evidence_between(
+        &self,
+        window_started_at: &str,
+        window_ended_at: &str,
+    ) -> Result<Vec<SignalEvidenceInput>, DatabaseError> {
+        let connection = self.connection.lock();
+        let mut statement = connection.prepare(
+            "SELECT dc.id, da.asset_id, sd.source_id, dc.sentiment,
+                    dc.sentiment_probability, COALESCE(dc.relevance_expected, dc.relevance_score),
+                    dc.content_type, dc.hype_probability, dc.factual_claim_probability,
+                    dc.confidence
+             FROM document_classifications dc
+             JOIN document_assets da ON da.id = dc.document_asset_id
+             JOIN source_documents sd ON sd.id = da.document_id
+             WHERE sd.published_at >= ?1 AND sd.published_at <= ?2
+             ORDER BY da.asset_id, sd.published_at",
+        )?;
+        statement
+            .query_map(params![window_started_at, window_ended_at], |row| {
+                Ok(SignalEvidenceInput {
+                    classification_id: row.get(0)?,
+                    asset_id: row.get(1)?,
+                    source_id: row.get(2)?,
+                    sentiment: row.get(3)?,
+                    sentiment_probability: row.get(4)?,
+                    relevance_expected: row.get(5)?,
+                    content_type: row.get(6)?,
+                    hype_probability: row.get(7)?,
+                    factual_claim_probability: row.get(8)?,
+                    confidence: row.get(9)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(Into::into)
+    }
+
+    pub fn store_market_signal(&self, signal: &CalculatedSignal) -> Result<(), DatabaseError> {
+        let mut connection = self.connection.lock();
+        let transaction = connection.transaction()?;
+        transaction.execute(
+            "INSERT INTO market_signals (
+                id, asset_id, window_started_at, window_ended_at, signal_score, confidence,
+                source_count, independent_source_count, evidence_count, hype_penalty,
+                methodology_version, calculated_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+             ON CONFLICT(asset_id, window_started_at, window_ended_at, methodology_version)
+             DO UPDATE SET
+                signal_score = excluded.signal_score,
+                confidence = excluded.confidence,
+                source_count = excluded.source_count,
+                independent_source_count = excluded.independent_source_count,
+                evidence_count = excluded.evidence_count,
+                hype_penalty = excluded.hype_penalty,
+                calculated_at = excluded.calculated_at",
+            params![
+                signal.id,
+                signal.asset_id,
+                signal.window_started_at,
+                signal.window_ended_at,
+                signal.signal_score,
+                signal.confidence,
+                signal.source_count as i64,
+                signal.independent_source_count as i64,
+                signal.evidence_count as i64,
+                signal.hype_penalty,
+                signal.methodology_version,
+                signal.calculated_at,
+            ],
+        )?;
+        transaction.execute(
+            "DELETE FROM signal_evidence WHERE signal_id = ?1",
+            params![signal.id],
+        )?;
+        for evidence in &signal.evidence {
+            transaction.execute(
+                "INSERT INTO signal_evidence (signal_id, classification_id, contribution_weight)
+                 VALUES (?1, ?2, ?3)",
+                params![
+                    signal.id,
+                    evidence.classification_id,
+                    evidence.contribution_weight
+                ],
+            )?;
+        }
+        transaction.commit()?;
+        Ok(())
+    }
+
     fn read_setting(&self, key: &str) -> Result<Option<String>, DatabaseError> {
         Ok(self
             .connection
@@ -960,6 +1049,7 @@ mod tests {
     fn finds_candidates_and_persists_a_typed_document_analysis() {
         use crate::domain::classification::DocumentAnalysisResult;
         use crate::domain::content::SourceDocumentInput;
+        use crate::domain::signals::{CalculatedSignal, WeightedEvidence};
 
         let directory = tempdir().expect("diretório temporário");
         let database =
@@ -1019,5 +1109,38 @@ mod tests {
         );
         let overview = database.content_overview().expect("visão geral");
         assert_eq!(overview.unclassified_document_count, 0);
+
+        let evidence = database
+            .signal_evidence_between("2026-11-01T00:00:00Z", "2026-11-02T00:00:00Z")
+            .expect("evidências");
+        assert_eq!(evidence.len(), 1);
+        database
+            .store_market_signal(&CalculatedSignal {
+                id: "signal:test".to_owned(),
+                asset_id: "asset:b3:PETR4".to_owned(),
+                window_started_at: "2026-11-01T00:00:00Z".to_owned(),
+                window_ended_at: "2026-11-02T00:00:00Z".to_owned(),
+                signal_score: 0.72,
+                confidence: 0.81,
+                source_count: 1,
+                independent_source_count: 1,
+                evidence_count: 1,
+                hype_penalty: 0.08,
+                methodology_version: "weighted-sentiment-v1".to_owned(),
+                calculated_at: "2026-11-02T00:01:00Z".to_owned(),
+                evidence: vec![WeightedEvidence {
+                    classification_id: evidence[0].classification_id.clone(),
+                    contribution_weight: 0.72,
+                }],
+            })
+            .expect("sinal persistido");
+        let connection = database.connection.lock();
+        let signal_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM market_signals", [], |row| row.get(0))
+            .expect("contagem de sinais");
+        let evidence_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM signal_evidence", [], |row| row.get(0))
+            .expect("contagem de contribuições");
+        assert_eq!((signal_count, evidence_count), (1, 1));
     }
 }

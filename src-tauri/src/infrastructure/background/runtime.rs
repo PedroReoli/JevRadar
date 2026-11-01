@@ -7,6 +7,7 @@ use std::time::Duration;
 use crate::application::classification_service::ClassificationService;
 use crate::application::content_collection_service::ContentCollectionService;
 use crate::application::market_collection_service::MarketCollectionService;
+use crate::application::signal_service::SignalService;
 use crate::domain::collection::CollectionTrigger;
 use crate::infrastructure::database::Database;
 use crate::infrastructure::secrets::KeyringSecretStore;
@@ -52,6 +53,9 @@ impl BackgroundRuntime {
                 }
                 if let Err(error) = ClassificationService::classify_pending(&database, &secrets) {
                     tracing::warn!(error = %error, "classificação Jev em background falhou");
+                }
+                if let Err(error) = SignalService::calculate_latest(&database) {
+                    tracing::warn!(error = %error, "agregação de sinais em background falhou");
                 }
             }),
         )

@@ -5,4 +5,5 @@ pub mod content;
 pub mod desktop;
 pub mod market;
 pub mod settings;
+pub mod signals;
 pub mod system_status;
