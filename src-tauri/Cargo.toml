@@ -1,6 +1,6 @@
 [package]
 name = "jevradar"
-version = "0.2.0-alpha.10"
+version = "0.2.0-alpha.11"
 description = "Core local do JevRadar"
 authors = ["Pedro Lucas Reis"]
 edition = "2024"
