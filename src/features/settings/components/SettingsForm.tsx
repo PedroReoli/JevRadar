@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { CredentialsSettingsSection } from "@/features/settings/components/CredentialsSettingsSection";
+import { DataManagementSection } from "@/features/settings/components/DataManagementSection";
 import { InterfaceSettingsSection } from "@/features/settings/components/InterfaceSettingsSection";
 import { OperationSettingsSection } from "@/features/settings/components/OperationSettingsSection";
 import { ProfileSettingsSection } from "@/features/settings/components/ProfileSettingsSection";
@@ -48,6 +49,7 @@ export function SettingsForm({ settings, secretStatus }: SettingsFormProps) {
       <OperationSettingsSection disabled={mutation.isPending} settings={draft} update={handleUpdate} />
       <ProfileSettingsSection disabled={mutation.isPending} settings={draft} update={handleUpdate} />
       <CredentialsSettingsSection status={secretStatus} />
+      <DataManagementSection />
 
       <div className={styles.actionBar}>
         <div aria-live="polite">

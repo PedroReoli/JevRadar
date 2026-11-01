@@ -3,6 +3,7 @@ pub mod catalog;
 pub mod classification;
 pub mod collection;
 pub mod content;
+pub mod data;
 pub mod desktop;
 pub mod market;
 pub mod settings;

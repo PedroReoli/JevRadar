@@ -19,6 +19,7 @@ use crate::interface::commands::collection::refresh_market_data;
 use crate::interface::commands::content::{
     get_content_overview, refresh_content_sources, set_content_source_enabled,
 };
+use crate::interface::commands::data::{export_local_data, purge_local_data};
 use crate::interface::commands::desktop::resolve_close_request;
 use crate::interface::commands::market::{get_market_overview, get_market_series};
 use crate::interface::commands::settings::{
@@ -71,6 +72,8 @@ pub fn run() {
             get_local_api_access,
             regenerate_local_api_token,
             resolve_close_request,
+            export_local_data,
+            purge_local_data,
             run_backtest,
             get_latest_backtest
         ])

@@ -2,6 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use parking_lot::Mutex;
+use rusqlite::backup::Backup;
 use rusqlite::{Connection, OptionalExtension, params};
 use thiserror::Error;
 
@@ -79,6 +80,43 @@ impl Database {
             .lock()
             .query_row("SELECT 1", [], |_| Ok(()))
             .is_ok()
+    }
+
+    pub fn export_snapshot(&self, path: &std::path::Path) -> Result<(), DatabaseError> {
+        let source = self.connection.lock();
+        let mut destination = Connection::open(path)?;
+        Backup::new(&source, &mut destination)?.run_to_completion(
+            64,
+            std::time::Duration::from_millis(10),
+            None,
+        )?;
+        Ok(())
+    }
+
+    pub fn purge_collected_data(&self) -> Result<(), DatabaseError> {
+        let mut connection = self.connection.lock();
+        let transaction = connection.transaction()?;
+        for table in [
+            "alert_deliveries",
+            "backtest_results",
+            "backtest_runs",
+            "event_asset_relations",
+            "market_events",
+            "signal_evidence",
+            "market_signals",
+            "document_classifications",
+            "document_analysis_runs",
+            "document_assets",
+            "source_documents",
+            "market_observations",
+            "source_collection_state",
+            "collection_run_sources",
+            "collection_runs",
+        ] {
+            transaction.execute(&format!("DELETE FROM {table}"), [])?;
+        }
+        transaction.commit()?;
+        Ok(())
     }
 
     pub fn read_bool_setting(&self, key: &str) -> Result<bool, DatabaseError> {
@@ -1681,5 +1719,25 @@ mod tests {
             .expect("relatório existente");
         assert_eq!(backtest.results[0].sample_size, 4);
         assert_eq!(backtest.signal_threshold, 0.15);
+    }
+
+    #[test]
+    fn exports_a_consistent_copy_and_preserves_settings_when_purging_history() {
+        let directory = tempdir().expect("diretório temporário");
+        let database = Database::open(directory.path().join("source.sqlite3")).expect("banco");
+        database
+            .write_settings(&[("language", "en".to_owned())])
+            .expect("preferência");
+        let export_path = directory.path().join("export.sqlite3");
+        database.export_snapshot(&export_path).expect("exportação");
+        assert!(export_path.is_file());
+
+        database.purge_collected_data().expect("limpeza");
+        assert_eq!(
+            database
+                .read_setting_or("language", "pt-BR")
+                .expect("idioma"),
+            "en"
+        );
     }
 }

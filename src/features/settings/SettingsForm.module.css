@@ -281,6 +281,34 @@
   margin-right: auto;
 }
 
+.dataActions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: var(--border-width-thin) solid var(--color-border-subtle);
+}
+
+.dataActions > div {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.dataActions strong {
+  color: var(--color-text-primary);
+  font: var(--font-label-md);
+}
+
+.dataActions small,
+.dataActions code {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font: var(--font-body-sm);
+  text-overflow: ellipsis;
+}
+
 .fieldError,
 .errorMessage {
   color: var(--color-negative-text);
@@ -351,6 +379,7 @@
   }
 
   .confirmation,
+  .dataActions,
   .actionBar {
     align-items: stretch;
     flex-direction: column;
