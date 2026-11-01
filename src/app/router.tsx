@@ -20,6 +20,7 @@ export const appRouter = createBrowserRouter([
       { path: "/compare", lazy: async () => ({ Component: (await import("@/pages/comparison/ComparisonPage")).ComparisonPage }) },
       { path: "/backtest", lazy: async () => ({ Component: (await import("@/pages/backtest/BacktestPage")).BacktestPage }) },
       { path: "/patterns", lazy: async () => ({ Component: (await import("@/pages/patterns/PatternsPage")).PatternsPage }) },
+      { path: "/calibration", lazy: async () => ({ Component: (await import("@/pages/calibration/CalibrationPage")).CalibrationPage }) },
       { path: "/backtests", element: <Navigate replace to="/backtest" /> },
       { path: "/watchlist", lazy: async () => ({ Component: (await import("@/pages/watchlist/WatchlistPage")).WatchlistPage }) },
       { path: "/sources", lazy: async () => ({ Component: (await import("@/pages/sources/SourcesPage")).SourcesPage }) },

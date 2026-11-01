@@ -1,4 +1,4 @@
-use crate::domain::backtest::BacktestReport;
+use crate::domain::backtest::{BacktestReport, CalibrationReadinessOverview};
 use crate::domain::insights::{AlertHistoryItem, CollectionRunSnapshot, JevUsageSnapshot};
 use crate::domain::signals::MarketSignalSnapshot;
 use crate::infrastructure::database::{Database, DatabaseError};
@@ -33,6 +33,12 @@ impl InsightsQueryService {
         limit: usize,
     ) -> Result<Vec<BacktestReport>, DatabaseError> {
         database.backtest_history(asset_id, limit)
+    }
+
+    pub fn calibration_readiness(
+        database: &Database,
+    ) -> Result<CalibrationReadinessOverview, DatabaseError> {
+        database.calibration_readiness()
     }
 
     pub fn jev_usage(database: &Database) -> Result<JevUsageSnapshot, DatabaseError> {

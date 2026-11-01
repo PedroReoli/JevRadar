@@ -104,6 +104,8 @@ Backtests usam `classified_at`, versão fixa do modelo e perguntas, calendário 
 
 Horizontes iniciais: 1, 7 e 30 dias quando houver histórico suficiente.
 
+A central de prontidão não declara validade preditiva. Para cada ativo habilitado na watchlist, ela mostra a janela observada, quantidade de sinais e preços, existência de backtest concluído e amostras em 1, 7 e 30 dias. O critério operacional inicial exige 30 dias observados e um limiar de amostra escolhido pelo usuário; esse limiar é reproduzível pela URL e serve apenas para organizar a leitura.
+
 A central de padrões históricos usa apenas o último backtest concluído de cada ativo compatível com um mesmo contrato de metodologia, modelo, perguntas e limiares. Resultados podem ser filtrados por horizonte, classe, tamanho mínimo da amostra e desempenho contra o baseline. Contratos incompatíveis nunca são agregados silenciosamente.
 
 ## Privacidade e telemetria

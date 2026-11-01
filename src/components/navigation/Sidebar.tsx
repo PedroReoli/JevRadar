@@ -1,4 +1,4 @@
-import { Activity, Bell, ChartNoAxesCombined, ChartSpline, FileBarChart, Files, Globe2, Landmark, ListFilter, Network, Newspaper, Radar, RadioTower, Scale, ScanSearch, Settings } from "lucide-react";
+import { Activity, Bell, ChartNoAxesCombined, ChartSpline, FileBarChart, Files, Gauge, Globe2, Landmark, ListFilter, Network, Newspaper, Radar, RadioTower, Scale, ScanSearch, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 
@@ -16,6 +16,7 @@ const navigation = [
   { to: "/compare", labelKey: "navigation.comparison", icon: Scale },
   { to: "/backtest", labelKey: "navigation.backtest", icon: ChartNoAxesCombined },
   { to: "/patterns", labelKey: "navigation.patterns", icon: ChartSpline },
+  { to: "/calibration", labelKey: "navigation.calibration", icon: Gauge },
   { to: "/watchlist", labelKey: "navigation.watchlist", icon: ListFilter },
   { to: "/sources", labelKey: "navigation.sources", icon: Newspaper },
   { to: "/operations", labelKey: "navigation.operations", icon: Activity },

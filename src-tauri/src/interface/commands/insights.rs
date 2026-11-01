@@ -1,7 +1,7 @@
 use tauri::State;
 
 use crate::application::insights_query_service::InsightsQueryService;
-use crate::domain::backtest::BacktestReport;
+use crate::domain::backtest::{BacktestReport, CalibrationReadinessOverview};
 use crate::domain::insights::{AlertHistoryItem, CollectionRunSnapshot, JevUsageSnapshot};
 use crate::domain::signals::MarketSignalSnapshot;
 use crate::interface::error::CommandError;
@@ -67,6 +67,13 @@ pub fn list_backtest_history(
         bounded_limit(limit, 25)?,
     )
     .map_err(CommandError::internal)
+}
+
+#[tauri::command]
+pub fn get_calibration_readiness(
+    state: State<'_, AppState>,
+) -> Result<CalibrationReadinessOverview, CommandError> {
+    InsightsQueryService::calibration_readiness(&state.database).map_err(CommandError::internal)
 }
 
 #[tauri::command]

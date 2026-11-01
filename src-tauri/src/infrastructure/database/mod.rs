@@ -10,7 +10,8 @@ use crate::domain::alerts::AlertCandidate;
 use crate::domain::assets::{Asset, AssetClass, Watchlist, WatchlistAsset};
 use crate::domain::backtest::{
     BacktestDataset, BacktestHorizonResult, BacktestPricePoint, BacktestReport,
-    BacktestSignalPoint, HistoricalPatternItem,
+    BacktestSignalPoint, CalibrationReadinessAsset, CalibrationReadinessOverview,
+    HistoricalPatternItem,
 };
 use crate::domain::classification::{
     AnalysisCandidateAsset, DocumentAnalysisResult, PendingDocumentAnalysis,
@@ -2197,6 +2198,115 @@ impl Database {
         Ok(u64::try_from(count).unwrap_or(0))
     }
 
+    pub fn calibration_readiness(&self) -> Result<CalibrationReadinessOverview, DatabaseError> {
+        let connection = self.connection.lock();
+        let generated_at =
+            connection.query_row("SELECT strftime('%Y-%m-%dT%H:%M:%SZ', 'now')", [], |row| {
+                row.get(0)
+            })?;
+        let mut statement = connection.prepare(
+            "WITH observation_bounds AS (
+                 SELECT asset_id, COUNT(*) AS price_count,
+                        MIN(observed_at) AS first_price_at, MAX(observed_at) AS last_price_at
+                 FROM market_observations GROUP BY asset_id
+             ), signal_bounds AS (
+                 SELECT asset_id, COUNT(*) AS signal_count,
+                        MIN(window_ended_at) AS first_signal_at, MAX(window_ended_at) AS last_signal_at
+                 FROM market_signals GROUP BY asset_id
+             ), latest_completed_runs AS (
+                 SELECT br.*, ROW_NUMBER() OVER (
+                     PARTITION BY br.asset_id ORDER BY br.completed_at DESC, br.created_at DESC, br.id DESC
+                 ) AS rank
+                 FROM backtest_runs br WHERE br.status = 'completed'
+             )
+             SELECT a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency, a.country_code,
+                    COALESCE(sb.signal_count, 0), COALESCE(ob.price_count, 0),
+                    CASE WHEN sb.first_signal_at IS NULL THEN ob.first_price_at
+                         WHEN ob.first_price_at IS NULL THEN sb.first_signal_at
+                         WHEN sb.first_signal_at < ob.first_price_at THEN sb.first_signal_at
+                         ELSE ob.first_price_at END,
+                    CASE WHEN sb.last_signal_at IS NULL THEN ob.last_price_at
+                         WHEN ob.last_price_at IS NULL THEN sb.last_signal_at
+                         WHEN sb.last_signal_at > ob.last_price_at THEN sb.last_signal_at
+                         ELSE ob.last_price_at END,
+                    CASE WHEN sb.first_signal_at IS NULL AND ob.first_price_at IS NULL THEN 0
+                         ELSE CAST(julianday(
+                             CASE WHEN sb.last_signal_at IS NULL THEN ob.last_price_at
+                                  WHEN ob.last_price_at IS NULL THEN sb.last_signal_at
+                                  WHEN sb.last_signal_at > ob.last_price_at THEN sb.last_signal_at
+                                  ELSE ob.last_price_at END
+                         ) - julianday(
+                             CASE WHEN sb.first_signal_at IS NULL THEN ob.first_price_at
+                                  WHEN ob.first_price_at IS NULL THEN sb.first_signal_at
+                                  WHEN sb.first_signal_at < ob.first_price_at THEN sb.first_signal_at
+                                  ELSE ob.first_price_at END
+                         ) + 1 AS INTEGER) END,
+                    lr.completed_at,
+                    COALESCE(MAX(CASE WHEN result.horizon_days = 1 THEN result.sample_size END), 0),
+                    COALESCE(MAX(CASE WHEN result.horizon_days = 7 THEN result.sample_size END), 0),
+                    COALESCE(MAX(CASE WHEN result.horizon_days = 30 THEN result.sample_size END), 0)
+             FROM watchlist_assets wa
+             JOIN assets a ON a.id = wa.asset_id
+             LEFT JOIN observation_bounds ob ON ob.asset_id = a.id
+             LEFT JOIN signal_bounds sb ON sb.asset_id = a.id
+             LEFT JOIN latest_completed_runs lr ON lr.asset_id = a.id AND lr.rank = 1
+             LEFT JOIN backtest_results result ON result.run_id = lr.id
+             WHERE wa.watchlist_id = 'watchlist:default' AND wa.enabled = 1
+             GROUP BY a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency,
+                      a.country_code, sb.signal_count, ob.price_count, sb.first_signal_at,
+                      sb.last_signal_at, ob.first_price_at, ob.last_price_at, lr.completed_at
+             ORDER BY a.symbol",
+        )?;
+        let items = statement
+            .query_map([], |row| {
+                let asset_class_value: String = row.get(3)?;
+                let asset_class =
+                    AssetClass::from_storage_value(&asset_class_value).ok_or_else(|| {
+                        rusqlite::Error::InvalidColumnType(
+                            3,
+                            "asset_class".to_owned(),
+                            rusqlite::types::Type::Text,
+                        )
+                    })?;
+                Ok(CalibrationReadinessAsset {
+                    asset: Asset {
+                        id: row.get(0)?,
+                        symbol: row.get(1)?,
+                        name: row.get(2)?,
+                        asset_class,
+                        exchange: row.get(4)?,
+                        currency: row.get(5)?,
+                        country_code: row.get(6)?,
+                    },
+                    signal_count: usize::try_from(row.get::<_, i64>(7)?).unwrap_or(0),
+                    price_observation_count: usize::try_from(row.get::<_, i64>(8)?).unwrap_or(0),
+                    first_observed_at: row.get(9)?,
+                    last_observed_at: row.get(10)?,
+                    observed_days: u32::try_from(row.get::<_, i64>(11)?.max(0)).unwrap_or(0),
+                    latest_completed_backtest_at: row.get(12)?,
+                    sample_size_1d: usize::try_from(row.get::<_, i64>(13)?).unwrap_or(0),
+                    sample_size_7d: usize::try_from(row.get::<_, i64>(14)?).unwrap_or(0),
+                    sample_size_30d: usize::try_from(row.get::<_, i64>(15)?).unwrap_or(0),
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(CalibrationReadinessOverview {
+            generated_at,
+            target_observation_days: 30,
+            watchlist_asset_count: items.len(),
+            assets_with_signals: items.iter().filter(|item| item.signal_count > 0).count(),
+            assets_with_prices: items
+                .iter()
+                .filter(|item| item.price_observation_count > 0)
+                .count(),
+            assets_with_completed_backtests: items
+                .iter()
+                .filter(|item| item.latest_completed_backtest_at.is_some())
+                .count(),
+            items,
+        })
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn historical_pattern_page(
         &self,
@@ -2594,6 +2704,7 @@ mod tests {
         Database, INITIAL_SCHEMA, MARKET_CORE_SCHEMA, SETTINGS_SCHEMA, US_MARKET_SCHEMA,
         apply_migration,
     };
+    use crate::domain::assets::{Asset, AssetClass};
 
     #[test]
     fn initializes_database_with_safe_defaults() {
@@ -2986,6 +3097,109 @@ mod tests {
         assert!(author.is_none());
         assert!(url.is_none());
         assert!(retention.is_none());
+    }
+
+    #[test]
+    fn summarizes_calibration_readiness_from_persisted_evidence() {
+        use crate::domain::backtest::{BacktestHorizonResult, BacktestReport};
+        use crate::domain::collection::MarketObservationInput;
+
+        let directory = tempdir().expect("diretório temporário");
+        let database = Database::open(directory.path().join("calibration-readiness.sqlite3"))
+            .expect("banco inicializado");
+        database
+            .add_default_watchlist_asset("asset:b3:PETR4", 50)
+            .expect("ativo monitorado");
+        database
+            .store_market_observations(&[
+                MarketObservationInput {
+                    id: "observation:first".to_owned(),
+                    asset_id: "asset:b3:PETR4".to_owned(),
+                    source_id: "source:brapi".to_owned(),
+                    interval: "1d".to_owned(),
+                    observed_at: "2026-10-01T00:00:00Z".to_owned(),
+                    open_value: None,
+                    high_value: None,
+                    low_value: None,
+                    close_value: 30.0,
+                    volume_value: None,
+                    collected_at: "2026-10-01T01:00:00Z".to_owned(),
+                },
+                MarketObservationInput {
+                    id: "observation:last".to_owned(),
+                    asset_id: "asset:b3:PETR4".to_owned(),
+                    source_id: "source:brapi".to_owned(),
+                    interval: "1d".to_owned(),
+                    observed_at: "2026-10-31T00:00:00Z".to_owned(),
+                    open_value: None,
+                    high_value: None,
+                    low_value: None,
+                    close_value: 32.0,
+                    volume_value: None,
+                    collected_at: "2026-10-31T01:00:00Z".to_owned(),
+                },
+            ])
+            .expect("preços persistidos");
+        database.connection.lock().execute(
+            "INSERT INTO market_signals (
+                id, asset_id, window_started_at, window_ended_at, signal_score, confidence,
+                source_count, independent_source_count, evidence_count, hype_penalty,
+                methodology_version, calculated_at, model_version, question_version
+             ) VALUES ('signal:calibration', 'asset:b3:PETR4', '2026-10-01T00:00:00Z',
+                       '2026-10-31T00:00:00Z', 0.4, 0.8, 2, 2, 3, 0.1,
+                       'weighted-sentiment-v2', '2026-10-31T01:00:00Z', 'jev-latest', 'questions-v1')",
+            [],
+        ).expect("sinal persistido");
+        database
+            .store_backtest_report(&BacktestReport {
+                run_id: "backtest:calibration".to_owned(),
+                asset: Asset {
+                    id: "asset:b3:PETR4".to_owned(),
+                    symbol: "PETR4".to_owned(),
+                    name: "Petrobras PN".to_owned(),
+                    asset_class: AssetClass::B3Equity,
+                    exchange: "B3".to_owned(),
+                    currency: "BRL".to_owned(),
+                    country_code: Some("BR".to_owned()),
+                },
+                methodology_version: "walk-forward-v1".to_owned(),
+                signal_methodology_version: "weighted-sentiment-v2".to_owned(),
+                model_version: "jev-latest".to_owned(),
+                question_version: "questions-v1".to_owned(),
+                signal_threshold: 0.2,
+                confidence_threshold: 0.6,
+                calibration_started_at: "2026-10-01T00:00:00Z".to_owned(),
+                calibration_ended_at: "2026-10-20T00:00:00Z".to_owned(),
+                evaluation_started_at: "2026-10-21T00:00:00Z".to_owned(),
+                evaluation_ended_at: "2026-10-31T00:00:00Z".to_owned(),
+                created_at: "2026-11-01T00:00:00Z".to_owned(),
+                completed_at: Some("2026-11-01T00:01:00Z".to_owned()),
+                status: "completed".to_owned(),
+                results: [1, 7, 30]
+                    .into_iter()
+                    .map(|horizon_days| BacktestHorizonResult {
+                        horizon_days,
+                        sample_size: 12,
+                        mean_return: Some(0.01),
+                        median_return: Some(0.01),
+                        positive_rate: Some(0.55),
+                        baseline_positive_rate: Some(0.5),
+                        confidence_interval_low: Some(0.4),
+                        confidence_interval_high: Some(0.7),
+                    })
+                    .collect(),
+            })
+            .expect("backtest persistido");
+
+        let overview = database
+            .calibration_readiness()
+            .expect("prontidão agregada");
+        assert_eq!(overview.watchlist_asset_count, 1);
+        assert_eq!(overview.assets_with_signals, 1);
+        assert_eq!(overview.assets_with_prices, 1);
+        assert_eq!(overview.assets_with_completed_backtests, 1);
+        assert_eq!(overview.items[0].observed_days, 31);
+        assert_eq!(overview.items[0].sample_size_30d, 12);
     }
 
     #[test]

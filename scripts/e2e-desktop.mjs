@@ -95,6 +95,7 @@ async function validateApplication(page) {
     ["Comparar", "Comparação de ativos", "/compare"],
     ["Backtest", "Qualidade dos sinais", "/backtest"],
     ["Padrões", "Padrões históricos", "/patterns"],
+    ["Calibração", "Prontidão e calibração", "/calibration"],
     ["Ativos", "Ativos e watchlist", "/watchlist"],
     ["Fontes", "Fontes e documentos", "/sources"],
     ["Operação", "Operação e coletas", "/operations"],

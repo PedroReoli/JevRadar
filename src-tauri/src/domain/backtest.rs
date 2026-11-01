@@ -114,3 +114,30 @@ pub struct HistoricalPatternPage {
     pub total_pages: u32,
     pub methodology_version: String,
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CalibrationReadinessAsset {
+    pub asset: Asset,
+    pub signal_count: usize,
+    pub price_observation_count: usize,
+    pub first_observed_at: Option<String>,
+    pub last_observed_at: Option<String>,
+    pub observed_days: u32,
+    pub latest_completed_backtest_at: Option<String>,
+    pub sample_size_1d: usize,
+    pub sample_size_7d: usize,
+    pub sample_size_30d: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CalibrationReadinessOverview {
+    pub generated_at: String,
+    pub target_observation_days: u32,
+    pub watchlist_asset_count: usize,
+    pub assets_with_signals: usize,
+    pub assets_with_prices: usize,
+    pub assets_with_completed_backtests: usize,
+    pub items: Vec<CalibrationReadinessAsset>,
+}
