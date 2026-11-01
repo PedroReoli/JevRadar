@@ -69,6 +69,26 @@ pub struct MarketReportExport {
     pub backtest_count: usize,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportVersionInventory {
+    pub signal_methodology_versions: Vec<String>,
+    pub backtest_methodology_versions: Vec<String>,
+    pub model_versions: Vec<String>,
+    pub question_versions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportOverview {
+    pub signal_count: u64,
+    pub alert_count: u64,
+    pub collection_count: u64,
+    pub backtest_count: u64,
+    pub versions: ReportVersionInventory,
+    pub recent_backtests: Vec<BacktestReport>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::ExportMarketReportRequest;

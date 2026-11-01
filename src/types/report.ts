@@ -1,3 +1,5 @@
+import type { BacktestReport } from "@/types/backtest";
+
 export interface ExportMarketReportRequest {
   periodHours: number;
   minimumConfidence: number;
@@ -14,4 +16,20 @@ export interface MarketReportExport {
   eventCount: number;
   relationCount: number;
   backtestCount: number;
+}
+
+export interface ReportVersionInventory {
+  signalMethodologyVersions: string[];
+  backtestMethodologyVersions: string[];
+  modelVersions: string[];
+  questionVersions: string[];
+}
+
+export interface ReportOverview {
+  signalCount: number;
+  alertCount: number;
+  collectionCount: number;
+  backtestCount: number;
+  versions: ReportVersionInventory;
+  recentBacktests: BacktestReport[];
 }

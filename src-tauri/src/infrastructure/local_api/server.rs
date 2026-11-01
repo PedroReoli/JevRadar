@@ -23,6 +23,7 @@ use crate::application::historical_pattern_query_service::{
 };
 use crate::application::insights_query_service::InsightsQueryService;
 use crate::application::market_query_service::{MarketEventQueryError, MarketQueryService};
+use crate::application::report_query_service::ReportQueryService;
 use crate::domain::assets::AssetClass;
 use crate::domain::market::MarketOverviewFilter;
 use crate::domain::signals::SignalEvidenceSnapshot;
@@ -222,6 +223,7 @@ impl From<SignalEvidenceSnapshot> for SignalEvidenceResponse {
         backtest_history_page,
         latest_backtest,
         calibration_readiness,
+        report_overview,
         jev_usage
     ),
     components(schemas(HealthResponse, SignalEvidenceResponse)),
@@ -272,6 +274,7 @@ pub async fn serve(
         .route("/v1/backtest-history", get(backtest_history_page))
         .route("/v1/backtests/{asset_id}", get(latest_backtest))
         .route("/v1/calibration-readiness", get(calibration_readiness))
+        .route("/v1/report-overview", get(report_overview))
         .route("/v1/jev/usage", get(jev_usage))
         .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
         .with_state(state);
@@ -822,6 +825,22 @@ async fn calibration_readiness(
 
 #[utoipa::path(
     get,
+    path = "/v1/report-overview",
+    security(("bearerAuth" = [])),
+    responses((status = 200, description = "Totais e versões do histórico local", body = Object), (status = 401))
+)]
+async fn report_overview(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    authorize(&headers, &state.token)?;
+    let overview = ReportQueryService::overview(&state.database)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    serialize_json(overview)
+}
+
+#[utoipa::path(
+    get,
     path = "/v1/jev/usage",
     security(("bearerAuth" = [])),
     responses((status = 200, description = "Limites e uso local do Jev", body = Object), (status = 401))
@@ -960,6 +979,7 @@ mod tests {
             "/v1/backtests",
             "/v1/backtest-history",
             "/v1/calibration-readiness",
+            "/v1/report-overview",
             "/v1/jev/usage",
         ] {
             assert!(

@@ -7,7 +7,7 @@ vi.mock("@tauri-apps/api/core", () => ({
   isTauri: () => true,
 }));
 
-import { exportMarketReport } from "@/services/reportService";
+import { exportMarketReport, getReportOverview } from "@/services/reportService";
 
 describe("reportService", () => {
   beforeEach(() => invoke.mockReset());
@@ -44,5 +44,23 @@ describe("reportService", () => {
       language: "pt-BR",
     })).rejects.toThrow();
     expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("valida totais completos e inventário de versões", async () => {
+    invoke.mockResolvedValueOnce({
+      signalCount: 120,
+      alertCount: 14,
+      collectionCount: 32,
+      backtestCount: 7,
+      versions: {
+        signalMethodologyVersions: ["weighted-sentiment-v2"],
+        backtestMethodologyVersions: ["positive-turn-forward-return-v1"],
+        modelVersions: ["jev-latest"],
+        questionVersions: ["document-market-signal-v1"],
+      },
+      recentBacktests: [],
+    });
+    expect((await getReportOverview()).signalCount).toBe(120);
+    expect(invoke).toHaveBeenCalledWith("get_report_overview");
   });
 });

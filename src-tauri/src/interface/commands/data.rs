@@ -3,7 +3,8 @@ use tauri::{Manager, State};
 
 use crate::application::data_management_service::DataManagementService;
 use crate::application::report_export_service::ReportExportService;
-use crate::domain::report::{ExportMarketReportRequest, MarketReportExport};
+use crate::application::report_query_service::ReportQueryService;
+use crate::domain::report::{ExportMarketReportRequest, MarketReportExport, ReportOverview};
 use crate::interface::error::CommandError;
 use crate::state::AppState;
 
@@ -36,4 +37,9 @@ pub fn export_market_report(
     let export_directory = app.path().download_dir().map_err(CommandError::internal)?;
     ReportExportService::export(&state.database, &export_directory, request)
         .map_err(CommandError::from)
+}
+
+#[tauri::command]
+pub fn get_report_overview(state: State<'_, AppState>) -> Result<ReportOverview, CommandError> {
+    ReportQueryService::overview(&state.database).map_err(CommandError::internal)
 }

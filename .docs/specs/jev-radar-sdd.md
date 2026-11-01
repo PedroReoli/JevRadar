@@ -122,6 +122,8 @@ Telemetria externa fica desligada por padrão. Métricas operacionais são locai
 
 Relatórios de mercado são exportados localmente em duas representações do mesmo recorte: Markdown legível e JSON versionado. O contrato registra período, confiança mínima, totais, truncamento e versões; não exporta segredos, texto bruto nem linguagem de recomendação.
 
+A central de relatórios usa um resumo agregado diretamente no SQLite para totais de sinais, alertas, coletas e backtests. O inventário lista todas as metodologias de sinal e backtest, modelos e contratos de perguntas efetivamente persistidos, sem inferir versões a partir de uma amostra. O mesmo read model fica disponível em `GET /v1/report-overview` quando a API local autenticada estiver habilitada.
+
 ## Licença
 
 O repositório público usa Apache License 2.0. O motor privado não é coberto por essa licença.

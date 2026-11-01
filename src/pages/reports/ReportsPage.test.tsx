@@ -8,24 +8,15 @@ import "@/i18n/config";
 const {
   exportLocalData,
   exportMarketReport,
-  listAlertHistory,
-  listBacktestHistory,
-  listCollectionHistory,
+  getReportOverview,
 } = vi.hoisted(() => ({
   exportLocalData: vi.fn(),
   exportMarketReport: vi.fn(),
-  listAlertHistory: vi.fn(),
-  listBacktestHistory: vi.fn(),
-  listCollectionHistory: vi.fn(),
+  getReportOverview: vi.fn(),
 }));
 
 vi.mock("@/services/dataManagementService", () => ({ exportLocalData, purgeLocalData: vi.fn() }));
-vi.mock("@/services/reportService", () => ({ exportMarketReport }));
-vi.mock("@/services/insightsService", () => ({
-  listAlertHistory,
-  listBacktestHistory,
-  listCollectionHistory,
-}));
+vi.mock("@/services/reportService", () => ({ exportMarketReport, getReportOverview }));
 
 import { ReportsPage } from "@/pages/reports/ReportsPage";
 
@@ -35,9 +26,19 @@ function LocationProbe() {
 
 describe("ReportsPage", () => {
   it("gera um relatório de mercado com o recorte escolhido", async () => {
-    listAlertHistory.mockResolvedValue([]);
-    listBacktestHistory.mockResolvedValue([]);
-    listCollectionHistory.mockResolvedValue([]);
+    getReportOverview.mockResolvedValue({
+      signalCount: 120,
+      alertCount: 14,
+      collectionCount: 32,
+      backtestCount: 7,
+      versions: {
+        signalMethodologyVersions: ["weighted-sentiment-v2"],
+        backtestMethodologyVersions: ["positive-turn-forward-return-v1"],
+        modelVersions: ["jev-latest"],
+        questionVersions: ["document-market-signal-v1"],
+      },
+      recentBacktests: [],
+    });
     exportMarketReport.mockResolvedValue({
       contractVersion: "market-report-v1",
       generatedAt: "2026-11-01T15:00:00Z",
@@ -56,6 +57,9 @@ describe("ReportsPage", () => {
         <MemoryRouter><ReportsPage /><LocationProbe /></MemoryRouter>
       </QueryClientProvider>,
     );
+
+    expect(await screen.findByText("120")).toBeInTheDocument();
+    expect(screen.getByText("weighted-sentiment-v2")).toBeInTheDocument();
 
     fireEvent.change(await screen.findByLabelText("Período observado"), { target: { value: "720" } });
     fireEvent.change(screen.getByLabelText("Confiança mínima"), { target: { value: "0.8" } });

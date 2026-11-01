@@ -28,6 +28,7 @@ use crate::domain::events::{
 };
 use crate::domain::insights::{AlertHistoryItem, CollectionRunSnapshot};
 use crate::domain::market::{LatestCollectionRun, MarketSeries, MarketSeriesPoint, MarketSnapshot};
+use crate::domain::report::ReportVersionInventory;
 use crate::domain::signals::{
     CalculatedSignal, MarketSignalSnapshot, SignalEvidenceInput, SignalEvidenceSnapshot,
 };
@@ -2309,6 +2310,57 @@ impl Database {
         Ok(u64::try_from(count).unwrap_or(0))
     }
 
+    pub fn report_overview_counts(&self) -> Result<(u64, u64, u64, u64), DatabaseError> {
+        let counts = self.connection.lock().query_row(
+            "SELECT (SELECT COUNT(*) FROM market_signals),
+                    (SELECT COUNT(*) FROM alert_deliveries),
+                    (SELECT COUNT(*) FROM collection_runs),
+                    (SELECT COUNT(*) FROM backtest_runs)",
+            [],
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
+                ))
+            },
+        )?;
+        Ok((
+            counts.0.max(0) as u64,
+            counts.1.max(0) as u64,
+            counts.2.max(0) as u64,
+            counts.3.max(0) as u64,
+        ))
+    }
+
+    pub fn report_version_inventory(&self) -> Result<ReportVersionInventory, DatabaseError> {
+        let connection = self.connection.lock();
+        Ok(ReportVersionInventory {
+            signal_methodology_versions: query_version_inventory(
+                &connection,
+                "SELECT methodology_version AS version FROM market_signals
+                 UNION SELECT signal_methodology_version FROM backtest_runs",
+            )?,
+            backtest_methodology_versions: query_version_inventory(
+                &connection,
+                "SELECT methodology_version AS version FROM backtest_runs",
+            )?,
+            model_versions: query_version_inventory(
+                &connection,
+                "SELECT model_version AS version FROM market_signals
+                 UNION SELECT model_version FROM backtest_runs
+                 UNION SELECT model_version FROM document_classifications",
+            )?,
+            question_versions: query_version_inventory(
+                &connection,
+                "SELECT question_version AS version FROM market_signals
+                 UNION SELECT question_version FROM backtest_runs
+                 UNION SELECT question_version FROM document_classifications",
+            )?,
+        })
+    }
+
     pub fn calibration_readiness(&self) -> Result<CalibrationReadinessOverview, DatabaseError> {
         let connection = self.connection.lock();
         let generated_at =
@@ -2765,6 +2817,21 @@ fn map_asset_offset(row: &rusqlite::Row<'_>, offset: usize) -> Result<Asset, rus
         currency: row.get(offset + 5)?,
         country_code: row.get(offset + 6)?,
     })
+}
+
+fn query_version_inventory(
+    connection: &Connection,
+    union_query: &str,
+) -> Result<Vec<String>, rusqlite::Error> {
+    let sql = format!(
+        "SELECT version FROM ({union_query})
+         WHERE version IS NOT NULL AND TRIM(version) != '' AND version != 'unavailable'
+         ORDER BY version"
+    );
+    connection
+        .prepare(&sql)?
+        .query_map([], |row| row.get(0))?
+        .collect()
 }
 
 fn map_optional_asset_offset(
@@ -3636,6 +3703,26 @@ mod tests {
             .expect("histórico de backtests");
         assert_eq!(history.len(), 1);
         assert_eq!(history[0].results[0].horizon_days, 1);
+        let report_counts = database
+            .report_overview_counts()
+            .expect("totais completos de relatórios");
+        assert_eq!(report_counts, (1, 1, 0, 1));
+        let report_versions = database
+            .report_version_inventory()
+            .expect("inventário de versões");
+        assert_eq!(
+            report_versions.signal_methodology_versions,
+            vec!["weighted-sentiment-v2"]
+        );
+        assert_eq!(
+            report_versions.backtest_methodology_versions,
+            vec!["positive-turn-forward-return-v1"]
+        );
+        assert_eq!(report_versions.model_versions, vec!["jev-latest"]);
+        assert_eq!(
+            report_versions.question_versions,
+            vec!["document-market-signal-v1"]
+        );
         let (paged_history, history_total) = database
             .backtest_history_page(Some("asset:b3:PETR4"), 10, 0)
             .expect("histórico paginado");
