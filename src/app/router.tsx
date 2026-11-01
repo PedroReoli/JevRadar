@@ -15,6 +15,7 @@ export const appRouter = createBrowserRouter([
       { path: "/signals/:signalId", lazy: async () => ({ Component: (await import("@/pages/signal/SignalReportPage")).SignalReportPage }) },
       { path: "/alerts", lazy: async () => ({ Component: (await import("@/pages/alerts/AlertsPage")).AlertsPage }) },
       { path: "/events", lazy: async () => ({ Component: (await import("@/pages/events/EventsPage")).EventsPage }) },
+      { path: "/relations", lazy: async () => ({ Component: (await import("@/pages/relations/RelationsPage")).RelationsPage }) },
       { path: "/backtest", lazy: async () => ({ Component: (await import("@/pages/backtest/BacktestPage")).BacktestPage }) },
       { path: "/backtests", element: <Navigate replace to="/backtest" /> },
       { path: "/watchlist", lazy: async () => ({ Component: (await import("@/pages/watchlist/WatchlistPage")).WatchlistPage }) },

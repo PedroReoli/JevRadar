@@ -21,6 +21,7 @@ O repositório está em **alpha para Windows**. O núcleo público funciona sem 
 - central de sinais com filtros na URL, comparação de intensidade, confiança, diversidade e acesso aos relatórios auditáveis;
 - feed paginado de evidências com filtros por origem, tipo, sentimento, estado e confiança;
 - explorador paginado de eventos políticos, econômicos e geopolíticos, com relações rastreáveis por ativo, país, tipo e confiança;
+- mapa agregado de relações entre países e ativos, com separação explícita entre relação conhecida, correlação, hipótese e causalidade não comprovada;
 - central de lacunas de cobertura que cruza movimentos reais de preço com volume editorial, sem transformar ausência de discussão em recomendação;
 - backtest cronológico em 1, 7 e 30 dias, com baseline, intervalo de confiança e separação calibração/avaliação;
 - API local opcional, autenticada e somente leitura, com Swagger e evidências auditáveis em `http://127.0.0.1:47831/docs/`;

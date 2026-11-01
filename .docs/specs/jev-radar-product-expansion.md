@@ -15,6 +15,7 @@ Transformar o alpha técnico em um produto navegável e explicável sem alterar 
 - Página de ativo com preço, variação, série, sinais, eventos relacionados, evidências e backtests.
 - Página de sinal com metodologia, versões, fatores de peso, evidências e vínculos para o ativo.
 - Explorador de eventos com filtros por tipo, país, ativo, relação e confiança.
+- Mapa agregado de relações por país, classe de ativo, natureza da relação, confiança e período, com acesso às evidências de origem.
 - Estado vazio orienta a coleta real; nenhum mock pode aparecer como dado observado.
 
 ### 2. Alertas e histórico
@@ -70,6 +71,7 @@ Rotas reproduzíveis:
 - `/signals/:signalId`
 - `/alerts?level=&asset=`
 - `/events?type=&country=&asset=&relation=&confidence=&page=`
+- `/relations?period=&country=&class=&relation=&confidence=&page=`
 - `/backtests?asset=&page=`
 - `/operations?status=&source=&page=`
 - `/sources/:sourceId`

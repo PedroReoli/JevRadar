@@ -20,7 +20,7 @@ use crate::domain::content::{
     SourceDocumentInput,
 };
 use crate::domain::coverage::CoverageGapItem;
-use crate::domain::events::MarketEventSnapshot;
+use crate::domain::events::{MarketEventSnapshot, MarketRelationSummary};
 use crate::domain::insights::{AlertHistoryItem, CollectionRunSnapshot};
 use crate::domain::market::{LatestCollectionRun, MarketSeries, MarketSeriesPoint, MarketSnapshot};
 use crate::domain::signals::{
@@ -1680,6 +1680,99 @@ impl Database {
         Ok((assets, countries))
     }
 
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_market_relation_page(
+        &self,
+        country_code: Option<&str>,
+        asset_class: Option<&str>,
+        relation_type: Option<&str>,
+        minimum_confidence: f64,
+        started_after: &str,
+        limit: u32,
+        offset: u32,
+    ) -> Result<(Vec<MarketRelationSummary>, u64, Vec<String>), DatabaseError> {
+        let connection = self.connection.lock();
+        let joins = "JOIN event_asset_relations ear ON ear.event_id = me.id
+                     JOIN assets a ON a.id = ear.asset_id";
+        let filters = "(?1 IS NULL OR me.country_codes = ?1)
+                       AND (?2 IS NULL OR a.asset_class = ?2)
+                       AND (?3 IS NULL OR ear.relation_type = ?3)
+                       AND ear.confidence >= ?4
+                       AND me.started_at >= ?5";
+        let count_sql = format!(
+            "SELECT COUNT(*) FROM (
+                SELECT 1 FROM market_events me {joins}
+                WHERE {filters}
+                GROUP BY me.country_codes, a.id
+             )"
+        );
+        let total_items = connection.query_row(
+            &count_sql,
+            params![
+                country_code,
+                asset_class,
+                relation_type,
+                minimum_confidence,
+                started_after,
+            ],
+            |row| row.get::<_, i64>(0),
+        )? as u64;
+        let query_sql = format!(
+            "SELECT me.country_codes,
+                    a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency, a.country_code,
+                    COUNT(*),
+                    SUM(CASE WHEN ear.relation_type = 'known' THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN ear.relation_type = 'correlation' THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN ear.relation_type = 'hypothesis' THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN ear.relation_type = 'unproven_causality' THEN 1 ELSE 0 END),
+                    AVG(ear.confidence), MAX(me.started_at)
+             FROM market_events me {joins}
+             WHERE {filters}
+             GROUP BY me.country_codes, a.id
+             ORDER BY COUNT(*) DESC, AVG(ear.confidence) DESC, MAX(me.started_at) DESC, a.symbol
+             LIMIT ?6 OFFSET ?7"
+        );
+        let mut statement = connection.prepare(&query_sql)?;
+        let items = statement
+            .query_map(
+                params![
+                    country_code,
+                    asset_class,
+                    relation_type,
+                    minimum_confidence,
+                    started_after,
+                    limit,
+                    offset,
+                ],
+                |row| {
+                    Ok(MarketRelationSummary {
+                        country_code: row.get(0)?,
+                        asset: map_asset_offset(row, 1)?,
+                        event_count: row.get::<_, i64>(8)? as u64,
+                        known_count: row.get::<_, i64>(9)? as u64,
+                        correlation_count: row.get::<_, i64>(10)? as u64,
+                        hypothesis_count: row.get::<_, i64>(11)? as u64,
+                        unproven_causality_count: row.get::<_, i64>(12)? as u64,
+                        average_confidence: row.get(13)?,
+                        latest_event_at: row.get(14)?,
+                    })
+                },
+            )?
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut country_statement = connection.prepare(
+            "SELECT DISTINCT me.country_codes
+             FROM market_events me
+             JOIN event_asset_relations ear ON ear.event_id = me.id
+             WHERE me.started_at >= ?1
+               AND me.country_codes IS NOT NULL
+             ORDER BY me.country_codes",
+        )?;
+        let countries = country_statement
+            .query_map(params![started_after], |row| row.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok((items, total_items, countries))
+    }
+
     pub fn backtest_dataset(&self, asset_id: &str) -> Result<BacktestDataset, DatabaseError> {
         let connection = self.connection.lock();
         let asset = connection
@@ -2676,6 +2769,23 @@ mod tests {
             .expect("página de eventos");
         assert_eq!(event_total, 1);
         assert_eq!(event_page[0].source_name, "CVM — Decisões do Colegiado");
+        let (relations, relation_total, countries) = database
+            .list_market_relation_page(
+                Some("BR"),
+                Some("b3_equity"),
+                None,
+                0.8,
+                "2026-10-01T00:00:00Z",
+                25,
+                0,
+            )
+            .expect("relações agregadas");
+        assert_eq!(relation_total, 1);
+        assert_eq!(relations[0].asset.symbol, "PETR4");
+        assert_eq!(relations[0].event_count, 1);
+        assert_eq!(relations[0].known_count, 1);
+        assert_eq!(relations[0].correlation_count, 0);
+        assert_eq!(countries, vec!["BR"]);
 
         let evidence = database
             .signal_evidence_between("2026-11-01T00:00:00Z", "2026-11-02T00:00:00Z")

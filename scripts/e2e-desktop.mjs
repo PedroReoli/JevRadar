@@ -90,6 +90,7 @@ async function validateApplication(page) {
     ["Cobertura", "Movimentos com pouca cobertura", "/coverage-gaps"],
     ["Alertas", "Central de alertas", "/alerts"],
     ["Eventos", "Eventos e relações", "/events"],
+    ["Relações", "Relações entre países e ativos", "/relations"],
     ["Backtest", "Qualidade dos sinais", "/backtest"],
     ["Ativos", "Ativos e watchlist", "/watchlist"],
     ["Fontes", "Fontes e documentos", "/sources"],

@@ -30,3 +30,29 @@ pub struct MarketEventPage {
     pub total_items: u64,
     pub total_pages: u32,
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarketRelationSummary {
+    pub country_code: Option<String>,
+    pub asset: Asset,
+    pub event_count: u64,
+    pub known_count: u64,
+    pub correlation_count: u64,
+    pub hypothesis_count: u64,
+    pub unproven_causality_count: u64,
+    pub average_confidence: f64,
+    pub latest_event_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarketRelationPage {
+    pub items: Vec<MarketRelationSummary>,
+    pub available_countries: Vec<String>,
+    pub page: u32,
+    pub page_size: u32,
+    pub total_items: u64,
+    pub total_pages: u32,
+    pub period_hours: u16,
+}

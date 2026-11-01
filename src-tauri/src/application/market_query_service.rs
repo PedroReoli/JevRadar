@@ -1,6 +1,7 @@
 use chrono::{Duration, Utc};
 
-use crate::domain::events::MarketEventPage;
+use crate::domain::assets::AssetClass;
+use crate::domain::events::{MarketEventPage, MarketRelationPage};
 use crate::domain::market::{MarketOverview, MarketOverviewFilter, MarketSeries};
 use crate::domain::signals::SignalEvidenceSnapshot;
 use crate::infrastructure::database::{Database, DatabaseError};
@@ -135,6 +136,62 @@ impl MarketQueryService {
             total_pages: total_items.div_ceil(u64::from(page_size)).max(1) as u32,
         })
     }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn relations(
+        database: &Database,
+        period_hours: u16,
+        country_code: Option<String>,
+        asset_class: Option<AssetClass>,
+        relation_type: Option<String>,
+        minimum_confidence: f64,
+        page: u32,
+        page_size: u32,
+    ) -> Result<MarketRelationPage, MarketEventQueryError> {
+        validate_optional_filter(
+            relation_type.as_deref(),
+            &["known", "correlation", "hypothesis", "unproven_causality"],
+        )?;
+        if !(1..=720).contains(&period_hours)
+            || !minimum_confidence.is_finite()
+            || !(0.0..=1.0).contains(&minimum_confidence)
+            || country_code.as_ref().is_some_and(|value| {
+                value.is_empty()
+                    || value.len() > 16
+                    || !value
+                        .chars()
+                        .all(|character| character.is_ascii_uppercase())
+            })
+        {
+            return Err(MarketEventQueryError::InvalidFilter);
+        }
+        if page == 0 || !(1..=50).contains(&page_size) {
+            return Err(MarketEventQueryError::InvalidPagination);
+        }
+        let offset = page
+            .checked_sub(1)
+            .and_then(|value| value.checked_mul(page_size))
+            .ok_or(MarketEventQueryError::InvalidPagination)?;
+        let started_after = (Utc::now() - Duration::hours(i64::from(period_hours))).to_rfc3339();
+        let (items, total_items, available_countries) = database.list_market_relation_page(
+            country_code.as_deref(),
+            asset_class.map(AssetClass::as_storage_value),
+            relation_type.as_deref(),
+            minimum_confidence,
+            &started_after,
+            page_size,
+            offset,
+        )?;
+        Ok(MarketRelationPage {
+            items,
+            available_countries,
+            page,
+            page_size,
+            total_items,
+            total_pages: total_items.div_ceil(u64::from(page_size)).max(1) as u32,
+            period_hours,
+        })
+    }
 }
 
 fn validate_optional_filter(
@@ -184,6 +241,34 @@ mod tests {
         assert!(matches!(
             invalid_page,
             MarketEventQueryError::InvalidPagination
+        ));
+    }
+
+    #[test]
+    fn rejects_invalid_relation_explorer_filters() {
+        let database = database();
+        let invalid_period =
+            MarketQueryService::relations(&database, 0, None, None, None, 0.0, 1, 25)
+                .expect_err("período vazio deve falhar");
+        assert!(matches!(
+            invalid_period,
+            MarketEventQueryError::InvalidFilter
+        ));
+
+        let invalid_relation = MarketQueryService::relations(
+            &database,
+            24,
+            Some("br".to_owned()),
+            None,
+            Some("causal".to_owned()),
+            0.5,
+            1,
+            25,
+        )
+        .expect_err("relação e país inválidos devem falhar");
+        assert!(matches!(
+            invalid_relation,
+            MarketEventQueryError::InvalidFilter
         ));
     }
 }

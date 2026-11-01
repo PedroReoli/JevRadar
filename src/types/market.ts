@@ -79,6 +79,37 @@ export interface MarketEventFilter {
   page: number;
 }
 
+export interface MarketRelationSummary {
+  countryCode: string | null;
+  asset: Asset;
+  eventCount: number;
+  knownCount: number;
+  correlationCount: number;
+  hypothesisCount: number;
+  unprovenCausalityCount: number;
+  averageConfidence: number;
+  latestEventAt: string;
+}
+
+export interface MarketRelationPage {
+  items: MarketRelationSummary[];
+  availableCountries: string[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  periodHours: number;
+}
+
+export interface MarketRelationFilter {
+  periodHours: 24 | 168 | 720;
+  countryCode: string;
+  assetClass: AssetClass | null;
+  relationType: MarketEventSnapshot["relationType"] | "";
+  minimumConfidence: 0 | 0.5 | 0.7 | 0.85;
+  page: number;
+}
+
 export interface MarketSignalSnapshot {
   id: string;
   asset: Asset;

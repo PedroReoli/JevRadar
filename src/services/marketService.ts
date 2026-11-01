@@ -2,7 +2,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { z } from "zod";
 
 import { assetSchema, marketSignalSchema, signalEvidenceSchema } from "@/services/contractSchemas";
-import type { CollectionSummary, MarketEventFilter, MarketEventPage, MarketOverview, MarketOverviewFilter, MarketSeries, SignalEvidenceSnapshot } from "@/types/market";
+import type { CollectionSummary, MarketEventFilter, MarketEventPage, MarketOverview, MarketOverviewFilter, MarketRelationFilter, MarketRelationPage, MarketSeries, SignalEvidenceSnapshot } from "@/types/market";
 const marketEventSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -75,6 +75,25 @@ const marketEventPageSchema = z.object({
   totalItems: z.number().int().nonnegative(),
   totalPages: z.number().int().positive(),
 });
+const marketRelationPageSchema = z.object({
+  items: z.array(z.object({
+    countryCode: z.string().nullable(),
+    asset: assetSchema,
+    eventCount: z.number().int().nonnegative(),
+    knownCount: z.number().int().nonnegative(),
+    correlationCount: z.number().int().nonnegative(),
+    hypothesisCount: z.number().int().nonnegative(),
+    unprovenCausalityCount: z.number().int().nonnegative(),
+    averageConfidence: z.number().min(0).max(1),
+    latestEventAt: z.string(),
+  })),
+  availableCountries: z.array(z.string()),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().min(1).max(50),
+  totalItems: z.number().int().nonnegative(),
+  totalPages: z.number().int().positive(),
+  periodHours: z.number().int().min(1).max(720),
+});
 
 function requireDesktopRuntime() {
   if (!isTauri()) throw new Error("desktop_runtime_required");
@@ -116,4 +135,18 @@ export async function listMarketEvents(filter: MarketEventFilter): Promise<Marke
     pageSize: 25,
   });
   return marketEventPageSchema.parse(response);
+}
+
+export async function listMarketRelations(filter: MarketRelationFilter): Promise<MarketRelationPage> {
+  requireDesktopRuntime();
+  const response: unknown = await invoke("list_market_relations", {
+    periodHours: filter.periodHours,
+    countryCode: filter.countryCode || null,
+    assetClass: filter.assetClass,
+    relationType: filter.relationType || null,
+    minimumConfidence: filter.minimumConfidence,
+    page: filter.page,
+    pageSize: 25,
+  });
+  return marketRelationPageSchema.parse(response);
 }

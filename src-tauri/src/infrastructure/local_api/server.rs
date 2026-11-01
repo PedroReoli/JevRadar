@@ -80,6 +80,18 @@ struct MarketEventQuery {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct MarketRelationQuery {
+    period_hours: Option<u16>,
+    country_code: Option<String>,
+    asset_class: Option<String>,
+    relation_type: Option<String>,
+    minimum_confidence: Option<f64>,
+    page: Option<u32>,
+    page_size: Option<u32>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct CoverageGapQuery {
     period_hours: Option<u16>,
     asset_class: Option<String>,
@@ -157,6 +169,7 @@ impl From<SignalEvidenceSnapshot> for SignalEvidenceResponse {
         content_overview,
         document_feed,
         market_events,
+        market_relations,
         coverage_gaps,
         signal_report,
         signal_evidence,
@@ -201,6 +214,7 @@ pub async fn serve(
         .route("/v1/sources", get(content_overview))
         .route("/v1/documents", get(document_feed))
         .route("/v1/events", get(market_events))
+        .route("/v1/relations", get(market_relations))
         .route("/v1/coverage-gaps", get(coverage_gaps))
         .route("/v1/signals/{signal_id}", get(signal_report))
         .route("/v1/signals/{signal_id}/evidence", get(signal_evidence))
@@ -341,6 +355,51 @@ async fn market_events(
         query.asset_id,
         query.relation_type,
         query.minimum_confidence.unwrap_or(0.0),
+        query.page.unwrap_or(1),
+        query.page_size.unwrap_or(25),
+    )
+    .map_err(event_query_status)?;
+    serialize_json(page)
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/relations",
+    params(
+        ("periodHours" = Option<u16>, Query, description = "1 a 720; padrão 168"),
+        ("countryCode" = Option<String>, Query, description = "Código de país ou região em maiúsculas"),
+        ("assetClass" = Option<String>, Query, description = "b3Equity, b3Fund, crypto ou macro"),
+        ("relationType" = Option<String>, Query, description = "known, correlation, hypothesis ou unproven_causality"),
+        ("minimumConfidence" = Option<f64>, Query, description = "0 a 1"),
+        ("page" = Option<u32>, Query, description = "Página a partir de 1"),
+        ("pageSize" = Option<u32>, Query, description = "1 a 50; padrão 25")
+    ),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Relações agregadas entre países, eventos e ativos", body = Object),
+        (status = 400, description = "Filtro ou paginação inválidos"),
+        (status = 401, description = "Token local ausente ou inválido"),
+        (status = 500, description = "Falha ao consultar o banco local")
+    )
+)]
+async fn market_relations(
+    State(state): State<ApiState>,
+    Query(query): Query<MarketRelationQuery>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    authorize(&headers, &state.token)?;
+    let asset_class = query
+        .asset_class
+        .as_deref()
+        .map(parse_asset_class)
+        .transpose()?;
+    let page = MarketQueryService::relations(
+        &state.database,
+        query.period_hours.unwrap_or(168),
+        query.country_code,
+        asset_class,
+        query.relation_type,
+        query.minimum_confidence.unwrap_or(0.5),
         query.page.unwrap_or(1),
         query.page_size.unwrap_or(25),
     )
@@ -653,6 +712,7 @@ mod tests {
             "/v1/signals/{signal_id}",
             "/v1/documents",
             "/v1/events",
+            "/v1/relations",
             "/v1/coverage-gaps",
             "/v1/alerts",
             "/v1/collections",

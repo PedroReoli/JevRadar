@@ -32,6 +32,7 @@ use crate::interface::commands::insights::{
 };
 use crate::interface::commands::market::{
     get_market_overview, get_market_series, get_signal_evidence, list_market_events,
+    list_market_relations,
 };
 use crate::interface::commands::settings::{
     delete_secret, get_app_settings, get_local_api_access, get_secret_status,
@@ -87,6 +88,7 @@ pub fn run() {
             get_market_series,
             get_signal_evidence,
             list_market_events,
+            list_market_relations,
             get_signal_report,
             list_alert_history,
             list_collection_history,

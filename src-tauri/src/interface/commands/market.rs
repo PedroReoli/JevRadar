@@ -1,7 +1,8 @@
 use tauri::State;
 
 use crate::application::market_query_service::MarketQueryService;
-use crate::domain::events::MarketEventPage;
+use crate::domain::assets::AssetClass;
+use crate::domain::events::{MarketEventPage, MarketRelationPage};
 use crate::domain::market::{MarketOverview, MarketOverviewFilter, MarketSeries};
 use crate::domain::signals::SignalEvidenceSnapshot;
 use crate::interface::error::CommandError;
@@ -57,6 +58,31 @@ pub fn list_market_events(
         event_type,
         country_code,
         asset_id,
+        relation_type,
+        minimum_confidence,
+        page,
+        page_size,
+    )
+    .map_err(CommandError::internal)
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn list_market_relations(
+    state: State<'_, AppState>,
+    period_hours: u16,
+    country_code: Option<String>,
+    asset_class: Option<AssetClass>,
+    relation_type: Option<String>,
+    minimum_confidence: f64,
+    page: u32,
+    page_size: u32,
+) -> Result<MarketRelationPage, CommandError> {
+    MarketQueryService::relations(
+        &state.database,
+        period_hours,
+        country_code,
+        asset_class,
         relation_type,
         minimum_confidence,
         page,

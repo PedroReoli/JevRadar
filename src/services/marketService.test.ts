@@ -7,7 +7,7 @@ vi.mock("@tauri-apps/api/core", () => ({
   isTauri: () => true,
 }));
 
-import { getMarketOverview, getMarketSeries, getSignalEvidence, listMarketEvents, refreshMarketData } from "@/services/marketService";
+import { getMarketOverview, getMarketSeries, getSignalEvidence, listMarketEvents, listMarketRelations, refreshMarketData } from "@/services/marketService";
 
 const asset = {
   id: "asset:crypto:BTC",
@@ -177,6 +177,40 @@ describe("marketService", () => {
       assetId: asset.id,
       relationType: "known",
       minimumConfidence: 0.7,
+      page: 1,
+      pageSize: 25,
+    });
+  });
+
+  it("valida relações agregadas entre país e ativo", async () => {
+    invoke.mockResolvedValueOnce({
+      items: [{
+        countryCode: "BR",
+        asset,
+        eventCount: 4,
+        knownCount: 2,
+        correlationCount: 1,
+        hypothesisCount: 1,
+        unprovenCausalityCount: 0,
+        averageConfidence: 0.78,
+        latestEventAt: "2026-11-01T11:00:00Z",
+      }],
+      availableCountries: ["BR"],
+      page: 1,
+      pageSize: 25,
+      totalItems: 1,
+      totalPages: 1,
+      periodHours: 168,
+    });
+    const filter = { periodHours: 168 as const, countryCode: "BR", assetClass: "crypto" as const, relationType: "" as const, minimumConfidence: 0.5 as const, page: 1 };
+    const result = await listMarketRelations(filter);
+    expect(result.items[0]!.knownCount).toBe(2);
+    expect(invoke).toHaveBeenCalledWith("list_market_relations", {
+      periodHours: 168,
+      countryCode: "BR",
+      assetClass: "crypto",
+      relationType: null,
+      minimumConfidence: 0.5,
       page: 1,
       pageSize: 25,
     });

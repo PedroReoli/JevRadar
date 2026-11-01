@@ -77,6 +77,8 @@ O sistema identifica eventos políticos, econômicos, regulatórios, climáticos
 
 Relatórios usam templates determinísticos e fontes rastreáveis. O produto diferencia fato observado, relação conhecida, correlação, hipótese e causalidade não comprovada. O Jev não gera narrativa livre.
 
+O mapa de relações agrega eventos por país ou região e ativo, mostra volume, confiança média, recência e a distribuição dos tipos de relação. Toda agregação mantém acesso aos eventos de origem e nunca converte frequência em causalidade ou recomendação.
+
 ## Dashboard
 
 O dashboard oferece mapa de calor, timeline, preço com sentimento sobreposto, cobertura, confiança, diversidade de fontes, eventos, filtros, watchlists e metodologia. Todo estilo parte de design tokens centralizados; páginas são orquestradores enxutos e as responsabilidades seguem as camadas definidas nas regras de engenharia.
