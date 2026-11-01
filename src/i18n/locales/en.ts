@@ -116,6 +116,13 @@ export const en = {
     add: "Add",
     added: "Added",
     removeAsset: "Remove {{symbol}} from the watchlist",
+    pagination: {
+      label: "Catalog pagination",
+      summary: "Showing {{first}}–{{last}} of {{total}} assets",
+      page: "Page {{page}} of {{totalPages}}",
+      previous: "Previous page",
+      next: "Next page",
+    },
     class: {
       all: "All",
       b3Equity: "B3 stocks",

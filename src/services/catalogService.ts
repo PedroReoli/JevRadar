@@ -1,7 +1,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { z } from "zod";
 
-import type { Asset, AssetClass, CatalogRefreshSummary, Watchlist } from "@/types/assets";
+import type { AssetCatalogPage, AssetClass, CatalogRefreshSummary, Watchlist } from "@/types/assets";
 
 const assetClassSchema = z.enum(["b3Equity", "b3Fund", "crypto", "macro"]);
 const assetSchema = z.object({
@@ -36,6 +36,13 @@ const catalogRefreshSchema = z.object({
     errorCode: z.string().nullable(),
   })),
 });
+const assetCatalogPageSchema = z.object({
+  items: z.array(assetSchema),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().min(1).max(100),
+  totalItems: z.number().int().nonnegative(),
+  totalPages: z.number().int().positive(),
+});
 
 function requireDesktopRuntime() {
   if (!isTauri()) {
@@ -43,13 +50,20 @@ function requireDesktopRuntime() {
   }
 }
 
-export async function listAssets(query?: string, assetClass?: AssetClass): Promise<Asset[]> {
+export async function listAssets(
+  query?: string,
+  assetClass?: AssetClass,
+  page = 1,
+  pageSize = 50,
+): Promise<AssetCatalogPage> {
   requireDesktopRuntime();
   const response: unknown = await invoke("list_assets", {
     query: query || null,
     assetClass: assetClass || null,
+    page,
+    pageSize,
   });
-  return z.array(assetSchema).parse(response);
+  return assetCatalogPageSchema.parse(response);
 }
 
 export async function getDefaultWatchlist(): Promise<Watchlist> {

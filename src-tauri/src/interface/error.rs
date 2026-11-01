@@ -51,7 +51,9 @@ impl From<SecretStoreError> for CommandError {
 impl From<CatalogServiceError> for CommandError {
     fn from(error: CatalogServiceError) -> Self {
         let code = match &error {
-            CatalogServiceError::InvalidQuery => "validation_error",
+            CatalogServiceError::InvalidQuery | CatalogServiceError::InvalidPagination => {
+                "validation_error"
+            }
             CatalogServiceError::HttpClient => "catalog_client_error",
             CatalogServiceError::Database(DatabaseError::AssetNotFound) => "asset_not_found",
             CatalogServiceError::Database(DatabaseError::WatchlistLimitExceeded) => {

@@ -185,14 +185,28 @@ impl Database {
         Ok(())
     }
 
-    pub fn list_assets(
+    pub fn list_assets_page(
         &self,
         query: Option<&str>,
         asset_class: Option<AssetClass>,
-    ) -> Result<Vec<Asset>, DatabaseError> {
+        limit: u32,
+        offset: u32,
+    ) -> Result<(Vec<Asset>, u64), DatabaseError> {
         let query_pattern = query.map(|value| format!("%{}%", escape_like(value)));
         let class = asset_class.map(AssetClass::as_storage_value);
         let connection = self.connection.lock();
+        let total = connection.query_row(
+            "SELECT COUNT(DISTINCT a.id)
+             FROM assets a
+             LEFT JOIN asset_aliases aa ON aa.asset_id = a.id
+             WHERE a.active = 1
+               AND (?1 IS NULL OR a.asset_class = ?1)
+               AND (?2 IS NULL OR a.symbol LIKE ?2 ESCAPE '\\' COLLATE NOCASE
+                    OR a.name LIKE ?2 ESCAPE '\\' COLLATE NOCASE
+                    OR aa.alias LIKE ?2 ESCAPE '\\' COLLATE NOCASE)",
+            params![class, query_pattern],
+            |row| row.get::<_, i64>(0),
+        )? as u64;
         let mut statement = connection.prepare(
             "SELECT DISTINCT a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency, a.country_code
              FROM assets a
@@ -202,10 +216,12 @@ impl Database {
                AND (?2 IS NULL OR a.symbol LIKE ?2 ESCAPE '\\' COLLATE NOCASE
                     OR a.name LIKE ?2 ESCAPE '\\' COLLATE NOCASE
                     OR aa.alias LIKE ?2 ESCAPE '\\' COLLATE NOCASE)
-             ORDER BY a.asset_class, a.symbol",
+             ORDER BY a.asset_class, a.symbol
+             LIMIT ?3 OFFSET ?4",
         )?;
-        let rows = statement.query_map(params![class, query_pattern], map_asset)?;
-        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+        let rows = statement.query_map(params![class, query_pattern, limit, offset], map_asset)?;
+        let assets = rows.collect::<Result<Vec<_>, _>>()?;
+        Ok((assets, total))
     }
 
     pub fn upsert_assets(&self, assets: &[Asset]) -> Result<usize, DatabaseError> {
@@ -2296,8 +2312,9 @@ mod tests {
                     .first()
                     .map(|_| {
                         database
-                            .list_assets(Some("PETR4"), None)
+                            .list_assets_page(Some("PETR4"), None, 1, 0)
                             .expect("ativo")
+                            .0
                             .remove(0)
                     })
                     .expect("candidato"),

@@ -44,6 +44,16 @@ pub struct Asset {
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub struct AssetCatalogPage {
+    pub items: Vec<Asset>,
+    pub page: u32,
+    pub page_size: u32,
+    pub total_items: u64,
+    pub total_pages: u32,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct WatchlistAsset {
     pub asset: Asset,
     pub enabled: bool,

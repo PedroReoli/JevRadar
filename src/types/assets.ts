@@ -10,6 +10,14 @@ export interface Asset {
   countryCode: string | null;
 }
 
+export interface AssetCatalogPage {
+  items: Asset[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
 export interface WatchlistAsset {
   asset: Asset;
   enabled: boolean;

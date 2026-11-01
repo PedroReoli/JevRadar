@@ -36,14 +36,17 @@ describe("catalogService", () => {
   beforeEach(() => invoke.mockReset());
 
   it("envia filtros tipados e valida o catálogo retornado", async () => {
-    invoke.mockResolvedValueOnce([asset]);
-    await expect(listAssets("petrobras", "b3Equity")).resolves.toEqual([asset]);
+    const page = { items: [asset], page: 2, pageSize: 50, totalItems: 51, totalPages: 2 };
+    invoke.mockResolvedValueOnce(page);
+    await expect(listAssets("petrobras", "b3Equity", 2)).resolves.toEqual(page);
     expect(invoke).toHaveBeenCalledWith("list_assets", {
       query: "petrobras",
       assetClass: "b3Equity",
+      page: 2,
+      pageSize: 50,
     });
 
-    invoke.mockResolvedValueOnce([{ ...asset, assetClass: "unknown" }]);
+    invoke.mockResolvedValueOnce({ ...page, items: [{ ...asset, assetClass: "unknown" }] });
     await expect(listAssets()).rejects.toThrow();
   });
 

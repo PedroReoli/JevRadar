@@ -11,10 +11,10 @@ import type { AssetClass } from "@/types/assets";
 
 const watchlistKey = ["default-watchlist"] as const;
 
-export function useAssetCatalog(query: string, assetClass?: AssetClass) {
+export function useAssetCatalog(query: string, assetClass: AssetClass | undefined, page: number) {
   return useQuery({
-    queryKey: ["asset-catalog", query, assetClass],
-    queryFn: () => listAssets(query, assetClass),
+    queryKey: ["asset-catalog", query, assetClass, page],
+    queryFn: () => listAssets(query, assetClass, page),
   });
 }
 

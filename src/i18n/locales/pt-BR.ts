@@ -116,6 +116,13 @@ export const ptBR = {
     add: "Adicionar",
     added: "Adicionado",
     removeAsset: "Remover {{symbol}} da watchlist",
+    pagination: {
+      label: "Paginação do catálogo",
+      summary: "Exibindo {{first}}–{{last}} de {{total}} ativos",
+      page: "Página {{page}} de {{totalPages}}",
+      previous: "Página anterior",
+      next: "Próxima página",
+    },
     class: {
       all: "Todos",
       b3Equity: "Ações B3",

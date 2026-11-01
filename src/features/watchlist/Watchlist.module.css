@@ -209,6 +209,53 @@
   font: var(--font-body-sm);
 }
 
+.pagination {
+  min-height: var(--control-height-xl);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  border-top: var(--border-width-thin) solid var(--color-border-subtle);
+}
+
+.pagination p,
+.paginationActions span {
+  margin: 0;
+  color: var(--color-text-muted);
+  font: var(--font-body-sm);
+}
+
+.paginationActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.paginationButton {
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  background: var(--color-surface-raised);
+  cursor: pointer;
+}
+
+.paginationButton:hover:not(:disabled) {
+  border-color: var(--color-accent-border);
+  color: var(--color-accent-text);
+  background: var(--color-accent-surface);
+}
+
+.paginationButton:disabled {
+  cursor: default;
+  opacity: var(--opacity-disabled);
+}
+
 @media (max-width: 40rem) {
   .assetRow,
   .selectedRow {
@@ -222,5 +269,11 @@
   .assetRow .iconAction {
     grid-column: 2;
     justify-self: start;
+  }
+
+  .pagination {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-inline: var(--space-4);
   }
 }

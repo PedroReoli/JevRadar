@@ -1,7 +1,7 @@
 use tauri::State;
 
 use crate::application::catalog_service::CatalogService;
-use crate::domain::assets::{Asset, AssetClass, CatalogRefreshSummary, Watchlist};
+use crate::domain::assets::{AssetCatalogPage, AssetClass, CatalogRefreshSummary, Watchlist};
 use crate::interface::error::CommandError;
 use crate::state::AppState;
 
@@ -10,8 +10,11 @@ pub fn list_assets(
     state: State<'_, AppState>,
     query: Option<String>,
     asset_class: Option<AssetClass>,
-) -> Result<Vec<Asset>, CommandError> {
-    CatalogService::list_assets(&state.database, query, asset_class).map_err(Into::into)
+    page: u32,
+    page_size: u32,
+) -> Result<AssetCatalogPage, CommandError> {
+    CatalogService::list_assets_page(&state.database, query, asset_class, page, page_size)
+        .map_err(Into::into)
 }
 
 #[tauri::command]

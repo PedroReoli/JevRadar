@@ -4,7 +4,7 @@ use chrono::Utc;
 use reqwest::blocking::Client;
 
 use crate::domain::assets::{
-    Asset, AssetClass, CatalogRefreshSummary, CatalogSourceRefresh, Watchlist,
+    AssetCatalogPage, AssetClass, CatalogRefreshSummary, CatalogSourceRefresh, Watchlist,
 };
 use crate::infrastructure::catalog::{
     CatalogProviderError, discover_binance_assets, discover_brapi_assets,
@@ -19,27 +19,47 @@ pub enum CatalogServiceError {
     Database(#[from] DatabaseError),
     #[error("consulta inválida: use no máximo 80 caracteres")]
     InvalidQuery,
+    #[error("paginação inválida")]
+    InvalidPagination,
     #[error("não foi possível preparar o cliente do catálogo")]
     HttpClient,
 }
 
 impl CatalogService {
-    pub fn list_assets(
+    pub fn list_assets_page(
         database: &Database,
         query: Option<String>,
         asset_class: Option<AssetClass>,
-    ) -> Result<Vec<Asset>, CatalogServiceError> {
+        page: u32,
+        page_size: u32,
+    ) -> Result<AssetCatalogPage, CatalogServiceError> {
         let query = query.map(|value| value.trim().to_owned());
         if query.as_ref().is_some_and(|value| value.len() > 80) {
             return Err(CatalogServiceError::InvalidQuery);
         }
+        if page == 0 || !(1..=100).contains(&page_size) {
+            return Err(CatalogServiceError::InvalidPagination);
+        }
 
-        database
-            .list_assets(
-                query.as_deref().filter(|value| !value.is_empty()),
-                asset_class,
-            )
-            .map_err(Into::into)
+        let offset = page
+            .checked_sub(1)
+            .and_then(|value| value.checked_mul(page_size))
+            .ok_or(CatalogServiceError::InvalidPagination)?;
+        let (items, total_items) = database.list_assets_page(
+            query.as_deref().filter(|value| !value.is_empty()),
+            asset_class,
+            page_size,
+            offset,
+        )?;
+        let total_pages = total_items.div_ceil(u64::from(page_size)).max(1) as u32;
+
+        Ok(AssetCatalogPage {
+            items,
+            page,
+            page_size,
+            total_items,
+            total_pages,
+        })
     }
 
     pub fn default_watchlist(database: &Database) -> Result<Watchlist, CatalogServiceError> {
@@ -140,13 +160,15 @@ mod tests {
     #[test]
     fn filters_catalog_and_manages_default_watchlist() {
         let database = database();
-        let crypto = CatalogService::list_assets(&database, None, Some(AssetClass::Crypto))
-            .expect("catálogo");
-        assert_eq!(crypto.len(), 3);
+        let crypto =
+            CatalogService::list_assets_page(&database, None, Some(AssetClass::Crypto), 1, 50)
+                .expect("catálogo");
+        assert_eq!(crypto.items.len(), 3);
 
-        let filtered = CatalogService::list_assets(&database, Some("petrobras".into()), None)
-            .expect("busca por alias");
-        assert_eq!(filtered[0].symbol, "PETR4");
+        let filtered =
+            CatalogService::list_assets_page(&database, Some("petrobras".into()), None, 1, 50)
+                .expect("busca por alias");
+        assert_eq!(filtered.items[0].symbol, "PETR4");
 
         let watchlist = CatalogService::add_to_default_watchlist(&database, "asset:b3:PETR4")
             .expect("adiciona ativo");
@@ -170,5 +192,21 @@ mod tests {
             error,
             CatalogServiceError::Database(DatabaseError::AssetNotFound)
         ));
+    }
+
+    #[test]
+    fn paginates_catalog_with_a_bounded_page_size() {
+        let database = database();
+        let first_page =
+            CatalogService::list_assets_page(&database, None, None, 1, 2).expect("primeira página");
+        assert_eq!(first_page.items.len(), 2);
+        assert_eq!(first_page.page, 1);
+        assert_eq!(first_page.page_size, 2);
+        assert!(first_page.total_items >= 2);
+        assert!(first_page.total_pages >= 2);
+
+        let error = CatalogService::list_assets_page(&database, None, None, 1, 101)
+            .expect_err("limite deve ser validado");
+        assert!(matches!(error, CatalogServiceError::InvalidPagination));
     }
 }
