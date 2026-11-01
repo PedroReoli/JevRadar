@@ -1,0 +1,22 @@
+.shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: var(--layout-sidebar-width) minmax(0, 1fr);
+  background: var(--color-surface-canvas);
+}
+
+.main {
+  min-width: 0;
+  padding: var(--space-page-block) var(--space-page-inline);
+}
+
+@media (max-width: 52rem) {
+  .shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .main {
+    padding: var(--space-6) var(--space-4);
+  }
+}

@@ -1,0 +1,40 @@
+export const en = {
+  app: {
+    name: "JevRadar",
+    tagline: "Sentiment, context, and evidence",
+  },
+  navigation: {
+    dashboard: "Radar",
+    settings: "Settings",
+  },
+  dashboard: {
+    eyebrow: "Overview",
+    title: "Market radar",
+    description: "Track observed signals without turning data into investment advice.",
+    systemHealth: "System health",
+    systemHealthDescription: "Live state of this installation's local components.",
+    database: "Local database",
+    background: "Background collection",
+    api: "Local API",
+    noSignalsTitle: "No signals have been processed yet",
+    noSignalsDescription: "Configure at least one source and a Jev key to start collecting.",
+    openSettings: "Open settings",
+    disclosure: "JevRadar presents data and historical relationships. It does not recommend buying or selling.",
+  },
+  settings: {
+    eyebrow: "Local preferences",
+    title: "Settings",
+    description: "Settings for this installation remain on the user's device.",
+    language: "Language",
+    languageDescription: "Change the interface language immediately.",
+    portuguese: "Português (Brasil)",
+    english: "English",
+    setupPending: "Credentials and sources will be configured in the setup wizard.",
+  },
+  status: {
+    ready: "Ready",
+    disabled: "Disabled",
+    unavailable: "Unavailable",
+    pending: "Pending",
+  },
+} as const;

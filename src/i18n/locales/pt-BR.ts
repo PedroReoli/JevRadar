@@ -1,0 +1,40 @@
+export const ptBR = {
+  app: {
+    name: "JevRadar",
+    tagline: "Sentimento, contexto e evidência",
+  },
+  navigation: {
+    dashboard: "Radar",
+    settings: "Configurações",
+  },
+  dashboard: {
+    eyebrow: "Visão geral",
+    title: "Radar de mercado",
+    description: "Acompanhe sinais observados sem transformar dados em recomendação de investimento.",
+    systemHealth: "Saúde do sistema",
+    systemHealthDescription: "Estado real dos componentes locais desta instalação.",
+    database: "Banco local",
+    background: "Coleta em segundo plano",
+    api: "API local",
+    noSignalsTitle: "Nenhum sinal processado ainda",
+    noSignalsDescription: "Configure ao menos uma fonte e uma chave do Jev para iniciar a coleta.",
+    openSettings: "Abrir configurações",
+    disclosure: "O JevRadar apresenta dados e relações históricas. Não recomenda compra ou venda.",
+  },
+  settings: {
+    eyebrow: "Preferências locais",
+    title: "Configurações",
+    description: "Ajustes desta instalação ficam na máquina do usuário.",
+    language: "Idioma",
+    languageDescription: "Altere o idioma da interface imediatamente.",
+    portuguese: "Português (Brasil)",
+    english: "English",
+    setupPending: "As credenciais e fontes serão configuradas no wizard de setup.",
+  },
+  status: {
+    ready: "Pronto",
+    disabled: "Desabilitado",
+    unavailable: "Indisponível",
+    pending: "Pendente",
+  },
+} as const;

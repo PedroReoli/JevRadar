@@ -1,0 +1,59 @@
+{
+  "name": "jevradar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Radar local-first de sentimento e sinais de mercado.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "tauri dev",
+    "dev:web": "vite --host 127.0.0.1 --port 1420",
+    "build": "npm run check && tauri build",
+    "build:web": "tsc -b && vite build",
+    "check": "npm run check:types && npm run check:lint && npm run test:unit -- --run",
+    "check:types": "tsc -b --pretty false",
+    "check:lint": "eslint .",
+    "check:rust": "cargo check --manifest-path src-tauri/Cargo.toml",
+    "test:unit": "vitest",
+    "test:unit:coverage": "vitest run --coverage",
+    "preview": "vite preview --host 127.0.0.1",
+    "ops": "node scripts/ops.js",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "5.105.1",
+    "@tauri-apps/api": "2.12.4",
+    "@typesafe-ai/sdk": "0.7.0",
+    "clsx": "2.1.1",
+    "date-fns": "4.4.0",
+    "i18next": "26.6.0",
+    "lucide-react": "1.66.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-i18next": "17.1.10",
+    "react-router-dom": "7.18.5",
+    "recharts": "3.10.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@tauri-apps/cli": "2.12.4",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@types/node": "24.10.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "eslint": "10.14.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "eslint-plugin-react-refresh": "0.5.7",
+    "jsdom": "29.1.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  },
+  "overrides": {
+    "minimatch": "11.0.1"
+  }
+}

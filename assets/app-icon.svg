@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
+  <title id="title">JevRadar</title>
+  <desc id="description">Radar abstrato com pulso de mercado</desc>
+  <defs>
+    <linearGradient id="background" x1="70" y1="56" x2="442" y2="456" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111b25"/>
+      <stop offset="1" stop-color="#080c11"/>
+    </linearGradient>
+    <linearGradient id="signal" x1="132" y1="388" x2="398" y2="116" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4f8cff"/>
+      <stop offset="1" stop-color="#55d6b2"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#background)"/>
+  <circle cx="256" cy="256" r="154" fill="none" stroke="#263746" stroke-width="18"/>
+  <circle cx="256" cy="256" r="94" fill="none" stroke="#263746" stroke-width="14"/>
+  <path d="M256 256 365 147" fill="none" stroke="url(#signal)" stroke-width="24" stroke-linecap="round"/>
+  <path d="M111 310h70l34-76 51 112 36-72h99" fill="none" stroke="url(#signal)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="256" cy="256" r="24" fill="#55d6b2"/>
+</svg>

@@ -1,0 +1,121 @@
+:root {
+  color-scheme: dark;
+
+  --font-family-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-family-mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  --font-display-lg: 700 2.25rem/1.08 var(--font-family-sans);
+  --font-display-md: 700 1.75rem/1.12 var(--font-family-sans);
+  --font-title-lg: 650 1.125rem/1.3 var(--font-family-sans);
+  --font-title-sm: 700 1rem/1.2 var(--font-family-sans);
+  --font-body-md: 400 0.9375rem/1.6 var(--font-family-sans);
+  --font-body-sm: 400 0.8125rem/1.5 var(--font-family-sans);
+  --font-label-md: 600 0.875rem/1.2 var(--font-family-sans);
+  --font-label-sm: 600 0.75rem/1.2 var(--font-family-sans);
+  --font-label-xs: 600 0.6875rem/1.2 var(--font-family-sans);
+
+  --tracking-tight: -0.035em;
+  --tracking-wide: 0.09em;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-page-inline: clamp(1.5rem, 4vw, 3.5rem);
+  --space-page-block: clamp(2rem, 5vh, 4rem);
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.125rem;
+  --radius-full: 999rem;
+
+  --border-width-thin: 0.0625rem;
+  --border-width-emphasis: 0.1875rem;
+
+  --control-height-sm: 2rem;
+  --control-height-md: 2.5rem;
+  --control-height-lg: 3.75rem;
+  --size-brand-mark: 2.25rem;
+  --size-status-dot: 0.375rem;
+  --size-icon-surface: 2.25rem;
+  --size-empty-icon: 3rem;
+  --size-empty-card-min: 20rem;
+  --icon-size-sm: 1rem;
+  --icon-size-md: 1.125rem;
+  --icon-size-lg: 1.375rem;
+  --icon-size-xl: 1.75rem;
+
+  --layout-sidebar-width: 15rem;
+  --layout-content-max: 76rem;
+  --layout-content-narrow: 58rem;
+
+  --color-surface-canvas: #090d12;
+  --color-surface-raised: #0d131a;
+  --color-surface-panel: #111922;
+  --color-surface-hover: #17212c;
+  --color-border-subtle: #22303d;
+  --color-border-strong: #344757;
+  --color-text-primary: #f2f6f8;
+  --color-text-secondary: #a8b4be;
+  --color-text-muted: #71808d;
+  --color-text-on-accent: #03120f;
+  --color-accent-strong: #55d6b2;
+  --color-accent-strong-hover: #72e2c2;
+  --color-accent-soft: #4f8cff;
+  --color-accent-text: #7be0c4;
+  --color-accent-surface: rgb(85 214 178 / 12%);
+  --color-accent-surface-subtle: rgb(85 214 178 / 4%);
+  --color-accent-border: rgb(85 214 178 / 32%);
+  --color-positive-text: #78dda8;
+  --color-positive-surface: rgb(62 194 122 / 10%);
+  --color-positive-border: rgb(62 194 122 / 28%);
+  --color-negative-text: #ff8e8e;
+  --color-negative-surface: rgb(255 94 94 / 10%);
+  --color-negative-border: rgb(255 94 94 / 28%);
+  --color-neutral-text: #aab6c0;
+  --color-neutral-surface: rgb(148 163 184 / 9%);
+  --color-neutral-border: rgb(148 163 184 / 22%);
+  --color-warning-surface: rgb(232 175 69 / 8%);
+  --color-warning-border: #9e762d;
+
+  --shadow-panel: 0 1.5rem 4rem rgb(0 0 0 / 18%);
+  --shadow-accent: 0 0.5rem 1.75rem rgb(85 214 178 / 20%);
+
+  --motion-fast: 150ms;
+  --motion-lift-distance: -0.0625rem;
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --color-surface-canvas: #f3f6f7;
+    --color-surface-raised: #ffffff;
+    --color-surface-panel: #ffffff;
+    --color-surface-hover: #e9eff1;
+    --color-border-subtle: #d8e0e4;
+    --color-border-strong: #bcc9cf;
+    --color-text-primary: #152029;
+    --color-text-secondary: #52616c;
+    --color-text-muted: #71808a;
+    --color-text-on-accent: #062019;
+    --color-accent-strong: #3fcaa4;
+    --color-accent-strong-hover: #2fb891;
+    --color-accent-text: #087a60;
+    --color-accent-surface: rgb(22 156 121 / 10%);
+    --color-accent-surface-subtle: rgb(22 156 121 / 3%);
+    --color-accent-border: rgb(22 156 121 / 25%);
+    --shadow-panel: 0 1rem 3rem rgb(32 52 62 / 8%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-lift-distance: 0;
+  }
+}

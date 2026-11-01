@@ -1,0 +1,191 @@
+.page {
+  width: min(100%, var(--layout-content-max));
+  margin: 0 auto;
+  display: grid;
+  gap: var(--space-8);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-6);
+}
+
+.header > div {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.eyebrow {
+  color: var(--color-accent-text);
+  font: var(--font-label-sm);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.header h1 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font: var(--font-display-lg);
+  letter-spacing: var(--tracking-tight);
+}
+
+.header p,
+.cardHeader p,
+.emptyCard p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font: var(--font-body-md);
+}
+
+.runtime {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height-sm);
+  padding: 0 var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  color: var(--color-text-muted);
+  font: var(--font-label-xs);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: var(--space-5);
+}
+
+.healthCard,
+.emptyCard {
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-panel);
+  box-shadow: var(--shadow-panel);
+}
+
+.healthCard {
+  padding: var(--space-6);
+}
+
+.cardHeader h2,
+.emptyCard h2 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font: var(--font-title-lg);
+}
+
+.cardHeader {
+  padding-bottom: var(--space-5);
+  border-bottom: var(--border-width-thin) solid var(--color-border-subtle);
+}
+
+.cardHeader > div {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.healthList {
+  margin: 0;
+  padding: var(--space-3) 0 0;
+  list-style: none;
+}
+
+.healthItem {
+  min-height: var(--control-height-lg);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  border-bottom: var(--border-width-thin) solid var(--color-border-subtle);
+}
+
+.healthItem:last-child {
+  border-bottom: 0;
+}
+
+.healthIcon {
+  width: var(--size-icon-surface);
+  height: var(--size-icon-surface);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
+}
+
+.healthLabel {
+  color: var(--color-text-primary);
+  font: var(--font-label-md);
+}
+
+.emptyCard {
+  min-height: var(--size-empty-card-min);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-8);
+  background: linear-gradient(145deg, var(--color-surface-panel), var(--color-accent-surface-subtle));
+}
+
+.emptySignal {
+  width: var(--size-empty-icon);
+  height: var(--size-empty-icon);
+  display: grid;
+  place-items: center;
+  border: var(--border-width-thin) solid var(--color-accent-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-accent-text);
+  background: var(--color-accent-surface);
+}
+
+.primaryAction {
+  min-height: var(--control-height-md);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-strong);
+  color: var(--color-text-on-accent);
+  font: var(--font-label-md);
+  text-decoration: none;
+  transition: transform var(--motion-fast) var(--ease-standard), background var(--motion-fast) var(--ease-standard);
+}
+
+.primaryAction:hover {
+  background: var(--color-accent-strong-hover);
+  transform: translateY(var(--motion-lift-distance));
+}
+
+.disclosure {
+  padding: var(--space-4);
+  border-left: var(--border-width-emphasis) solid var(--color-warning-border);
+  color: var(--color-text-muted);
+  background: var(--color-warning-surface);
+  font: var(--font-body-sm);
+}
+
+@media (max-width: 64rem) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 40rem) {
+  .header {
+    flex-direction: column;
+  }
+
+  .header h1 {
+    font: var(--font-display-md);
+  }
+
+  .healthCard,
+  .emptyCard {
+    padding: var(--space-5);
+  }
+}
