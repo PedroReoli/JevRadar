@@ -433,6 +433,18 @@ impl Database {
             .map_err(Into::into)
     }
 
+    pub fn set_content_source_enabled(
+        &self,
+        source_id: &str,
+        enabled: bool,
+    ) -> Result<bool, DatabaseError> {
+        let changed = self.connection.lock().execute(
+            "UPDATE content_sources SET enabled = ?2 WHERE id = ?1",
+            params![source_id, enabled],
+        )?;
+        Ok(changed == 1)
+    }
+
     pub fn store_source_documents(
         &self,
         documents: &[SourceDocumentInput],

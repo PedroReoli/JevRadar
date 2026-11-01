@@ -7,7 +7,11 @@ vi.mock("@tauri-apps/api/core", () => ({
   isTauri: () => true,
 }));
 
-import { getContentOverview, refreshContentSources } from "@/services/contentService";
+import {
+  getContentOverview,
+  refreshContentSources,
+  setContentSourceEnabled,
+} from "@/services/contentService";
 
 describe("contentService", () => {
   beforeEach(() => invoke.mockReset());
@@ -45,5 +49,18 @@ describe("contentService", () => {
       }],
     });
     expect((await refreshContentSources()).storedDocumentCount).toBe(8);
+  });
+
+  it("altera uma fonte sem perder a visão consolidada", async () => {
+    invoke.mockResolvedValueOnce({
+      sources: [],
+      totalDocumentCount: 0,
+      unclassifiedDocumentCount: 0,
+    });
+    await setContentSourceEnabled("source:reddit", false);
+    expect(invoke).toHaveBeenCalledWith("set_content_source_enabled", {
+      sourceId: "source:reddit",
+      enabled: false,
+    });
   });
 });

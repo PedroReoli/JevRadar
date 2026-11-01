@@ -4,13 +4,18 @@ import { useTranslation } from "react-i18next";
 import { SourceList } from "@/features/sources/components/SourceList";
 import { SourceMetrics } from "@/features/sources/components/SourceMetrics";
 import { ClassificationPanel } from "@/features/sources/components/ClassificationPanel";
-import { useContentOverview, useRefreshContentSources } from "@/features/sources/hooks/useContentSources";
+import {
+  useContentOverview,
+  useRefreshContentSources,
+  useSetContentSourceEnabled,
+} from "@/features/sources/hooks/useContentSources";
 import styles from "@/pages/sources/SourcesPage.module.css";
 
 export function SourcesPage() {
   const { t } = useTranslation();
   const overviewQuery = useContentOverview();
   const refreshMutation = useRefreshContentSources();
+  const sourceToggleMutation = useSetContentSourceEnabled();
   const overview = overviewQuery.data;
 
   return (
@@ -33,7 +38,7 @@ export function SourcesPage() {
       </header>
 
       {overviewQuery.isPending ? <p className={styles.feedback}>{t("sources.loading")}</p> : null}
-      {overviewQuery.isError || refreshMutation.isError ? (
+      {overviewQuery.isError || refreshMutation.isError || sourceToggleMutation.isError ? (
         <p className={styles.errorMessage} role="alert">{t("sources.loadError")}</p>
       ) : null}
       {refreshMutation.data ? (
@@ -53,7 +58,11 @@ export function SourcesPage() {
             unclassifiedDocumentCount={overview.unclassifiedDocumentCount}
           />
           <ClassificationPanel pendingCount={overview.unclassifiedDocumentCount} />
-          <SourceList sources={overview.sources} />
+          <SourceList
+            disabled={sourceToggleMutation.isPending}
+            onToggle={(sourceId, enabled) => sourceToggleMutation.mutate({ sourceId, enabled })}
+            sources={overview.sources}
+          />
         </>
       ) : null}
 

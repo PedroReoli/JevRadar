@@ -5,6 +5,8 @@ import styles from "@/pages/sources/SourcesPage.module.css";
 import type { ContentSourceStatus } from "@/types/content";
 
 interface SourceListProps {
+  disabled?: boolean;
+  onToggle: (sourceId: string, enabled: boolean) => void;
   sources: ContentSourceStatus[];
 }
 
@@ -15,7 +17,7 @@ const statusIcons = {
   pending: CircleDashed,
 } as const;
 
-export function SourceList({ sources }: SourceListProps) {
+export function SourceList({ disabled, onToggle, sources }: SourceListProps) {
   const { i18n, t } = useTranslation();
 
   return (
@@ -53,6 +55,15 @@ export function SourceList({ sources }: SourceListProps) {
                 </span>
                 {source.errorCode ? <code>{t(`sources.error.${source.errorCode}`, { defaultValue: source.errorCode })}</code> : null}
               </div>
+              <label className={styles.sourceToggle}>
+                <span>{source.enabled ? t("sources.enabled") : t("sources.disabled")}</span>
+                <input
+                  checked={source.enabled}
+                  disabled={disabled}
+                  onChange={(event) => onToggle(source.id, event.target.checked)}
+                  type="checkbox"
+                />
+              </label>
             </li>
           );
         })}

@@ -46,3 +46,9 @@ export async function refreshContentSources(): Promise<ContentCollectionSummary>
   const response: unknown = await invoke("refresh_content_sources");
   return collectionSummarySchema.parse(response);
 }
+
+export async function setContentSourceEnabled(sourceId: string, enabled: boolean): Promise<ContentOverview> {
+  requireDesktopRuntime();
+  const response: unknown = await invoke("set_content_source_enabled", { sourceId, enabled });
+  return overviewSchema.parse(response);
+}

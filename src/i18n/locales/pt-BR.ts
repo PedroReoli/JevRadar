@@ -68,6 +68,8 @@ export const ptBR = {
     sourceCount: "{{count}} fontes cadastradas",
     documents: "documentos",
     neverCollected: "Ainda não coletada",
+    enabled: "Habilitada",
+    disabled: "Desabilitada",
     disclosure: "O conteúdo permanece rastreável até a fonte. Coleta não implica validação, endosso ou recomendação.",
     kind: { rss: "Notícias e comunicados", reddit: "Comunidade", forum: "Fórum", x: "Rede social" },
     status: { completed: "Concluída", failed: "Falhou", skipped: "Ignorada", pending: "Pendente" },

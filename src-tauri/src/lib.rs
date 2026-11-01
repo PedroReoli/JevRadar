@@ -16,7 +16,9 @@ use crate::interface::commands::catalog::{
 };
 use crate::interface::commands::classification::classify_pending_documents;
 use crate::interface::commands::collection::refresh_market_data;
-use crate::interface::commands::content::{get_content_overview, refresh_content_sources};
+use crate::interface::commands::content::{
+    get_content_overview, refresh_content_sources, set_content_source_enabled,
+};
 use crate::interface::commands::desktop::resolve_close_request;
 use crate::interface::commands::market::get_market_overview;
 use crate::interface::commands::settings::{
@@ -57,6 +59,7 @@ pub fn run() {
             refresh_content_sources,
             classify_pending_documents,
             get_content_overview,
+            set_content_source_enabled,
             get_market_overview,
             get_system_status,
             get_app_settings,

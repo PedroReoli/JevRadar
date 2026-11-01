@@ -24,3 +24,13 @@ pub async fn refresh_content_sources(
 pub fn get_content_overview(state: State<'_, AppState>) -> Result<ContentOverview, CommandError> {
     ContentQueryService::overview(&state.database).map_err(CommandError::internal)
 }
+
+#[tauri::command]
+pub fn set_content_source_enabled(
+    state: State<'_, AppState>,
+    source_id: String,
+    enabled: bool,
+) -> Result<ContentOverview, CommandError> {
+    ContentQueryService::set_source_enabled(&state.database, &source_id, enabled)
+        .map_err(CommandError::internal)
+}

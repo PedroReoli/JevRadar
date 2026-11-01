@@ -68,6 +68,8 @@ export const en = {
     sourceCount: "{{count}} registered sources",
     documents: "documents",
     neverCollected: "Not collected yet",
+    enabled: "Enabled",
+    disabled: "Disabled",
     disclosure: "Content remains traceable to its source. Collection does not imply validation, endorsement, or advice.",
     kind: { rss: "News and releases", reddit: "Community", forum: "Forum", x: "Social network" },
     status: { completed: "Completed", failed: "Failed", skipped: "Skipped", pending: "Pending" },
