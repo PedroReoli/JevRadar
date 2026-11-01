@@ -28,4 +28,6 @@ export interface JevUsageSnapshot {
   dailyLimit: number;
   batchLimit: number;
   pendingDocumentCount: number;
+  inputTokensToday: number;
+  outputTokensToday: number;
 }

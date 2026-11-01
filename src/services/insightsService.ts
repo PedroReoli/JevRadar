@@ -41,6 +41,8 @@ const jevUsageSchema = z.object({
   dailyLimit: z.number().int().nonnegative(),
   batchLimit: z.number().int().nonnegative(),
   pendingDocumentCount: z.number().int().nonnegative(),
+  inputTokensToday: z.number().int().nonnegative(),
+  outputTokensToday: z.number().int().nonnegative(),
 });
 
 function requireDesktopRuntime() {

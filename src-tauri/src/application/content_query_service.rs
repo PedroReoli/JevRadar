@@ -209,6 +209,8 @@ mod tests {
                 confidence: 0.91,
                 input_language: Some("pt-BR".to_owned()),
                 analyzed_at: "2026-11-01T12:01:00Z".to_owned(),
+                input_tokens: 120,
+                output_tokens: 24,
                 event: None,
             })
             .expect("análise armazenada");

@@ -48,6 +48,7 @@ pub fn send_with_retry(
 
 fn retryable_status(status: StatusCode, policy: RetryPolicy) -> bool {
     status == StatusCode::TOO_MANY_REQUESTS
+        || status.as_u16() == 529
         || (matches!(policy, RetryPolicy::Idempotent)
             && matches!(
                 status,
@@ -96,6 +97,10 @@ mod tests {
         ));
         assert!(retryable_status(
             StatusCode::TOO_MANY_REQUESTS,
+            RetryPolicy::RateLimitOnly
+        ));
+        assert!(retryable_status(
+            StatusCode::from_u16(529).expect("status TypeSafe overloaded"),
             RetryPolicy::RateLimitOnly
         ));
         assert!(!retryable_status(

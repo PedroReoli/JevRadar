@@ -21,6 +21,8 @@ describe("OperationsPage", () => {
       dailyLimit: 250,
       batchLimit: 25,
       pendingDocumentCount: 12,
+      inputTokensToday: 18420,
+      outputTokensToday: 2160,
     });
     listCollectionHistory.mockResolvedValue([{
       runId: "run:1",
@@ -50,6 +52,7 @@ describe("OperationsPage", () => {
 
     expect(await screen.findByText("30")).toBeInTheDocument();
     expect(screen.getByText("250")).toBeInTheDocument();
+    expect(screen.getByText("18.420")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /source:brapi/ })).toBeInTheDocument();
     expect(screen.getAllByText("Concluída parcialmente").length).toBeGreaterThan(0);
   });

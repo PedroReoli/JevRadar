@@ -36,6 +36,8 @@ pub struct DocumentAnalysisResult {
     pub confidence: f64,
     pub input_language: Option<String>,
     pub analyzed_at: String,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
     pub event: Option<DetectedMarketEvent>,
 }
 

@@ -36,4 +36,6 @@ pub struct JevUsageSnapshot {
     pub daily_limit: usize,
     pub batch_limit: usize,
     pub pending_document_count: usize,
+    pub input_tokens_today: u64,
+    pub output_tokens_today: u64,
 }

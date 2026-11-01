@@ -67,6 +67,10 @@ O peso agregado combina, de forma versionada e auditável:
 
 O Jev não decide sozinho o peso final. O código controla fórmulas, limiares e efeitos. Pesos serão calibrados em corpus rotulado e comparados com baselines.
 
+Cada lote Jev usa um contrato de perguntas versionado. Antes de persistir uma análise, o adapter valida modelo, opções escolhidas, probabilidades, confiança, faixas dos scores e o ativo candidato. Respostas inválidas são rejeitadas integralmente. Falhas de autenticação, limite de uso, sobrecarga e payload inválido possuem códigos distintos; limites transitórios podem ser repetidos com espera exponencial limitada.
+
+O uso retornado pelo provider é armazenado como contagem de tokens de entrada e saída por execução e agregado localmente por dia. A interface mostra essas quantidades sem inferir custo monetário, pois preço e condições comerciais pertencem ao provider e podem mudar.
+
 ## Relações macro e geopolíticas
 
 O sistema identifica eventos políticos, econômicos, regulatórios, climáticos, sanitários, tecnológicos e geopolíticos e os relaciona a países, setores, commodities, moedas e ativos.

@@ -37,11 +37,14 @@ impl InsightsQueryService {
 
     pub fn jev_usage(database: &Database) -> Result<JevUsageSnapshot, DatabaseError> {
         let overview = database.content_overview()?;
+        let (input_tokens_today, output_tokens_today) = database.jev_token_usage_today()?;
         Ok(JevUsageSnapshot {
             analyzed_today: database.analyses_completed_today()?,
             daily_limit: usize::from(database.read_u16_setting("jev_daily_document_limit", 250)?),
             batch_limit: usize::from(database.read_u8_setting("jev_batch_limit", 25)?),
             pending_document_count: overview.unclassified_document_count,
+            input_tokens_today,
+            output_tokens_today,
         })
     }
 }

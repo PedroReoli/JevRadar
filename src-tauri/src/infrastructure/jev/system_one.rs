@@ -11,7 +11,7 @@ use crate::infrastructure::http::{RetryPolicy, send_with_retry};
 
 const SYSTEM_ONE_URL: &str = "https://api.typesafe.ai/v1/systemone";
 const REQUESTED_MODEL: &str = "jev-latest";
-pub const QUESTION_VERSION: &str = "document-market-signal-v1";
+pub const QUESTION_VERSION: &str = "document-market-signal-v2";
 const MIN_ASSET_PRESENT: f64 = 0.70;
 const MIN_CHOICE_CONFIDENCE: f64 = 0.45;
 
@@ -24,6 +24,12 @@ pub struct JevClient {
 pub enum JevClientError {
     #[error("o Jev não concluiu a classificação")]
     Request,
+    #[error("a chave do Jev foi rejeitada")]
+    Authentication,
+    #[error("o limite de requisições do Jev foi atingido")]
+    RateLimited,
+    #[error("o Jev está temporariamente sobrecarregado")]
+    Overloaded,
     #[error("o Jev retornou um contrato inesperado")]
     InvalidPayload,
 }
@@ -32,6 +38,9 @@ impl JevClientError {
     pub fn code(&self) -> &'static str {
         match self {
             Self::Request => "jev_request_failed",
+            Self::Authentication => "jev_authentication_failed",
+            Self::RateLimited => "jev_rate_limited",
+            Self::Overloaded => "jev_overloaded",
             Self::InvalidPayload => "jev_invalid_payload",
         }
     }
@@ -127,7 +136,7 @@ impl JevClient {
                 },
                 "event_type": {
                     "type": "choice",
-                    "instructions": "Classify the dominant external event type.",
+                    "instructions": "If the document describes a concrete external event related to the primary asset, classify its dominant type. Otherwise this answer will be ignored.",
                     "criteria": {
                         "political": "Election, government decision, policy, or political institution.",
                         "economic": "Macroeconomic indicator, interest rate, currency, trade, or economic activity.",
@@ -141,7 +150,7 @@ impl JevClient {
                 },
                 "event_country": {
                     "type": "choice",
-                    "instructions": "Select the main country or region directly involved in the event.",
+                    "instructions": "If a concrete external event exists, select the main country or region directly involved. Otherwise this answer will be ignored.",
                     "criteria": {
                         "BR": "Brazil", "US": "United States", "CN": "China", "RU": "Russia",
                         "EU": "European Union", "GLOBAL": "Multiple regions or global", "OTHER": "Another country or region"
@@ -149,7 +158,7 @@ impl JevClient {
                 },
                 "relation_type": {
                     "type": "choice",
-                    "instructions": "Classify the epistemic strength of the event-to-asset relationship without claiming unsupported causality.",
+                    "instructions": "If a concrete external event exists, classify the epistemic strength of its relationship to the primary asset without claiming unsupported causality. Otherwise this answer will be ignored.",
                     "criteria": {
                         "known": "A direct documented operational, legal, or contractual link.",
                         "correlation": "A historically associated relationship, without proof of causality here.",
@@ -168,10 +177,17 @@ impl JevClient {
             },
             RetryPolicy::RateLimitOnly,
         )
-        .and_then(reqwest::blocking::Response::error_for_status)
-        .map_err(|_| JevClientError::Request)?
-        .json::<SystemOneResponse>()
-        .map_err(|_| JevClientError::InvalidPayload)?;
+        .map_err(|_| JevClientError::Request)?;
+        let response = match response.status().as_u16() {
+            401 => return Err(JevClientError::Authentication),
+            429 => return Err(JevClientError::RateLimited),
+            529 => return Err(JevClientError::Overloaded),
+            status if !(200..300).contains(&status) => return Err(JevClientError::Request),
+            _ => response,
+        };
+        let response = response
+            .json::<SystemOneResponse>()
+            .map_err(|_| JevClientError::InvalidPayload)?;
         parse_response(document, response)
     }
 }
@@ -180,7 +196,12 @@ fn parse_response(
     document: &PendingDocumentAnalysis,
     response: SystemOneResponse,
 ) -> Result<DocumentAnalysisResult, JevClientError> {
-    let answers = response.answers;
+    validate_response(document, &response)?;
+    let SystemOneResponse {
+        model,
+        answers,
+        usage,
+    } = response;
     let selected_asset_id = (answers.asset_present.noul >= MIN_ASSET_PRESENT
         && answers.asset.confidence >= MIN_CHOICE_CONFIDENCE
         && document
@@ -211,7 +232,7 @@ fn parse_response(
         .probabilities
         .get(&answers.sentiment.choice)
         .copied()
-        .unwrap_or(answers.sentiment.confidence)
+        .ok_or(JevClientError::InvalidPayload)?
         .clamp(0.0, 1.0);
     let relevance_expected = answers.relevance.score.clamp(0.0, 3.0);
     let confidence = [
@@ -247,7 +268,10 @@ fn parse_response(
         && selected_asset_id.is_some()
         && valid_event_type
         && valid_relation_type
-        && valid_country)
+        && valid_country
+        && answers.event_type.confidence >= MIN_CHOICE_CONFIDENCE
+        && answers.event_country.confidence >= MIN_CHOICE_CONFIDENCE
+        && answers.relation_type.confidence >= MIN_CHOICE_CONFIDENCE)
         .then(|| crate::domain::classification::DetectedMarketEvent {
             title: document
                 .title
@@ -266,7 +290,7 @@ fn parse_response(
     Ok(DocumentAnalysisResult {
         document_id: document.id.clone(),
         model_name: "TypeSafe System One".to_owned(),
-        model_version: response.model,
+        model_version: model,
         question_version: QUESTION_VERSION.to_owned(),
         asset_present_probability: answers.asset_present.noul.clamp(0.0, 1.0),
         selected_asset_id,
@@ -281,14 +305,58 @@ fn parse_response(
         confidence: confidence.clamp(0.0, 1.0),
         input_language: document.language.clone(),
         analyzed_at: chrono::Utc::now().to_rfc3339(),
+        input_tokens: usage.input_tokens,
+        output_tokens: usage.output_tokens,
         event,
     })
+}
+
+fn validate_response(
+    document: &PendingDocumentAnalysis,
+    response: &SystemOneResponse,
+) -> Result<(), JevClientError> {
+    if response.model.trim().is_empty()
+        || !valid_probability(response.answers.asset_present.noul)
+        || !valid_probability(response.answers.hype.noul)
+        || !valid_probability(response.answers.factual_claim.noul)
+        || !valid_probability(response.answers.event_present.noul)
+        || !valid_choice(&response.answers.asset)
+        || !valid_choice(&response.answers.sentiment)
+        || !valid_choice(&response.answers.content_type)
+        || !valid_choice(&response.answers.event_type)
+        || !valid_choice(&response.answers.event_country)
+        || !valid_choice(&response.answers.relation_type)
+        || !response.answers.relevance.score.is_finite()
+        || !(0.0..=3.0).contains(&response.answers.relevance.score)
+        || !valid_probability(response.answers.relevance.confidence)
+        || !document
+            .candidates
+            .iter()
+            .any(|candidate| candidate.id == response.answers.asset.choice)
+    {
+        return Err(JevClientError::InvalidPayload);
+    }
+    Ok(())
+}
+
+fn valid_choice(answer: &ChoiceAnswer) -> bool {
+    valid_probability(answer.confidence)
+        && answer.probabilities.contains_key(&answer.choice)
+        && answer
+            .probabilities
+            .values()
+            .all(|value| valid_probability(*value))
+}
+
+fn valid_probability(value: f64) -> bool {
+    value.is_finite() && (0.0..=1.0).contains(&value)
 }
 
 #[derive(Debug, Deserialize)]
 struct SystemOneResponse {
     model: String,
     answers: Answers,
+    usage: Usage,
 }
 
 #[derive(Debug, Deserialize)]
@@ -324,11 +392,19 @@ struct ScoreAnswer {
     confidence: f64,
 }
 
+#[derive(Debug, Deserialize)]
+struct Usage {
+    input_tokens: u64,
+    output_tokens: u64,
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
 
-    use super::{SystemOneResponse, parse_response};
+    use std::collections::BTreeMap;
+
+    use super::{ChoiceAnswer, SystemOneResponse, parse_response, valid_choice, valid_probability};
     use crate::domain::classification::{AnalysisCandidateAsset, PendingDocumentAnalysis};
 
     fn document() -> PendingDocumentAnalysis {
@@ -363,7 +439,7 @@ mod tests {
                 "event_country": { "type": "choice", "choice": "BR", "confidence": 0.93, "probabilities": { "BR": 0.93 } },
                 "relation_type": { "type": "choice", "choice": "known", "confidence": 0.79, "probabilities": { "known": 0.79 } }
             },
-            "usage": { "input_tokens": 100, "output_tokens": 0 }
+            "usage": { "input_tokens": 100, "output_tokens": 12 }
         }))
         .expect("contrato de resposta");
         let analysis = parse_response(&document(), response).expect("análise");
@@ -374,6 +450,8 @@ mod tests {
         assert_eq!(analysis.sentiment, "optimistic");
         assert_eq!(analysis.relevance_expected, 2.6);
         assert_eq!(analysis.relevance_score, 3);
+        assert_eq!(analysis.input_tokens, 100);
+        assert_eq!(analysis.output_tokens, 12);
         assert_eq!(
             analysis
                 .event
@@ -399,7 +477,8 @@ mod tests {
                 "event_type": { "choice": "geopolitical", "confidence": 0.8, "probabilities": { "geopolitical": 0.8 } },
                 "event_country": { "choice": "GLOBAL", "confidence": 0.8, "probabilities": { "GLOBAL": 0.8 } },
                 "relation_type": { "choice": "hypothesis", "confidence": 0.8, "probabilities": { "hypothesis": 0.8 } }
-            }
+            },
+            "usage": { "input_tokens": 80, "output_tokens": 10 }
         }))
         .expect("contrato de resposta");
         let analysis = parse_response(&document(), response).expect("análise");
@@ -407,5 +486,21 @@ mod tests {
         assert_eq!(analysis.sentiment, "uncertain");
         assert_eq!(analysis.content_type, "uncertain");
         assert!(analysis.event.is_none());
+    }
+
+    #[test]
+    fn rejects_invalid_probabilities_before_persisting_them() {
+        assert!(!valid_probability(f64::NAN));
+        assert!(!valid_probability(1.01));
+        assert!(!valid_choice(&ChoiceAnswer {
+            choice: "optimistic".to_owned(),
+            confidence: 0.8,
+            probabilities: BTreeMap::from([("pessimistic".to_owned(), 0.2)]),
+        }));
+        assert!(!valid_choice(&ChoiceAnswer {
+            choice: "optimistic".to_owned(),
+            confidence: 0.8,
+            probabilities: BTreeMap::from([("optimistic".to_owned(), 1.4)]),
+        }));
     }
 }

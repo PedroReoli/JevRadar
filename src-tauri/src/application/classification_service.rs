@@ -1,10 +1,8 @@
 use crate::domain::classification::ClassificationSummary;
 use crate::domain::settings::SecretKind;
 use crate::infrastructure::database::{Database, DatabaseError};
-use crate::infrastructure::jev::{JevClient, JevClientError};
+use crate::infrastructure::jev::{JevClient, JevClientError, QUESTION_VERSION};
 use crate::infrastructure::secrets::KeyringSecretStore;
-
-const QUESTION_VERSION: &str = "document-market-signal-v1";
 
 pub struct ClassificationService;
 

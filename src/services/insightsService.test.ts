@@ -84,6 +84,8 @@ describe("insightsService", () => {
       dailyLimit: 250,
       batchLimit: 25,
       pendingDocumentCount: 12,
+      inputTokensToday: 18420,
+      outputTokensToday: 2160,
     });
     expect((await getJevUsage()).dailyLimit).toBe(250);
   });

@@ -43,6 +43,7 @@ const VERSIONED_SIGNALS_SCHEMA: &str = include_str!("migrations/0013_versioned_s
 const OFFICIAL_FEEDS_SCHEMA: &str = include_str!("migrations/0014_official_feeds.sql");
 const REDDIT_COMMUNITIES_SCHEMA: &str = include_str!("migrations/0015_reddit_communities.sql");
 const EVENT_QUERY_INDEXES_SCHEMA: &str = include_str!("migrations/0016_event_query_indexes.sql");
+const JEV_TOKEN_USAGE_SCHEMA: &str = include_str!("migrations/0017_jev_token_usage.sql");
 
 pub struct Database {
     connection: Mutex<Connection>,
@@ -88,6 +89,7 @@ impl Database {
         apply_migration(&connection, 14, OFFICIAL_FEEDS_SCHEMA)?;
         apply_migration(&connection, 15, REDDIT_COMMUNITIES_SCHEMA)?;
         apply_migration(&connection, 16, EVENT_QUERY_INDEXES_SCHEMA)?;
+        apply_migration(&connection, 17, JEV_TOKEN_USAGE_SCHEMA)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -171,6 +173,24 @@ impl Database {
             |row| row.get::<_, i64>(0),
         )?;
         Ok(usize::try_from(count).unwrap_or(usize::MAX))
+    }
+
+    pub fn jev_token_usage_today(&self) -> Result<(u64, u64), DatabaseError> {
+        self.connection
+            .lock()
+            .query_row(
+                "SELECT COALESCE(SUM(input_tokens), 0), COALESCE(SUM(output_tokens), 0)
+                 FROM document_analysis_runs
+                 WHERE date(analyzed_at) = date('now')",
+                [],
+                |row| {
+                    Ok((
+                        row.get::<_, i64>(0)?.max(0) as u64,
+                        row.get::<_, i64>(1)?.max(0) as u64,
+                    ))
+                },
+            )
+            .map_err(Into::into)
     }
 
     pub fn write_settings(
@@ -1158,11 +1178,18 @@ impl Database {
             "analysis:{}:{}:{}",
             analysis.document_id, analysis.model_version, analysis.question_version
         );
+        let input_tokens = i64::try_from(analysis.input_tokens).map_err(|_| {
+            rusqlite::Error::ToSqlConversionFailure("input_tokens excede INTEGER".into())
+        })?;
+        let output_tokens = i64::try_from(analysis.output_tokens).map_err(|_| {
+            rusqlite::Error::ToSqlConversionFailure("output_tokens excede INTEGER".into())
+        })?;
         transaction.execute(
             "INSERT OR IGNORE INTO document_analysis_runs (
                 id, document_id, model_name, model_version, question_version, status,
-                asset_present_probability, selected_asset_id, selected_asset_confidence, analyzed_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                asset_present_probability, selected_asset_id, selected_asset_confidence, analyzed_at,
+                input_tokens, output_tokens
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             params![
                 analysis_id,
                 analysis.document_id,
@@ -1174,6 +1201,8 @@ impl Database {
                 analysis.selected_asset_id,
                 analysis.selected_asset_confidence,
                 analysis.analyzed_at,
+                input_tokens,
+                output_tokens,
             ],
         )?;
         let Some(asset_id) = &analysis.selected_asset_id else {
@@ -2598,6 +2627,8 @@ mod tests {
                 confidence: 0.83,
                 input_language: Some("pt-BR".to_owned()),
                 analyzed_at: "2026-11-01T00:02:00Z".to_owned(),
+                input_tokens: 180,
+                output_tokens: 36,
                 event: Some(DetectedMarketEvent {
                     title: "Decisão regulatória sobre a Petrobras".to_owned(),
                     observed_fact: "A autoridade publicou uma decisão.".to_owned(),
@@ -2609,6 +2640,17 @@ mod tests {
             })
             .expect("classificação persistida");
         assert!(classified);
+        let stored_usage = database
+            .connection
+            .lock()
+            .query_row(
+                "SELECT input_tokens, output_tokens FROM document_analysis_runs
+                 WHERE document_id = 'document:petrobras'",
+                [],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+            )
+            .expect("uso do Jev persistido");
+        assert_eq!(stored_usage, (180, 36));
         assert!(
             database
                 .pending_document_analyses("document-market-signal-v1", 25)

@@ -14,6 +14,7 @@ O repositório está em **alpha para Windows**. O núcleo público funciona sem 
 - feeds RSS personalizados para fóruns, blogs e publicações que exponham um feed público;
 - lista configurável de até 25 comunidades do Reddit, com coleta oficial de posts e comentários;
 - classificação Jev por ativo, sentimento, relevância, tipo, alegação factual, hype e contexto externo;
+- validação estrita do contrato Jev, consumo diário de tokens visível na central operacional e tratamento explícito de autenticação, limite de uso e sobrecarga;
 - agregação auditável, alertas locais em quatro níveis e coleta em background configurável;
 - teste explícito de notificação nas configurações, sem criar sinal ou alterar o histórico;
 - dashboard com filtros na URL, mapa de calor, preço × sentimento, eventos, contexto educacional e lacunas de cobertura;
@@ -100,6 +101,7 @@ interrompe o processo antes de publicar um artefato que pareça assinado.
 - nenhuma telemetria externa é enviada nesta release;
 - segredos armazenados pelo keychain do sistema;
 - teto diário e por lote para consumo do Jev;
+- contagem local de tokens de entrada e saída por análise, sem registrar a chave ou enviar telemetria externa;
 - conteúdo social bruto é anonimizado ao vencer a retenção, sem destruir a trilha agregada de auditoria;
 - exportação cria uma cópia consistente na pasta Downloads;
 - exclusão de histórico preserva preferências, catálogo e credenciais.
