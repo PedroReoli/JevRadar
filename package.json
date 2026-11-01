@@ -23,7 +23,6 @@
   "dependencies": {
     "@tanstack/react-query": "5.105.1",
     "@tauri-apps/api": "2.12.4",
-    "@typesafe-ai/sdk": "0.7.0",
     "clsx": "2.1.1",
     "date-fns": "4.4.0",
     "i18next": "26.6.0",
