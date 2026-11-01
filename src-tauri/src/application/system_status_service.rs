@@ -1,11 +1,16 @@
 use crate::domain::system_status::{ComponentStatus, SystemStatus};
 use crate::infrastructure::background::{BackgroundRuntime, BackgroundRuntimeStatus};
 use crate::infrastructure::database::Database;
+use crate::infrastructure::local_api::{LocalApiRuntime, LocalApiRuntimeStatus};
 
 pub struct SystemStatusService;
 
 impl SystemStatusService {
-    pub fn read(database: &Database, background: &BackgroundRuntime) -> SystemStatus {
+    pub fn read(
+        database: &Database,
+        background: &BackgroundRuntime,
+        local_api_runtime: &LocalApiRuntime,
+    ) -> SystemStatus {
         let database_status = if database.is_healthy() {
             ComponentStatus::Ready
         } else {
@@ -19,7 +24,12 @@ impl SystemStatusService {
             }
             BackgroundRuntimeStatus::Unavailable => ComponentStatus::Unavailable,
         };
-        let local_api = configured_but_not_started_status(database, "local_api_enabled");
+        let local_api = match local_api_runtime.status() {
+            LocalApiRuntimeStatus::Disabled => ComponentStatus::Disabled,
+            LocalApiRuntimeStatus::Starting => ComponentStatus::Pending,
+            LocalApiRuntimeStatus::Ready => ComponentStatus::Ready,
+            LocalApiRuntimeStatus::Unavailable => ComponentStatus::Unavailable,
+        };
 
         SystemStatus {
             runtime: "tauri",
@@ -28,13 +38,5 @@ impl SystemStatusService {
             background_collection,
             local_api,
         }
-    }
-}
-
-fn configured_but_not_started_status(database: &Database, key: &str) -> ComponentStatus {
-    match database.read_bool_setting(key) {
-        Ok(true) => ComponentStatus::Pending,
-        Ok(false) => ComponentStatus::Disabled,
-        Err(_) => ComponentStatus::Unavailable,
     }
 }

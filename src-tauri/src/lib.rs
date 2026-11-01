@@ -20,7 +20,8 @@ use crate::interface::commands::content::{get_content_overview, refresh_content_
 use crate::interface::commands::desktop::resolve_close_request;
 use crate::interface::commands::market::get_market_overview;
 use crate::interface::commands::settings::{
-    delete_secret, get_app_settings, get_secret_status, save_secret, update_app_settings,
+    delete_secret, get_app_settings, get_local_api_access, get_secret_status,
+    regenerate_local_api_token, save_secret, update_app_settings,
 };
 use crate::interface::commands::system::get_system_status;
 use crate::state::AppState;
@@ -63,6 +64,8 @@ pub fn run() {
             get_secret_status,
             save_secret,
             delete_secret,
+            get_local_api_access,
+            regenerate_local_api_token,
             resolve_close_request,
             run_backtest,
             get_latest_backtest

@@ -15,6 +15,7 @@ tauri-build = { version = "2.7.4", features = [] }
 
 [dependencies]
 chrono = { version = "0.4.42", features = ["serde"] }
+axum = "0.8.9"
 feed-rs = "3.0.0"
 keyring = "4.2.0"
 parking_lot = "0.12.5"
@@ -26,6 +27,10 @@ sha2 = "0.10.9"
 tauri = { version = "2.12.5", features = ["tray-icon"] }
 tauri-plugin-autostart = "2.7.0"
 tauri-plugin-notification = "2.8.0"
+tokio = { version = "1.48.0", features = ["net", "rt-multi-thread", "sync"] }
+utoipa = "6.0.0"
+utoipa-swagger-ui = { version = "10.0.2", features = ["axum", "vendored"] }
+uuid = { version = "1.29.0", features = ["v4"] }
 thiserror = "2.0.17"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }

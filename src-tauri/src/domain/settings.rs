@@ -93,6 +93,7 @@ pub enum SecretKind {
     RedditClientSecret,
     XBearerToken,
     BrapiToken,
+    LocalApiToken,
 }
 
 impl SecretKind {
@@ -103,6 +104,7 @@ impl SecretKind {
             Self::RedditClientSecret => "reddit-client-secret",
             Self::XBearerToken => "x-bearer-token",
             Self::BrapiToken => "brapi-token",
+            Self::LocalApiToken => "local-api-token",
         }
     }
 }
@@ -115,6 +117,14 @@ pub struct SecretStatus {
     pub reddit_client_secret: bool,
     pub x_bearer_token: bool,
     pub brapi_token: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalApiAccess {
+    pub base_url: &'static str,
+    pub docs_url: &'static str,
+    pub token: String,
 }
 
 #[cfg(test)]

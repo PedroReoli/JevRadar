@@ -5,6 +5,7 @@ use crate::domain::settings::{
 };
 use crate::infrastructure::background::BackgroundRuntime;
 use crate::infrastructure::database::{Database, DatabaseError};
+use crate::infrastructure::local_api::LocalApiRuntime;
 use crate::infrastructure::secrets::{KeyringSecretStore, SecretStoreError};
 
 pub struct SettingsService;
@@ -45,6 +46,7 @@ impl SettingsService {
         app: &tauri::AppHandle<R>,
         database: &Database,
         background: &BackgroundRuntime,
+        local_api: &LocalApiRuntime,
         update: UpdateAppSettings,
     ) -> Result<AppSettings, SettingsServiceError> {
         update
@@ -60,6 +62,7 @@ impl SettingsService {
         autostart_result.map_err(|_| SettingsServiceError::Autostart)?;
 
         let background_collection_enabled = update.background_collection_enabled;
+        let local_api_enabled = update.local_api_enabled;
         database.write_settings(&[
             ("setup_completed", update.setup_completed.to_string()),
             ("language", update.language),
@@ -83,6 +86,7 @@ impl SettingsService {
             ("investment_range", update.investment_range),
         ])?;
         background.reconfigure(background_collection_enabled);
+        local_api.reconfigure(local_api_enabled);
 
         Self::read(database)
     }
