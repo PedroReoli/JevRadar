@@ -9,6 +9,7 @@
   padding: var(--space-6) var(--space-4);
   border-right: var(--border-width-thin) solid var(--color-border-subtle);
   background: var(--color-surface-raised);
+  overflow-y: auto;
 }
 
 .brand {
@@ -80,6 +81,7 @@
     padding: var(--space-3) var(--space-4);
     border-right: 0;
     border-bottom: var(--border-width-thin) solid var(--color-border-subtle);
+    overflow-y: visible;
   }
 
   .brand div span {
@@ -88,6 +90,7 @@
 
   .navigation {
     display: flex;
+    overflow-x: auto;
   }
 
   .link,
@@ -110,6 +113,7 @@
     width: 100%;
     display: grid;
     grid-template-columns: repeat(var(--navigation-mobile-columns), minmax(0, 1fr));
+    overflow-x: visible;
   }
 
   .link,
