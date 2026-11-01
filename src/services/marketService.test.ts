@@ -45,6 +45,8 @@ describe("marketService", () => {
         windowStartedAt: "2026-10-31T12:00:00Z",
         windowEndedAt: "2026-11-01T12:00:00Z",
         methodologyVersion: "weighted-sentiment-v1",
+        modelVersion: "jev-latest",
+        questionVersion: "document-market-signal-v1",
       }],
       events: [{
         id: "event:1",

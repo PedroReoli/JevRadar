@@ -36,6 +36,7 @@ const JEV_USAGE_LIMITS_SCHEMA: &str = include_str!("migrations/0009_jev_usage_li
 const X_SOURCE_SCHEMA: &str = include_str!("migrations/0010_x_source.sql");
 const ALERT_PREFERENCES_SCHEMA: &str = include_str!("migrations/0011_alert_preferences.sql");
 const SIGNAL_WEIGHT_AUDIT_SCHEMA: &str = include_str!("migrations/0012_signal_weight_audit.sql");
+const VERSIONED_SIGNALS_SCHEMA: &str = include_str!("migrations/0013_versioned_signals.sql");
 
 pub struct Database {
     connection: Mutex<Connection>,
@@ -77,6 +78,7 @@ impl Database {
         apply_migration(&connection, 10, X_SOURCE_SCHEMA)?;
         apply_migration(&connection, 11, ALERT_PREFERENCES_SCHEMA)?;
         apply_migration(&connection, 12, SIGNAL_WEIGHT_AUDIT_SCHEMA)?;
+        apply_migration(&connection, 13, VERSIONED_SIGNALS_SCHEMA)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -910,13 +912,23 @@ impl Database {
              SELECT dc.id, da.asset_id, sd.source_id, sd.published_at, dc.sentiment,
                     dc.sentiment_probability, COALESCE(dc.relevance_expected, dc.relevance_score),
                     dc.content_type, dc.hype_probability, dc.factual_claim_probability,
-                    dc.confidence, COALESCE(source_history.credibility, 0.65)
+                    dc.confidence, COALESCE(source_history.credibility, 0.65),
+                    dc.model_version, dc.question_version
              FROM document_classifications dc
              JOIN document_assets da ON da.id = dc.document_asset_id
              JOIN source_documents sd ON sd.id = da.document_id
              LEFT JOIN source_history ON source_history.source_id = sd.source_id
              WHERE sd.published_at >= ?1 AND sd.published_at <= ?2
                AND sd.duplicate_of_id IS NULL
+               AND (dc.model_version, dc.question_version) = (
+                   SELECT latest_dc.model_version, latest_dc.question_version
+                   FROM document_classifications latest_dc
+                   JOIN document_assets latest_da ON latest_da.id = latest_dc.document_asset_id
+                   WHERE latest_da.asset_id = da.asset_id
+                     AND latest_dc.classified_at <= ?2
+                   ORDER BY latest_dc.classified_at DESC
+                   LIMIT 1
+               )
              ORDER BY da.asset_id, sd.published_at",
         )?;
         statement
@@ -934,6 +946,8 @@ impl Database {
                     factual_claim_probability: row.get(9)?,
                     confidence: row.get(10)?,
                     source_credibility: row.get(11)?,
+                    model_version: row.get(12)?,
+                    question_version: row.get(13)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()
@@ -947,8 +961,8 @@ impl Database {
             "INSERT INTO market_signals (
                 id, asset_id, window_started_at, window_ended_at, signal_score, confidence,
                 source_count, independent_source_count, evidence_count, hype_penalty,
-                methodology_version, calculated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+                methodology_version, calculated_at, model_version, question_version
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
              ON CONFLICT(asset_id, window_started_at, window_ended_at, methodology_version)
              DO UPDATE SET
                 signal_score = excluded.signal_score,
@@ -957,7 +971,9 @@ impl Database {
                 independent_source_count = excluded.independent_source_count,
                 evidence_count = excluded.evidence_count,
                 hype_penalty = excluded.hype_penalty,
-                calculated_at = excluded.calculated_at",
+                calculated_at = excluded.calculated_at,
+                model_version = excluded.model_version,
+                question_version = excluded.question_version",
             params![
                 signal.id,
                 signal.asset_id,
@@ -971,6 +987,8 @@ impl Database {
                 signal.hype_penalty,
                 signal.methodology_version,
                 signal.calculated_at,
+                signal.model_version,
+                signal.question_version,
             ],
         )?;
         transaction.execute(
@@ -1009,7 +1027,7 @@ impl Database {
             "SELECT ms.id, a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency, a.country_code,
                     ms.signal_score, ms.confidence, ms.source_count, ms.independent_source_count,
                     ms.evidence_count, ms.hype_penalty, ms.window_started_at, ms.window_ended_at,
-                    ms.methodology_version
+                    ms.methodology_version, ms.model_version, ms.question_version
              FROM market_signals ms
              JOIN assets a ON a.id = ms.asset_id
              WHERE ms.id = (
@@ -1034,6 +1052,8 @@ impl Database {
                     window_started_at: row.get(14)?,
                     window_ended_at: row.get(15)?,
                     methodology_version: row.get(16)?,
+                    model_version: row.get(17)?,
+                    question_version: row.get(18)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()
@@ -1164,20 +1184,51 @@ impl Database {
             )
             .optional()?
             .ok_or(DatabaseError::AssetNotFound)?;
+        let (signal_methodology_version, model_version, question_version) = connection
+            .query_row(
+                "SELECT methodology_version, model_version, question_version
+                 FROM market_signals
+                 WHERE asset_id = ?1
+                   AND model_version != 'unavailable'
+                   AND question_version != 'unavailable'
+                 ORDER BY window_ended_at DESC, calculated_at DESC
+                 LIMIT 1",
+                params![asset_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()?
+            .unwrap_or_else(|| {
+                (
+                    "unavailable".to_owned(),
+                    "unavailable".to_owned(),
+                    "unavailable".to_owned(),
+                )
+            });
         let mut signal_statement = connection.prepare(
             "SELECT window_ended_at, signal_score, confidence
              FROM market_signals
              WHERE asset_id = ?1
+               AND methodology_version = ?2
+               AND model_version = ?3
+               AND question_version = ?4
              ORDER BY window_ended_at",
         )?;
         let signals = signal_statement
-            .query_map(params![asset_id], |row| {
-                Ok(BacktestSignalPoint {
-                    ended_at: row.get(0)?,
-                    signal_score: row.get(1)?,
-                    confidence: row.get(2)?,
-                })
-            })?
+            .query_map(
+                params![
+                    asset_id,
+                    signal_methodology_version,
+                    model_version,
+                    question_version
+                ],
+                |row| {
+                    Ok(BacktestSignalPoint {
+                        ended_at: row.get(0)?,
+                        signal_score: row.get(1)?,
+                        confidence: row.get(2)?,
+                    })
+                },
+            )?
             .collect::<Result<Vec<_>, _>>()?;
         let mut price_statement = connection.prepare(
             "SELECT observed_at, close_value
@@ -1193,23 +1244,11 @@ impl Database {
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
-        let (model_version, question_version) = connection
-            .query_row(
-                "SELECT dc.model_version, dc.question_version
-                 FROM document_classifications dc
-                 JOIN document_assets da ON da.id = dc.document_asset_id
-                 WHERE da.asset_id = ?1
-                 ORDER BY dc.classified_at DESC
-                 LIMIT 1",
-                params![asset_id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .optional()?
-            .unwrap_or_else(|| ("unavailable".to_owned(), "unavailable".to_owned()));
         Ok(BacktestDataset {
             asset,
             signals,
             prices,
+            signal_methodology_version,
             model_version,
             question_version,
         })
@@ -1235,8 +1274,16 @@ impl Database {
              WHERE asset_id = ?1 AND observed_at >= ?2
              UNION ALL
              SELECT window_ended_at, NULL, signal_score, confidence
-             FROM market_signals
+             FROM market_signals current_signal
              WHERE asset_id = ?1 AND window_ended_at >= ?2
+               AND (methodology_version, model_version, question_version) = (
+                   SELECT latest_signal.methodology_version, latest_signal.model_version,
+                          latest_signal.question_version
+                   FROM market_signals latest_signal
+                   WHERE latest_signal.asset_id = current_signal.asset_id
+                   ORDER BY latest_signal.window_ended_at DESC, latest_signal.calculated_at DESC
+                   LIMIT 1
+               )
              ORDER BY 1",
         )?;
         let points = statement
@@ -1260,15 +1307,17 @@ impl Database {
         let transaction = connection.transaction()?;
         transaction.execute(
             "INSERT INTO backtest_runs (
-                id, asset_id, methodology_version, model_version, question_version,
+                id, asset_id, methodology_version, signal_methodology_version,
+                model_version, question_version,
                 calibration_started_at, calibration_ended_at, evaluation_started_at,
                 evaluation_ended_at, created_at, completed_at, status,
                 signal_threshold, confidence_threshold
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
             params![
                 report.run_id,
                 report.asset.id,
                 report.methodology_version,
+                report.signal_methodology_version,
                 report.model_version,
                 report.question_version,
                 report.calibration_started_at,
@@ -1314,8 +1363,8 @@ impl Database {
         let report = connection
             .query_row(
                 "SELECT br.id, a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency,
-                        a.country_code, br.methodology_version, br.model_version,
-                        br.question_version, br.signal_threshold, br.confidence_threshold,
+                        a.country_code, br.methodology_version, br.signal_methodology_version,
+                        br.model_version, br.question_version, br.signal_threshold, br.confidence_threshold,
                         br.calibration_started_at, br.calibration_ended_at,
                         br.evaluation_started_at, br.evaluation_ended_at, br.created_at,
                         br.completed_at, br.status
@@ -1346,17 +1395,18 @@ impl Database {
                             country_code: row.get(7)?,
                         },
                         methodology_version: row.get(8)?,
-                        model_version: row.get(9)?,
-                        question_version: row.get(10)?,
-                        signal_threshold: row.get(11)?,
-                        confidence_threshold: row.get(12)?,
-                        calibration_started_at: row.get(13)?,
-                        calibration_ended_at: row.get(14)?,
-                        evaluation_started_at: row.get(15)?,
-                        evaluation_ended_at: row.get(16)?,
-                        created_at: row.get(17)?,
-                        completed_at: row.get(18)?,
-                        status: row.get(19)?,
+                        signal_methodology_version: row.get(9)?,
+                        model_version: row.get(10)?,
+                        question_version: row.get(11)?,
+                        signal_threshold: row.get(12)?,
+                        confidence_threshold: row.get(13)?,
+                        calibration_started_at: row.get(14)?,
+                        calibration_ended_at: row.get(15)?,
+                        evaluation_started_at: row.get(16)?,
+                        evaluation_ended_at: row.get(17)?,
+                        created_at: row.get(18)?,
+                        completed_at: row.get(19)?,
+                        status: row.get(20)?,
                         results: Vec::new(),
                     })
                 },
@@ -1406,6 +1456,13 @@ impl Database {
                         ) AS newest
                  FROM market_signals ms
                  JOIN assets a ON a.id = ms.asset_id
+                 WHERE (ms.methodology_version, ms.model_version, ms.question_version) = (
+                     SELECT latest.methodology_version, latest.model_version, latest.question_version
+                     FROM market_signals latest
+                     WHERE latest.asset_id = ms.asset_id
+                     ORDER BY latest.window_ended_at DESC, latest.calculated_at DESC
+                     LIMIT 1
+                 )
              )
              SELECT sh.id, sh.asset_id, sh.symbol, sh.signal_score, sh.confidence,
                     sh.independent_source_count, sh.evidence_count, sh.hype_penalty,
@@ -1628,6 +1685,52 @@ mod tests {
     }
 
     #[test]
+    fn backtest_dataset_uses_one_signal_contract_version() {
+        let directory = tempdir().expect("diretório temporário");
+        let database =
+            Database::open(directory.path().join("versioned-backtest.sqlite3")).expect("banco");
+        let connection = database.connection.lock();
+        for (id, ended_at, methodology, model, questions) in [
+            (
+                "signal:legacy",
+                "2026-10-31T12:00:00Z",
+                "weighted-sentiment-v1",
+                "jev-old",
+                "questions-old",
+            ),
+            (
+                "signal:current",
+                "2026-11-01T12:00:00Z",
+                "weighted-sentiment-v2",
+                "jev-latest",
+                "document-market-signal-v1",
+            ),
+        ] {
+            connection
+                .execute(
+                    "INSERT INTO market_signals (
+                        id, asset_id, window_started_at, window_ended_at, signal_score,
+                        confidence, source_count, independent_source_count, evidence_count,
+                        hype_penalty, methodology_version, calculated_at, model_version,
+                        question_version
+                     ) VALUES (?1, 'asset:b3:PETR4', ?2, ?3, 0.5, 0.8, 1, 1, 1, 0.1, ?4, ?3, ?5, ?6)",
+                    params![id, "2026-10-30T12:00:00Z", ended_at, methodology, model, questions],
+                )
+                .expect("sinal versionado");
+        }
+        drop(connection);
+
+        let dataset = database
+            .backtest_dataset("asset:b3:PETR4")
+            .expect("dataset versionado");
+        assert_eq!(dataset.signal_methodology_version, "weighted-sentiment-v2");
+        assert_eq!(dataset.model_version, "jev-latest");
+        assert_eq!(dataset.question_version, "document-market-signal-v1");
+        assert_eq!(dataset.signals.len(), 1);
+        assert_eq!(dataset.signals[0].ended_at, "2026-11-01T12:00:00Z");
+    }
+
+    #[test]
     fn applies_collection_schema() {
         let directory = tempdir().expect("diretório temporário");
         let database = Database::open(directory.path().join("collection.sqlite3"))
@@ -1833,6 +1936,8 @@ mod tests {
                 evidence_count: 1,
                 hype_penalty: 0.08,
                 methodology_version: "weighted-sentiment-v2".to_owned(),
+                model_version: "jev-latest".to_owned(),
+                question_version: "document-market-signal-v1".to_owned(),
                 calculated_at: "2026-11-02T00:01:00Z".to_owned(),
                 evidence: vec![WeightedEvidence {
                     classification_id: evidence[0].classification_id.clone(),
@@ -1891,6 +1996,7 @@ mod tests {
                     })
                     .expect("candidato"),
                 methodology_version: "positive-turn-forward-return-v1".to_owned(),
+                signal_methodology_version: "weighted-sentiment-v2".to_owned(),
                 model_version: "jev-latest".to_owned(),
                 question_version: "document-market-signal-v1".to_owned(),
                 signal_threshold: 0.15,

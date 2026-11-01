@@ -60,6 +60,8 @@ fn calculate_asset_signal(
     let mut hype_total = 0.0;
     let mut sources = BTreeSet::new();
     let mut weighted_evidence = Vec::new();
+    let model_version = items.first()?.model_version.clone();
+    let question_version = items.first()?.question_version.clone();
     let mut evidence_per_source = BTreeMap::<String, usize>::new();
     for item in &items {
         *evidence_per_source
@@ -154,6 +156,8 @@ fn calculate_asset_signal(
         evidence_count: items.len(),
         hype_penalty: (hype_total / weight_total).clamp(0.0, 1.0),
         methodology_version: METHODOLOGY_VERSION.to_owned(),
+        model_version,
+        question_version,
         calculated_at: Utc::now().to_rfc3339(),
         evidence: weighted_evidence,
     })
@@ -180,6 +184,8 @@ mod tests {
             factual_claim_probability: 0.95,
             confidence: 0.9,
             source_credibility: 0.8,
+            model_version: "jev-latest".to_owned(),
+            question_version: "document-market-signal-v1".to_owned(),
         }
     }
 

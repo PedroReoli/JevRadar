@@ -12,6 +12,8 @@ pub struct SignalEvidenceInput {
     pub factual_claim_probability: f64,
     pub confidence: f64,
     pub source_credibility: f64,
+    pub model_version: String,
+    pub question_version: String,
 }
 
 #[derive(Debug, Clone)]
@@ -41,6 +43,8 @@ pub struct CalculatedSignal {
     pub evidence_count: usize,
     pub hype_penalty: f64,
     pub methodology_version: String,
+    pub model_version: String,
+    pub question_version: String,
     pub calculated_at: String,
     pub evidence: Vec<WeightedEvidence>,
 }
@@ -62,6 +66,8 @@ pub struct MarketSignalSnapshot {
     pub window_started_at: String,
     pub window_ended_at: String,
     pub methodology_version: String,
+    pub model_version: String,
+    pub question_version: String,
 }
 
 #[derive(Debug, Clone, Serialize)]

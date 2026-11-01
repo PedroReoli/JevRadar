@@ -41,6 +41,7 @@ export const en = {
     interval: "95% CI",
     smallSample: "Small sample: treat this result as exploratory.",
     methodology: "Methodology {{version}}. Parameters are fixed before evaluation; consecutive turns are not recounted.",
+    signalMethodology: "Signals {{version}} · model {{model}} · questions {{questions}}",
     disclosure: "Historical performance does not guarantee future results. Backtesting measures association, not causality or investment advice.",
   },
   sources: {

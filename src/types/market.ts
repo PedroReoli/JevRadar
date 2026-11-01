@@ -72,6 +72,8 @@ export interface MarketSignalSnapshot {
   windowStartedAt: string;
   windowEndedAt: string;
   methodologyVersion: string;
+  modelVersion: string;
+  questionVersion: string;
 }
 
 export interface SignalEvidenceSnapshot {

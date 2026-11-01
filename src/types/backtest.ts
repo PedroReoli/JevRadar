@@ -15,6 +15,7 @@ export interface BacktestReport {
   runId: string;
   asset: Asset;
   methodologyVersion: string;
+  signalMethodologyVersion: string;
   modelVersion: string;
   questionVersion: string;
   signalThreshold: number;

@@ -41,6 +41,7 @@ export const ptBR = {
     interval: "IC 95%",
     smallSample: "Amostra pequena: trate o resultado como exploratório.",
     methodology: "Metodologia {{version}}. Parâmetros fixos antes da avaliação; viradas consecutivas não são recontadas.",
+    signalMethodology: "Sinais {{version}} · modelo {{model}} · perguntas {{questions}}",
     disclosure: "Desempenho histórico não garante resultado futuro. O backtest mede associação, não prova causalidade nem recomenda investimento.",
   },
   sources: {

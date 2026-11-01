@@ -26,6 +26,8 @@ const signal: MarketSignalSnapshot = {
   windowStartedAt: "2026-10-31T12:00:00Z",
   windowEndedAt: "2026-11-01T12:00:00Z",
   methodologyVersion: "weighted-sentiment-v2",
+  modelVersion: "jev-latest",
+  questionVersion: "document-market-signal-v1",
 };
 
 describe("SignalHeatmap", () => {

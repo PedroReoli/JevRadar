@@ -36,6 +36,8 @@ const marketOverviewSchema = z.object({
     windowStartedAt: z.string(),
     windowEndedAt: z.string(),
     methodologyVersion: z.string(),
+    modelVersion: z.string(),
+    questionVersion: z.string(),
   })),
   events: z.array(z.object({
     id: z.string(),

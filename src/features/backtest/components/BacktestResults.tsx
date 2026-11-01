@@ -33,7 +33,7 @@ export function BacktestResults({ report }: BacktestResultsProps) {
           </article>
         ))}
       </div>
-      <footer>{t("backtest.methodology", { version: report.methodologyVersion })}</footer>
+      <footer>{t("backtest.methodology", { version: report.methodologyVersion })} · {t("backtest.signalMethodology", { version: report.signalMethodologyVersion, model: report.modelVersion, questions: report.questionVersion })}</footer>
     </section>
   );
 }

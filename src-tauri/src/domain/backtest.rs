@@ -20,6 +20,7 @@ pub struct BacktestDataset {
     pub asset: Asset,
     pub signals: Vec<BacktestSignalPoint>,
     pub prices: Vec<BacktestPricePoint>,
+    pub signal_methodology_version: String,
     pub model_version: String,
     pub question_version: String,
 }
@@ -63,6 +64,7 @@ pub struct BacktestReport {
     pub run_id: String,
     pub asset: Asset,
     pub methodology_version: String,
+    pub signal_methodology_version: String,
     pub model_version: String,
     pub question_version: String,
     pub signal_threshold: f64,

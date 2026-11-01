@@ -9,6 +9,7 @@ const report = {
   runId: "backtest:1",
   asset: { id: "asset:b3:PETR4", symbol: "PETR4", name: "Petrobras PN", assetClass: "b3Equity", exchange: "B3", currency: "BRL", countryCode: "BR" },
   methodologyVersion: "positive-turn-forward-return-v1",
+  signalMethodologyVersion: "weighted-sentiment-v2",
   modelVersion: "jev-latest",
   questionVersion: "document-market-signal-v1",
   signalThreshold: 0.15,

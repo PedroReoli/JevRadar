@@ -13,6 +13,7 @@ const backtestReportSchema = z.object({
   runId: z.string(),
   asset: assetSchema,
   methodologyVersion: z.string(),
+  signalMethodologyVersion: z.string(),
   modelVersion: z.string(),
   questionVersion: z.string(),
   signalThreshold: z.number().min(0).max(1),
