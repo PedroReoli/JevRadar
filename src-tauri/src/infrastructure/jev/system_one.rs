@@ -119,6 +119,42 @@ impl JevClient {
                 "factual_claim": {
                     "type": "noul",
                     "instructions": "Does the document contain a concrete externally verifiable factual claim?"
+                },
+                "event_present": {
+                    "type": "noul",
+                    "instructions": "Does the document describe a concrete political, economic, regulatory, climate, health, technology, or geopolitical event that may relate to the primary asset?"
+                },
+                "event_type": {
+                    "type": "choice",
+                    "instructions": "Classify the dominant external event type.",
+                    "criteria": {
+                        "political": "Election, government decision, policy, or political institution.",
+                        "economic": "Macroeconomic indicator, interest rate, currency, trade, or economic activity.",
+                        "regulatory": "Law, regulation, enforcement, court, or regulator action.",
+                        "climate": "Weather, climate, environmental disaster, or transition risk.",
+                        "health": "Public health, medicine, epidemic, or health-system event.",
+                        "technology": "Material technology, infrastructure, cybersecurity, or innovation event.",
+                        "geopolitical": "War, sanctions, diplomatic conflict, border, or international security event.",
+                        "other": "Concrete external event not covered by the other labels."
+                    }
+                },
+                "event_country": {
+                    "type": "choice",
+                    "instructions": "Select the main country or region directly involved in the event.",
+                    "criteria": {
+                        "BR": "Brazil", "US": "United States", "CN": "China", "RU": "Russia",
+                        "EU": "European Union", "GLOBAL": "Multiple regions or global", "OTHER": "Another country or region"
+                    }
+                },
+                "relation_type": {
+                    "type": "choice",
+                    "instructions": "Classify the epistemic strength of the event-to-asset relationship without claiming unsupported causality.",
+                    "criteria": {
+                        "known": "A direct documented operational, legal, or contractual link.",
+                        "correlation": "A historically associated relationship, without proof of causality here.",
+                        "hypothesis": "A plausible mechanism that requires further evidence.",
+                        "unproven_causality": "The document implies causality that is not established by the evidence."
+                    }
                 }
             }
         });
@@ -184,6 +220,45 @@ fn parse_response(
     .sum::<f64>()
         / 4.0;
 
+    let valid_event_type = matches!(
+        answers.event_type.choice.as_str(),
+        "political"
+            | "economic"
+            | "regulatory"
+            | "climate"
+            | "health"
+            | "technology"
+            | "geopolitical"
+            | "other"
+    );
+    let valid_relation_type = matches!(
+        answers.relation_type.choice.as_str(),
+        "known" | "correlation" | "hypothesis" | "unproven_causality"
+    );
+    let valid_country = matches!(
+        answers.event_country.choice.as_str(),
+        "BR" | "US" | "CN" | "RU" | "EU" | "GLOBAL" | "OTHER"
+    );
+    let event = (answers.event_present.noul >= 0.65
+        && selected_asset_id.is_some()
+        && valid_event_type
+        && valid_relation_type
+        && valid_country)
+        .then(|| crate::domain::classification::DetectedMarketEvent {
+            title: document
+                .title
+                .clone()
+                .unwrap_or_else(|| "Evento de mercado observado".to_owned()),
+            observed_fact: document.raw_text.chars().take(600).collect(),
+            event_type: answers.event_type.choice.clone(),
+            country_code: answers.event_country.choice.clone(),
+            relation_type: answers.relation_type.choice.clone(),
+            relation_confidence: ((answers.event_present.noul
+                + answers.event_type.confidence
+                + answers.relation_type.confidence)
+                / 3.0)
+                .clamp(0.0, 1.0),
+        });
     Ok(DocumentAnalysisResult {
         document_id: document.id.clone(),
         model_name: "TypeSafe System One".to_owned(),
@@ -202,6 +277,7 @@ fn parse_response(
         confidence: confidence.clamp(0.0, 1.0),
         input_language: document.language.clone(),
         analyzed_at: chrono::Utc::now().to_rfc3339(),
+        event,
     })
 }
 
@@ -220,6 +296,10 @@ struct Answers {
     content_type: ChoiceAnswer,
     hype: NoulAnswer,
     factual_claim: NoulAnswer,
+    event_present: NoulAnswer,
+    event_type: ChoiceAnswer,
+    event_country: ChoiceAnswer,
+    relation_type: ChoiceAnswer,
 }
 
 #[derive(Debug, Deserialize)]
@@ -273,7 +353,11 @@ mod tests {
                 "relevance": { "type": "score", "score": 2.6, "confidence": 0.76, "legend": {}, "probabilities": {} },
                 "content_type": { "type": "choice", "choice": "news", "confidence": 0.88, "probabilities": { "news": 0.88 } },
                 "hype": { "type": "noul", "noul": 0.07 },
-                "factual_claim": { "type": "noul", "noul": 0.97 }
+                "factual_claim": { "type": "noul", "noul": 0.97 },
+                "event_present": { "type": "noul", "noul": 0.91 },
+                "event_type": { "type": "choice", "choice": "economic", "confidence": 0.88, "probabilities": { "economic": 0.88 } },
+                "event_country": { "type": "choice", "choice": "BR", "confidence": 0.93, "probabilities": { "BR": 0.93 } },
+                "relation_type": { "type": "choice", "choice": "known", "confidence": 0.79, "probabilities": { "known": 0.79 } }
             },
             "usage": { "input_tokens": 100, "output_tokens": 0 }
         }))
@@ -286,6 +370,13 @@ mod tests {
         assert_eq!(analysis.sentiment, "optimistic");
         assert_eq!(analysis.relevance_expected, 2.6);
         assert_eq!(analysis.relevance_score, 3);
+        assert_eq!(
+            analysis
+                .event
+                .as_ref()
+                .map(|event| event.event_type.as_str()),
+            Some("economic")
+        );
     }
 
     #[test]
@@ -299,7 +390,11 @@ mod tests {
                 "relevance": { "score": 1.2, "confidence": 0.5 },
                 "content_type": { "choice": "opinion", "confidence": 0.2, "probabilities": { "opinion": 0.4 } },
                 "hype": { "noul": 0.3 },
-                "factual_claim": { "noul": 0.2 }
+                "factual_claim": { "noul": 0.2 },
+                "event_present": { "noul": 0.8 },
+                "event_type": { "choice": "geopolitical", "confidence": 0.8, "probabilities": { "geopolitical": 0.8 } },
+                "event_country": { "choice": "GLOBAL", "confidence": 0.8, "probabilities": { "GLOBAL": 0.8 } },
+                "relation_type": { "choice": "hypothesis", "confidence": 0.8, "probabilities": { "hypothesis": 0.8 } }
             }
         }))
         .expect("contrato de resposta");
@@ -307,5 +402,6 @@ mod tests {
         assert!(analysis.selected_asset_id.is_none());
         assert_eq!(analysis.sentiment, "uncertain");
         assert_eq!(analysis.content_type, "uncertain");
+        assert!(analysis.event.is_none());
     }
 }

@@ -17,6 +17,7 @@ use crate::domain::collection::{MarketObservationInput, SourceCollectionResult};
 use crate::domain::content::{
     ContentOverview, ContentSource, ContentSourceResult, ContentSourceStatus, SourceDocumentInput,
 };
+use crate::domain::events::MarketEventSnapshot;
 use crate::domain::market::{LatestCollectionRun, MarketSnapshot};
 use crate::domain::signals::{CalculatedSignal, MarketSignalSnapshot, SignalEvidenceInput};
 
@@ -715,6 +716,46 @@ impl Database {
                 analysis.relevance_expected,
             ],
         )?;
+        if let Some(event) = &analysis.event {
+            let event_id = format!("event:{}", analysis.document_id);
+            transaction.execute(
+                "INSERT INTO market_events (
+                    id, event_type, title, observed_fact, country_codes, started_at,
+                    source_document_id, created_at
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                 ON CONFLICT(id) DO UPDATE SET
+                    event_type = excluded.event_type,
+                    title = excluded.title,
+                    observed_fact = excluded.observed_fact,
+                    country_codes = excluded.country_codes",
+                params![
+                    event_id,
+                    event.event_type,
+                    event.title,
+                    event.observed_fact,
+                    event.country_code,
+                    analysis.analyzed_at,
+                    analysis.document_id,
+                    analysis.analyzed_at,
+                ],
+            )?;
+            transaction.execute(
+                "INSERT INTO event_asset_relations (
+                    event_id, asset_id, relation_type, confidence, rationale_template_key
+                 ) VALUES (?1, ?2, ?3, ?4, ?5)
+                 ON CONFLICT(event_id, asset_id) DO UPDATE SET
+                    relation_type = excluded.relation_type,
+                    confidence = excluded.confidence,
+                    rationale_template_key = excluded.rationale_template_key",
+                params![
+                    event_id,
+                    asset_id,
+                    event.relation_type,
+                    event.relation_confidence,
+                    format!("event.{}.{}", event.event_type, event.relation_type),
+                ],
+            )?;
+        }
         transaction.commit()?;
         Ok(inserted > 0)
     }
@@ -837,6 +878,64 @@ impl Database {
                     window_started_at: row.get(13)?,
                     window_ended_at: row.get(14)?,
                     methodology_version: row.get(15)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(Into::into)
+    }
+
+    pub fn latest_market_events(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<MarketEventSnapshot>, DatabaseError> {
+        let connection = self.connection.lock();
+        let mut statement = connection.prepare(
+            "SELECT me.id, me.title, me.observed_fact, me.event_type, me.country_codes,
+                    me.started_at, a.id, a.symbol, a.name, a.asset_class, a.exchange,
+                    a.currency, a.country_code, ear.relation_type, ear.confidence,
+                    ear.rationale_template_key, s.name, sd.canonical_url
+             FROM market_events me
+             JOIN event_asset_relations ear ON ear.event_id = me.id
+             JOIN assets a ON a.id = ear.asset_id
+             LEFT JOIN source_documents sd ON sd.id = me.source_document_id
+             LEFT JOIN sources s ON s.id = sd.source_id
+             ORDER BY me.started_at DESC
+             LIMIT ?1",
+        )?;
+        statement
+            .query_map(params![i64::try_from(limit).unwrap_or(i64::MAX)], |row| {
+                Ok(MarketEventSnapshot {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    observed_fact: row.get(2)?,
+                    event_type: row.get(3)?,
+                    country_code: row.get(4)?,
+                    started_at: row.get(5)?,
+                    asset: Asset {
+                        id: row.get(6)?,
+                        symbol: row.get(7)?,
+                        name: row.get(8)?,
+                        asset_class: AssetClass::from_storage_value(
+                            row.get::<_, String>(9)?.as_str(),
+                        )
+                        .ok_or_else(|| {
+                            rusqlite::Error::InvalidColumnType(
+                                9,
+                                "asset_class".to_owned(),
+                                rusqlite::types::Type::Text,
+                            )
+                        })?,
+                        exchange: row.get(10)?,
+                        currency: row.get(11)?,
+                        country_code: row.get(12)?,
+                    },
+                    relation_type: row.get(13)?,
+                    confidence: row.get(14)?,
+                    rationale_template_key: row.get(15)?,
+                    source_name: row
+                        .get::<_, Option<String>>(16)?
+                        .unwrap_or_else(|| "Fonte local".to_owned()),
+                    source_url: row.get(17)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()
@@ -1347,7 +1446,7 @@ mod tests {
     #[test]
     fn finds_candidates_and_persists_a_typed_document_analysis() {
         use crate::domain::backtest::{BacktestHorizonResult, BacktestReport};
-        use crate::domain::classification::DocumentAnalysisResult;
+        use crate::domain::classification::{DetectedMarketEvent, DocumentAnalysisResult};
         use crate::domain::content::SourceDocumentInput;
         use crate::domain::signals::{CalculatedSignal, WeightedEvidence};
 
@@ -1398,6 +1497,14 @@ mod tests {
                 confidence: 0.83,
                 input_language: Some("pt-BR".to_owned()),
                 analyzed_at: "2026-11-01T00:02:00Z".to_owned(),
+                event: Some(DetectedMarketEvent {
+                    title: "Decisão regulatória sobre a Petrobras".to_owned(),
+                    observed_fact: "A autoridade publicou uma decisão.".to_owned(),
+                    event_type: "regulatory".to_owned(),
+                    country_code: "BR".to_owned(),
+                    relation_type: "known".to_owned(),
+                    relation_confidence: 0.88,
+                }),
             })
             .expect("classificação persistida");
         assert!(classified);
@@ -1409,6 +1516,9 @@ mod tests {
         );
         let overview = database.content_overview().expect("visão geral");
         assert_eq!(overview.unclassified_document_count, 0);
+        let events = database.latest_market_events(10).expect("eventos");
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].relation_type, "known");
 
         let evidence = database
             .signal_evidence_between("2026-11-01T00:00:00Z", "2026-11-02T00:00:00Z")

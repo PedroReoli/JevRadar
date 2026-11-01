@@ -1,6 +1,7 @@
 use serde::Serialize;
 
 use crate::domain::assets::Asset;
+use crate::domain::events::MarketEventSnapshot;
 use crate::domain::signals::MarketSignalSnapshot;
 
 #[derive(Debug, Clone, Serialize)]
@@ -31,5 +32,6 @@ pub struct LatestCollectionRun {
 pub struct MarketOverview {
     pub snapshots: Vec<MarketSnapshot>,
     pub signals: Vec<MarketSignalSnapshot>,
+    pub events: Vec<MarketEventSnapshot>,
     pub latest_collection: Option<LatestCollectionRun>,
 }

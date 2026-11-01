@@ -8,6 +8,7 @@ impl MarketQueryService {
         Ok(MarketOverview {
             snapshots: database.market_snapshots()?,
             signals: database.latest_market_signals()?,
+            events: database.latest_market_events(50)?,
             latest_collection: database.latest_collection_run()?,
         })
     }

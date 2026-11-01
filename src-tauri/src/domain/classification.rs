@@ -36,6 +36,17 @@ pub struct DocumentAnalysisResult {
     pub confidence: f64,
     pub input_language: Option<String>,
     pub analyzed_at: String,
+    pub event: Option<DetectedMarketEvent>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DetectedMarketEvent {
+    pub title: String,
+    pub observed_fact: String,
+    pub event_type: String,
+    pub country_code: String,
+    pub relation_type: String,
+    pub relation_confidence: f64,
 }
 
 #[derive(Debug, Clone, Serialize)]
