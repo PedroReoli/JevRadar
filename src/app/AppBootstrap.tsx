@@ -1,4 +1,5 @@
 import { AlertTriangle, LoaderCircle } from "lucide-react";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { RouterProvider } from "react-router-dom";
 
@@ -8,8 +9,14 @@ import { useAppSettingsQuery } from "@/hooks/useAppSettings";
 import styles from "@/app/AppBootstrap.module.css";
 
 export function AppBootstrap() {
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const settingsQuery = useAppSettingsQuery();
+
+  useEffect(() => {
+    if (settingsQuery.data?.language && i18n.language !== settingsQuery.data.language) {
+      void i18n.changeLanguage(settingsQuery.data.language);
+    }
+  }, [i18n, settingsQuery.data?.language]);
 
   if (settingsQuery.isPending) {
     return (

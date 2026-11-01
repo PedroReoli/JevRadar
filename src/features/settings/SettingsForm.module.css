@@ -1,0 +1,308 @@
+.form {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.section {
+  overflow: hidden;
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-panel);
+  box-shadow: var(--shadow-panel);
+}
+
+.sectionHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+  border-bottom: var(--border-width-thin) solid var(--color-border-subtle);
+}
+
+.sectionIcon {
+  width: var(--size-icon-surface);
+  height: var(--size-icon-surface);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  color: var(--color-accent-text);
+  background: var(--color-accent-surface);
+}
+
+.sectionHeader div,
+.toggleField > span,
+.selectField > span,
+.secretHeader > span:first-child {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.sectionHeader h2,
+.sectionHeader p,
+.fieldError {
+  margin: 0;
+}
+
+.sectionHeader h2 {
+  color: var(--color-text-primary);
+  font: var(--font-title-lg);
+}
+
+.sectionHeader p,
+.toggleField small,
+.selectField small,
+.secretHeader small {
+  color: var(--color-text-muted);
+  font: var(--font-body-sm);
+}
+
+.sectionBody {
+  display: grid;
+}
+
+.toggleField,
+.selectField,
+.secretField {
+  padding: var(--space-4) var(--space-6);
+  border-bottom: var(--border-width-thin) solid var(--color-border-subtle);
+}
+
+.sectionBody > :last-child {
+  border-bottom: 0;
+}
+
+.toggleField,
+.selectField {
+  min-height: var(--control-height-xl);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.toggleField strong,
+.selectField strong,
+.secretHeader strong {
+  color: var(--color-text-primary);
+  font: var(--font-label-md);
+}
+
+.toggleField input {
+  width: var(--size-toggle-width);
+  height: var(--size-toggle-height);
+  accent-color: var(--color-accent-strong);
+}
+
+.selectField select,
+.selectField input,
+.secretControls input {
+  min-height: var(--control-height-md);
+  padding-inline: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  background: var(--color-surface-canvas);
+  font: var(--font-body-sm);
+}
+
+.selectField select,
+.selectField input {
+  width: var(--control-width-settings);
+}
+
+.secretField {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.secretHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.configured,
+.notConfigured {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 0 0 auto;
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-width-thin) solid;
+  border-radius: var(--radius-full);
+  font: var(--font-label-xs);
+}
+
+.configured {
+  border-color: var(--color-positive-border);
+  color: var(--color-positive-text);
+  background: var(--color-positive-surface);
+}
+
+.notConfigured {
+  border-color: var(--color-neutral-border);
+  color: var(--color-neutral-text);
+  background: var(--color-neutral-surface);
+}
+
+.secretControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: var(--space-2);
+}
+
+.secretControls label,
+.secretControls input {
+  width: 100%;
+}
+
+.primaryButton,
+.secondaryButton,
+.ghostButton,
+.dangerButton,
+.iconButton,
+.dangerIconButton {
+  min-height: var(--control-height-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  font: var(--font-label-md);
+  cursor: pointer;
+}
+
+.primaryButton {
+  border: 0;
+  color: var(--color-text-on-accent);
+  background: var(--color-accent-strong);
+}
+
+.secondaryButton,
+.ghostButton,
+.iconButton {
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  background: transparent;
+}
+
+.iconButton,
+.dangerIconButton {
+  width: var(--control-height-md);
+  padding: 0;
+}
+
+.dangerButton,
+.dangerIconButton {
+  border: var(--border-width-thin) solid var(--color-negative-border);
+  color: var(--color-negative-text);
+  background: var(--color-negative-surface);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.ghostButton:disabled,
+.dangerButton:disabled,
+.iconButton:disabled,
+.dangerIconButton:disabled,
+.toggleField input:disabled,
+.selectField select:disabled,
+.selectField input:disabled,
+.secretControls input:disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+
+.confirmation {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-negative-border);
+  border-radius: var(--radius-md);
+  color: var(--color-negative-text);
+  background: var(--color-negative-surface);
+  font: var(--font-body-sm);
+}
+
+.confirmation span {
+  margin-right: auto;
+}
+
+.fieldError,
+.errorMessage {
+  color: var(--color-negative-text);
+  font: var(--font-body-sm);
+}
+
+.successMessage {
+  color: var(--color-positive-text);
+  font: var(--font-body-sm);
+}
+
+.actionBar {
+  position: sticky;
+  bottom: var(--space-4);
+  z-index: var(--z-sticky-actions);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-dialog);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+@media (max-width: 40rem) {
+  .sectionHeader,
+  .toggleField,
+  .selectField,
+  .secretField {
+    padding-inline: var(--space-4);
+  }
+
+  .toggleField,
+  .selectField {
+    grid-template-columns: 1fr;
+  }
+
+  .selectField select,
+  .selectField input {
+    width: 100%;
+  }
+
+  .secretHeader {
+    flex-direction: column;
+  }
+
+  .secretControls {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .secretControls .secondaryButton {
+    grid-column: 1;
+  }
+
+  .confirmation,
+  .actionBar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

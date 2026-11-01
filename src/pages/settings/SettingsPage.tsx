@@ -1,16 +1,20 @@
-import { Languages } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { SettingsForm } from "@/features/settings/components/SettingsForm";
+import { useAppSettingsQuery, useSecretStatusQuery } from "@/hooks/useAppSettings";
 import styles from "@/pages/settings/SettingsPage.module.css";
 
-type SupportedLanguage = "pt-BR" | "en";
-
 export function SettingsPage() {
-  const { i18n, t } = useTranslation();
+  const { t } = useTranslation();
+  const settingsQuery = useAppSettingsQuery();
+  const secretStatusQuery = useSecretStatusQuery();
+  const isLoading = settingsQuery.isLoading || secretStatusQuery.isLoading;
+  const hasError = settingsQuery.isError || secretStatusQuery.isError;
 
-  const changeLanguage = (language: SupportedLanguage) => {
-    window.localStorage.setItem("jevradar.language", language);
-    void i18n.changeLanguage(language);
+  const retry = () => {
+    void settingsQuery.refetch();
+    void secretStatusQuery.refetch();
   };
 
   return (
@@ -21,29 +25,24 @@ export function SettingsPage() {
         <p>{t("settings.description")}</p>
       </header>
 
-      <section className={styles.card} aria-labelledby="language-title">
-        <div className={styles.cardIcon}>
-          <Languages aria-hidden="true" size="var(--icon-size-lg)" />
-        </div>
-        <div className={styles.cardContent}>
-          <h2 id="language-title">{t("settings.language")}</h2>
-          <p>{t("settings.languageDescription")}</p>
-          <div className={styles.segmentedControl} role="group" aria-label={t("settings.language")}>
-            <button
-              aria-pressed={i18n.language === "pt-BR"}
-              onClick={() => changeLanguage("pt-BR")}
-              type="button"
-            >
-              {t("settings.portuguese")}
-            </button>
-            <button aria-pressed={i18n.language === "en"} onClick={() => changeLanguage("en")} type="button">
-              {t("settings.english")}
-            </button>
-          </div>
-        </div>
-      </section>
+      {isLoading && <div className={styles.state} role="status">{t("settings.loading")}</div>}
 
-      <p className={styles.pending}>{t("settings.setupPending")}</p>
+      {hasError && (
+        <div className={styles.errorState} role="alert">
+          <div>
+            <strong>{t("settings.loadErrorTitle")}</strong>
+            <span>{t("settings.loadErrorDescription")}</span>
+          </div>
+          <button onClick={retry} type="button">
+            <RefreshCw aria-hidden="true" size="var(--icon-size-sm)" />
+            {t("bootstrap.retry")}
+          </button>
+        </div>
+      )}
+
+      {settingsQuery.data && secretStatusQuery.data && (
+        <SettingsForm settings={settingsQuery.data} secretStatus={secretStatusQuery.data} />
+      )}
     </div>
   );
 }

@@ -40,6 +40,7 @@
   --control-height-md: 2.5rem;
   --control-height-lg: 3.75rem;
   --control-height-xl: 4.75rem;
+  --control-width-settings: 14rem;
   --size-brand-mark: 2.25rem;
   --size-status-dot: 0.375rem;
   --size-icon-surface: 2.25rem;
@@ -100,6 +101,7 @@
   --motion-lift-distance: -0.0625rem;
   --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
   --opacity-disabled: 0.45;
+  --z-sticky-actions: 10;
 }
 
 @media (prefers-color-scheme: light) {

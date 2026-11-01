@@ -1,4 +1,5 @@
 .page {
+  min-width: 0;
   width: min(100%, var(--layout-content-narrow));
   margin: 0 auto;
   display: grid;
@@ -17,91 +18,82 @@
   text-transform: uppercase;
 }
 
-.header h1 {
+.header h1,
+.header p {
   margin: 0;
+}
+
+.header h1 {
   color: var(--color-text-primary);
   font: var(--font-display-lg);
 }
 
-.header p,
-.cardContent p,
-.pending {
-  margin: 0;
+.header p {
   color: var(--color-text-secondary);
   font: var(--font-body-md);
 }
 
-.card {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--space-5);
-  padding: var(--space-6);
+.state,
+.errorState {
+  padding: var(--space-5);
   border: var(--border-width-thin) solid var(--color-border-subtle);
   border-radius: var(--radius-xl);
   background: var(--color-surface-panel);
-  box-shadow: var(--shadow-panel);
 }
 
-.cardIcon {
-  width: var(--size-empty-icon);
-  height: var(--size-empty-icon);
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-lg);
-  color: var(--color-accent-text);
-  background: var(--color-accent-surface);
+.state {
+  color: var(--color-text-muted);
+  font: var(--font-body-md);
 }
 
-.cardContent {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.cardContent h2 {
-  margin: 0;
-  color: var(--color-text-primary);
-  font: var(--font-title-lg);
-}
-
-.segmentedControl {
-  width: fit-content;
+.errorState {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  border-color: var(--color-negative-border);
+}
+
+.errorState div {
+  display: grid;
   gap: var(--space-1);
-  padding: var(--space-1);
+}
+
+.errorState strong {
+  color: var(--color-negative-text);
+  font: var(--font-label-md);
+}
+
+.errorState span {
+  color: var(--color-text-secondary);
+  font: var(--font-body-sm);
+}
+
+.errorState button {
+  min-height: var(--control-height-md);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
   border: var(--border-width-thin) solid var(--color-border-subtle);
   border-radius: var(--radius-md);
-  background: var(--color-surface-canvas);
-}
-
-.segmentedControl button {
-  min-height: var(--control-height-sm);
-  padding: 0 var(--space-3);
-  border: 0;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-secondary);
+  color: var(--color-text-primary);
   background: transparent;
-  font: var(--font-label-sm);
+  font: var(--font-label-md);
   cursor: pointer;
 }
 
-.segmentedControl button[aria-pressed="true"] {
-  color: var(--color-text-on-accent);
-  background: var(--color-accent-strong);
-}
-
-.pending {
-  padding: var(--space-4);
-  border: var(--border-width-thin) dashed var(--color-border-strong);
-  border-radius: var(--radius-lg);
-}
-
 @media (max-width: 40rem) {
-  .card {
-    grid-template-columns: 1fr;
+  .header h1 {
+    font: var(--font-display-md);
   }
 
-  .segmentedControl {
-    width: 100%;
+  .errorState {
+    align-items: stretch;
     flex-direction: column;
+  }
+
+  .errorState button {
+    justify-content: center;
   }
 }
