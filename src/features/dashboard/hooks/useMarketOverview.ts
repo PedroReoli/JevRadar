@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { getMarketOverview, refreshMarketData } from "@/services/marketService";
+import type { MarketOverviewFilter } from "@/types/market";
 
 const marketOverviewKey = ["market-overview"] as const;
 
-export function useMarketOverview() {
+export function useMarketOverview(filter: MarketOverviewFilter) {
   return useQuery({
-    queryKey: marketOverviewKey,
-    queryFn: getMarketOverview,
+    queryKey: [...marketOverviewKey, filter],
+    queryFn: () => getMarketOverview(filter),
     refetchInterval: 60_000,
   });
 }

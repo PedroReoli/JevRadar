@@ -1,6 +1,6 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-use crate::domain::assets::Asset;
+use crate::domain::assets::{Asset, AssetClass};
 use crate::domain::events::MarketEventSnapshot;
 use crate::domain::signals::MarketSignalSnapshot;
 
@@ -34,4 +34,34 @@ pub struct MarketOverview {
     pub signals: Vec<MarketSignalSnapshot>,
     pub events: Vec<MarketEventSnapshot>,
     pub latest_collection: Option<LatestCollectionRun>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarketOverviewFilter {
+    pub period_hours: u16,
+    pub asset_class: Option<AssetClass>,
+    pub minimum_confidence: f64,
+}
+
+impl Default for MarketOverviewFilter {
+    fn default() -> Self {
+        Self {
+            period_hours: 24,
+            asset_class: None,
+            minimum_confidence: 0.0,
+        }
+    }
+}
+
+impl MarketOverviewFilter {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if !(1..=720).contains(&self.period_hours) {
+            return Err("período deve estar entre 1 e 720 horas");
+        }
+        if !(0.0..=1.0).contains(&self.minimum_confidence) {
+            return Err("confiança mínima deve estar entre 0 e 1");
+        }
+        Ok(())
+    }
 }

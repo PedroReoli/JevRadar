@@ -1,4 +1,11 @@
 import type { Asset } from "@/types/assets";
+import type { AssetClass } from "@/types/assets";
+
+export interface MarketOverviewFilter {
+  periodHours: number;
+  assetClass: AssetClass | null;
+  minimumConfidence: number;
+}
 
 export interface MarketSnapshot {
   asset: Asset;

@@ -16,6 +16,7 @@ use utoipa_swagger_ui::SwaggerUi;
 use crate::application::backtest_service::BacktestService;
 use crate::application::content_query_service::ContentQueryService;
 use crate::application::market_query_service::MarketQueryService;
+use crate::domain::market::MarketOverviewFilter;
 use crate::infrastructure::database::Database;
 use crate::infrastructure::local_api::runtime::mark_ready;
 
@@ -100,7 +101,7 @@ async fn market_overview(
     headers: HeaderMap,
 ) -> Result<Json<Value>, StatusCode> {
     authorize(&headers, &state.token)?;
-    let overview = MarketQueryService::overview(&state.database)
+    let overview = MarketQueryService::overview(&state.database, MarketOverviewFilter::default())
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     serde_json::to_value(overview)
         .map(Json)

@@ -68,11 +68,12 @@ describe("marketService", () => {
         sourceErrorCount: 0,
       },
     });
-    const overview = await getMarketOverview();
+    const filter = { periodHours: 168, assetClass: "crypto" as const, minimumConfidence: 0.7 };
+    const overview = await getMarketOverview(filter);
     expect(overview.snapshots[0]!.asset.symbol).toBe("BTC");
     expect(overview.signals[0]!.signalScore).toBe(0.64);
     expect(overview.events[0]!.relationType).toBe("known");
-    expect(invoke).toHaveBeenCalledWith("get_market_overview");
+    expect(invoke).toHaveBeenCalledWith("get_market_overview", { filter });
   });
 
   it("valida o resultado parcial sem mascarar erros de fonte", async () => {

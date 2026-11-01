@@ -1,7 +1,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { z } from "zod";
 
-import type { CollectionSummary, MarketOverview } from "@/types/market";
+import type { CollectionSummary, MarketOverview, MarketOverviewFilter } from "@/types/market";
 
 const assetSchema = z.object({
   id: z.string(),
@@ -81,9 +81,9 @@ function requireDesktopRuntime() {
   if (!isTauri()) throw new Error("desktop_runtime_required");
 }
 
-export async function getMarketOverview(): Promise<MarketOverview> {
+export async function getMarketOverview(filter: MarketOverviewFilter = { periodHours: 24, assetClass: null, minimumConfidence: 0 }): Promise<MarketOverview> {
   requireDesktopRuntime();
-  const response: unknown = await invoke("get_market_overview");
+  const response: unknown = await invoke("get_market_overview", { filter });
   return marketOverviewSchema.parse(response);
 }
 

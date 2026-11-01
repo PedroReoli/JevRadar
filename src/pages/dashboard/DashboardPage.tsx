@@ -1,24 +1,47 @@
 import { ArrowRight, CircleGauge, RadioTower, RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 import { CollectionStatusCard } from "@/features/dashboard/components/CollectionStatusCard";
 import { EventTimeline } from "@/features/dashboard/components/EventTimeline";
 import { MarketSnapshotPanel } from "@/features/dashboard/components/MarketSnapshotPanel";
+import { RadarFilters } from "@/features/dashboard/components/RadarFilters";
 import { SignalRadarPanel } from "@/features/dashboard/components/SignalRadarPanel";
 import { SystemHealthCard } from "@/features/dashboard/components/SystemHealthCard";
 import { useMarketOverview, useRefreshMarketData } from "@/features/dashboard/hooks/useMarketOverview";
 import { useSystemStatus } from "@/hooks/useSystemStatus";
 import styles from "@/pages/dashboard/DashboardPage.module.css";
 import type { ComponentStatus } from "@/types/system";
+import type { AssetClass } from "@/types/assets";
+
+const supportedClasses = new Set<AssetClass>(["b3Equity", "b3Fund", "crypto", "macro"]);
+const supportedPeriods = new Set([1, 6, 24, 168, 720]);
+const supportedConfidence = new Set([0, 0.5, 0.7, 0.85]);
 
 export function DashboardPage() {
   const { t } = useTranslation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const periodParam = Number(searchParams.get("period") ?? 24);
+  const classParam = searchParams.get("class") as AssetClass | null;
+  const confidenceParam = Number(searchParams.get("confidence") ?? 0);
+  const filter = {
+    periodHours: supportedPeriods.has(periodParam) ? periodParam : 24,
+    assetClass: classParam && supportedClasses.has(classParam) ? classParam : null,
+    minimumConfidence: supportedConfidence.has(confidenceParam) ? confidenceParam : 0,
+  };
   const statusQuery = useSystemStatus();
-  const marketQuery = useMarketOverview();
+  const marketQuery = useMarketOverview(filter);
   const refreshMutation = useRefreshMarketData();
   const fallbackStatus: ComponentStatus = statusQuery.isPending ? "pending" : "unavailable";
   const status = statusQuery.data;
+  const updateFilter = (key: "periodHours" | "assetClass" | "minimumConfidence", value: number | AssetClass | null) => {
+    const next = new URLSearchParams(searchParams);
+    const param = key === "periodHours" ? "period" : key === "assetClass" ? "class" : "confidence";
+    if (value === null || value === 0) next.delete(param);
+    else next.set(param, String(value));
+    setSearchParams(next, { replace: true });
+  };
 
   return (
     <div className={styles.page}>
@@ -44,6 +67,8 @@ export function DashboardPage() {
           </button>
         </div>
       </header>
+
+      <RadarFilters filter={filter} onChange={updateFilter} />
 
       {refreshMutation.isError ? <div className={styles.errorMessage} role="alert">{t("dashboard.refreshError")}</div> : null}
 
