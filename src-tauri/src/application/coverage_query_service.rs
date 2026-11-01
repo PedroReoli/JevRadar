@@ -109,6 +109,11 @@ mod tests {
             .store_market_observations(&[
                 observation("observation:old", "2026-10-31T00:00:00Z", 100.0),
                 observation("observation:new", "2026-11-01T00:00:00Z", 104.0),
+                MarketObservationInput {
+                    source_id: "source:binance".to_owned(),
+                    interval: "1h".to_owned(),
+                    ..observation("observation:incompatible", "2026-11-02T00:00:00Z", 250.0)
+                },
             ])
             .expect("observações armazenadas");
 

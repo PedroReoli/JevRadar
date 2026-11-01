@@ -450,13 +450,28 @@ impl Database {
     pub fn market_snapshots(&self) -> Result<Vec<MarketSnapshot>, DatabaseError> {
         let connection = self.connection.lock();
         let mut statement = connection.prepare(
-            "WITH ranked AS (
+            "WITH series_ranked AS (
                 SELECT mo.*,
                        ROW_NUMBER() OVER (
-                           PARTITION BY mo.asset_id
+                           PARTITION BY mo.asset_id, mo.source_id, mo.interval
                            ORDER BY mo.observed_at DESC, mo.collected_at DESC
                        ) AS position
                 FROM market_observations mo
+             ), latest_series AS (
+                SELECT series_ranked.*,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY series_ranked.asset_id
+                           ORDER BY series_ranked.observed_at DESC, series_ranked.collected_at DESC
+                       ) AS asset_position
+                FROM series_ranked
+                WHERE series_ranked.position = 1
+                  AND EXISTS (
+                      SELECT 1 FROM series_ranked previous_candidate
+                      WHERE previous_candidate.asset_id = series_ranked.asset_id
+                        AND previous_candidate.source_id = series_ranked.source_id
+                        AND previous_candidate.interval = series_ranked.interval
+                        AND previous_candidate.position = 2
+                  )
              )
              SELECT a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency, a.country_code,
                     latest.close_value, previous.close_value, latest.observed_at,
@@ -464,8 +479,11 @@ impl Database {
              FROM watchlist_assets wa
              JOIN watchlists w ON w.id = wa.watchlist_id AND w.is_default = 1
              JOIN assets a ON a.id = wa.asset_id
-             LEFT JOIN ranked latest ON latest.asset_id = a.id AND latest.position = 1
-             LEFT JOIN ranked previous ON previous.asset_id = a.id AND previous.position = 2
+             LEFT JOIN latest_series latest ON latest.asset_id = a.id AND latest.asset_position = 1
+             LEFT JOIN series_ranked previous ON previous.asset_id = latest.asset_id
+                AND previous.source_id = latest.source_id
+                AND previous.interval = latest.interval
+                AND previous.position = 2
              LEFT JOIN sources source ON source.id = latest.source_id
              WHERE wa.enabled = 1
              ORDER BY a.asset_class, a.symbol",
@@ -508,10 +526,10 @@ impl Database {
         offset: u32,
     ) -> Result<(Vec<CoverageGapItem>, u64), DatabaseError> {
         let connection = self.connection.lock();
-        let common_table_expressions = "WITH ranked_observations AS (
+        let common_table_expressions = "WITH series_ranked AS (
                  SELECT mo.*,
                         ROW_NUMBER() OVER (
-                            PARTITION BY mo.asset_id
+                            PARTITION BY mo.asset_id, mo.source_id, mo.interval
                             ORDER BY mo.observed_at DESC, mo.collected_at DESC
                         ) AS position
                  FROM market_observations mo
@@ -519,6 +537,21 @@ impl Database {
                  JOIN watchlists ranked_w ON ranked_w.id = ranked_wa.watchlist_id
                     AND ranked_w.is_default = 1
                  WHERE ranked_wa.enabled = 1
+             ), latest_series AS (
+                 SELECT series_ranked.*,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY series_ranked.asset_id
+                            ORDER BY series_ranked.observed_at DESC, series_ranked.collected_at DESC
+                        ) AS asset_position
+                 FROM series_ranked
+                 WHERE series_ranked.position = 1
+                   AND EXISTS (
+                       SELECT 1 FROM series_ranked previous_candidate
+                       WHERE previous_candidate.asset_id = series_ranked.asset_id
+                         AND previous_candidate.source_id = series_ranked.source_id
+                         AND previous_candidate.interval = series_ranked.interval
+                         AND previous_candidate.position = 2
+                   )
              ), recent_evidence AS (
                  SELECT da.asset_id,
                         COUNT(DISTINCT dc.id) AS evidence_count,
@@ -533,8 +566,11 @@ impl Database {
         let joins = "FROM watchlist_assets wa
              JOIN watchlists w ON w.id = wa.watchlist_id AND w.is_default = 1
              JOIN assets a ON a.id = wa.asset_id
-             JOIN ranked_observations latest ON latest.asset_id = a.id AND latest.position = 1
-             JOIN ranked_observations previous ON previous.asset_id = a.id AND previous.position = 2
+             JOIN latest_series latest ON latest.asset_id = a.id AND latest.asset_position = 1
+             JOIN series_ranked previous ON previous.asset_id = latest.asset_id
+                AND previous.source_id = latest.source_id
+                AND previous.interval = latest.interval
+                AND previous.position = 2
              JOIN sources source ON source.id = latest.source_id
              LEFT JOIN recent_evidence evidence ON evidence.asset_id = a.id";
         let filters = "wa.enabled = 1
