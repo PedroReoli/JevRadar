@@ -281,11 +281,22 @@ pub async fn serve(
     shutdown: oneshot::Receiver<()>,
     status: Arc<AtomicU8>,
 ) -> Result<(), std::io::Error> {
+    let app = build_router(database, token);
+    let listener = tokio::net::TcpListener::bind(ADDRESS).await?;
+    mark_ready(&status);
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async move {
+            let _ = shutdown.await;
+        })
+        .await
+}
+
+fn build_router(database: Arc<Database>, token: String) -> Router {
     let state = ApiState {
         database,
         token: Arc::from(token),
     };
-    let app = Router::new()
+    Router::new()
         .route("/health", get(health))
         .route("/v1/market", get(market_overview))
         .route("/v1/assets/{asset_id}/overview", get(asset_detail))
@@ -311,14 +322,7 @@ pub async fn serve(
         .route("/v1/report-overview", get(report_overview))
         .route("/v1/jev/usage", get(jev_usage))
         .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
-        .with_state(state);
-    let listener = tokio::net::TcpListener::bind(ADDRESS).await?;
-    mark_ready(&status);
-    axum::serve(listener, app)
-        .with_graceful_shutdown(async move {
-            let _ = shutdown.await;
-        })
-        .await
+        .with_state(state)
 }
 
 #[utoipa::path(get, path = "/health", responses((status = 200, body = HealthResponse)))]
@@ -1109,18 +1113,99 @@ fn valid_signal_id(value: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use axum::http::{HeaderMap, HeaderValue, header};
+    use std::sync::Arc;
 
+    use axum::http::{HeaderMap, HeaderValue, header};
+    use tempfile::tempdir;
     use utoipa::OpenApi;
 
     use super::{
-        ApiDoc, asset_detail_query_status, authorize, bounded_limit, comparison_query_status,
-        content_query_status, valid_signal_id,
+        ApiDoc, asset_detail_query_status, authorize, bounded_limit, build_router,
+        comparison_query_status, content_query_status, valid_signal_id,
     };
     use crate::application::comparison_query_service::ComparisonQueryError;
     use crate::application::content_query_service::ContentSourceManagementError;
     use crate::application::market_query_service::AssetDetailQueryError;
     use crate::infrastructure::database::DatabaseError;
+
+    #[test]
+    fn serves_swagger_and_protects_read_models_over_real_http() {
+        let temporary_directory = tempdir().expect("diretório temporário");
+        let database = Arc::new(
+            crate::infrastructure::database::Database::open(
+                temporary_directory.path().join("local-api.sqlite3"),
+            )
+            .expect("banco da API local"),
+        );
+        let runtime = tokio::runtime::Runtime::new().expect("runtime Tokio");
+        let listener = runtime
+            .block_on(tokio::net::TcpListener::bind("127.0.0.1:0"))
+            .expect("porta local efêmera");
+        let address = listener.local_addr().expect("endereço local");
+        let server = runtime.spawn(async move {
+            axum::serve(
+                listener,
+                build_router(database, "integration-token".to_owned()),
+            )
+            .await
+            .expect("servidor da API local");
+        });
+        let client = reqwest::blocking::Client::builder()
+            .redirect(reqwest::redirect::Policy::limited(2))
+            .build()
+            .expect("cliente HTTP");
+        let base_url = format!("http://{address}");
+
+        let health = client
+            .get(format!("{base_url}/health"))
+            .send()
+            .expect("health da API local");
+        assert_eq!(health.status(), reqwest::StatusCode::OK);
+        assert_eq!(
+            health.json::<serde_json::Value>().expect("health JSON")["status"],
+            "ready"
+        );
+
+        let docs = client
+            .get(format!("{base_url}/docs/"))
+            .send()
+            .expect("Swagger UI");
+        assert_eq!(docs.status(), reqwest::StatusCode::OK);
+        assert!(
+            docs.headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|value| value.to_str().ok())
+                .is_some_and(|value| value.starts_with("text/html"))
+        );
+        assert!(docs.text().expect("HTML do Swagger").contains("<html"));
+
+        let openapi = client
+            .get(format!("{base_url}/openapi.json"))
+            .send()
+            .expect("OpenAPI JSON");
+        assert_eq!(openapi.status(), reqwest::StatusCode::OK);
+        let openapi = openapi.json::<serde_json::Value>().expect("OpenAPI válido");
+        assert_eq!(openapi["info"]["title"], "jevradar");
+        assert!(openapi["components"]["securitySchemes"]["bearerAuth"].is_object());
+
+        let unauthorized = client
+            .get(format!("{base_url}/v1/market"))
+            .send()
+            .expect("requisição sem token");
+        assert_eq!(unauthorized.status(), reqwest::StatusCode::UNAUTHORIZED);
+
+        let authorized = client
+            .get(format!("{base_url}/v1/market"))
+            .bearer_auth("integration-token")
+            .send()
+            .expect("requisição autenticada");
+        assert_eq!(authorized.status(), reqwest::StatusCode::OK);
+
+        server.abort();
+        runtime.block_on(async {
+            let _ = server.await;
+        });
+    }
 
     #[test]
     fn requires_an_exact_bearer_token() {
