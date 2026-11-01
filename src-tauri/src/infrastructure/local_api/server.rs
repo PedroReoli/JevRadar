@@ -2,11 +2,11 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicU8;
 
 use axum::Router;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Json;
 use axum::routing::get;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::oneshot;
 use utoipa::openapi::security::{Http, HttpAuthScheme, SecurityScheme};
@@ -15,6 +15,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::application::backtest_service::BacktestService;
 use crate::application::content_query_service::ContentQueryService;
+use crate::application::insights_query_service::InsightsQueryService;
 use crate::application::market_query_service::MarketQueryService;
 use crate::domain::market::MarketOverviewFilter;
 use crate::domain::signals::SignalEvidenceSnapshot;
@@ -33,6 +34,18 @@ struct ApiState {
 struct HealthResponse {
     status: &'static str,
     version: &'static str,
+}
+
+#[derive(Debug, Deserialize)]
+struct ListQuery {
+    limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BacktestHistoryQuery {
+    asset_id: Option<String>,
+    limit: Option<usize>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -97,7 +110,18 @@ impl From<SignalEvidenceSnapshot> for SignalEvidenceResponse {
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(health, market_overview, content_overview, signal_evidence, latest_backtest),
+    paths(
+        health,
+        market_overview,
+        content_overview,
+        signal_report,
+        signal_evidence,
+        alert_history,
+        collection_history,
+        backtest_history,
+        latest_backtest,
+        jev_usage
+    ),
     components(schemas(HealthResponse, SignalEvidenceResponse)),
     modifiers(&SecurityAddon),
     tags((name = "JevRadar", description = "API local somente leitura"))
@@ -131,8 +155,13 @@ pub async fn serve(
         .route("/health", get(health))
         .route("/v1/market", get(market_overview))
         .route("/v1/sources", get(content_overview))
+        .route("/v1/signals/{signal_id}", get(signal_report))
         .route("/v1/signals/{signal_id}/evidence", get(signal_evidence))
+        .route("/v1/alerts", get(alert_history))
+        .route("/v1/collections", get(collection_history))
+        .route("/v1/backtests", get(backtest_history))
         .route("/v1/backtests/{asset_id}", get(latest_backtest))
+        .route("/v1/jev/usage", get(jev_usage))
         .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
         .with_state(state);
     let listener = tokio::net::TcpListener::bind(ADDRESS).await?;
@@ -190,6 +219,35 @@ async fn content_overview(
 
 #[utoipa::path(
     get,
+    path = "/v1/signals/{signal_id}",
+    params(("signal_id" = String, Path, description = "ID versionado do sinal")),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Relatório auditável do sinal", body = Object),
+        (status = 400, description = "ID de sinal inválido"),
+        (status = 401),
+        (status = 404)
+    )
+)]
+async fn signal_report(
+    State(state): State<ApiState>,
+    Path(signal_id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    authorize(&headers, &state.token)?;
+    if !valid_signal_id(&signal_id) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let signal = InsightsQueryService::signal(&state.database, &signal_id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+    serde_json::to_value(signal)
+        .map(Json)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+#[utoipa::path(
+    get,
     path = "/v1/signals/{signal_id}/evidence",
     params(("signal_id" = String, Path, description = "ID versionado do sinal")),
     security(("bearerAuth" = [])),
@@ -220,6 +278,68 @@ async fn signal_evidence(
 
 #[utoipa::path(
     get,
+    path = "/v1/alerts",
+    params(("limit" = Option<usize>, Query, description = "1 a 200; padrão 50")),
+    security(("bearerAuth" = [])),
+    responses((status = 200, description = "Histórico local de alertas", body = [Object]), (status = 401))
+)]
+async fn alert_history(
+    State(state): State<ApiState>,
+    Query(query): Query<ListQuery>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    authorize(&headers, &state.token)?;
+    let alerts = InsightsQueryService::alerts(&state.database, bounded_limit(query.limit, 50))
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    serialize_json(alerts)
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/collections",
+    params(("limit" = Option<usize>, Query, description = "1 a 200; padrão 50")),
+    security(("bearerAuth" = [])),
+    responses((status = 200, description = "Execuções de coleta e falhas por fonte", body = [Object]), (status = 401))
+)]
+async fn collection_history(
+    State(state): State<ApiState>,
+    Query(query): Query<ListQuery>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    authorize(&headers, &state.token)?;
+    let collections =
+        InsightsQueryService::collections(&state.database, bounded_limit(query.limit, 50))
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    serialize_json(collections)
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/backtests",
+    params(
+        ("assetId" = Option<String>, Query, description = "ID local do ativo"),
+        ("limit" = Option<usize>, Query, description = "1 a 200; padrão 25")
+    ),
+    security(("bearerAuth" = [])),
+    responses((status = 200, description = "Histórico de backtests", body = [Object]), (status = 401))
+)]
+async fn backtest_history(
+    State(state): State<ApiState>,
+    Query(query): Query<BacktestHistoryQuery>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    authorize(&headers, &state.token)?;
+    let reports = InsightsQueryService::backtests(
+        &state.database,
+        query.asset_id.as_deref(),
+        bounded_limit(query.limit, 25),
+    )
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    serialize_json(reports)
+}
+
+#[utoipa::path(
+    get,
     path = "/v1/backtests/{asset_id}",
     params(("asset_id" = String, Path, description = "ID local do ativo")),
     security(("bearerAuth" = [])),
@@ -236,6 +356,32 @@ async fn latest_backtest(
     serde_json::to_value(report)
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/jev/usage",
+    security(("bearerAuth" = [])),
+    responses((status = 200, description = "Limites e uso local do Jev", body = Object), (status = 401))
+)]
+async fn jev_usage(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    authorize(&headers, &state.token)?;
+    let usage = InsightsQueryService::jev_usage(&state.database)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    serialize_json(usage)
+}
+
+fn serialize_json(value: impl Serialize) -> Result<Json<Value>, StatusCode> {
+    serde_json::to_value(value)
+        .map(Json)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+fn bounded_limit(value: Option<usize>, default: usize) -> usize {
+    value.unwrap_or(default).clamp(1, 200)
 }
 
 fn authorize(headers: &HeaderMap, expected_token: &str) -> Result<(), StatusCode> {
@@ -264,7 +410,7 @@ mod tests {
 
     use utoipa::OpenApi;
 
-    use super::{ApiDoc, authorize, valid_signal_id};
+    use super::{ApiDoc, authorize, bounded_limit, valid_signal_id};
 
     #[test]
     fn requires_an_exact_bearer_token() {
@@ -298,5 +444,20 @@ mod tests {
                 .paths
                 .contains_key("/v1/signals/{signal_id}/evidence")
         );
+        for path in [
+            "/v1/signals/{signal_id}",
+            "/v1/alerts",
+            "/v1/collections",
+            "/v1/backtests",
+            "/v1/jev/usage",
+        ] {
+            assert!(
+                document.paths.paths.contains_key(path),
+                "rota ausente: {path}"
+            );
+        }
+        assert_eq!(bounded_limit(None, 25), 25);
+        assert_eq!(bounded_limit(Some(0), 25), 1);
+        assert_eq!(bounded_limit(Some(999), 25), 200);
     }
 }
