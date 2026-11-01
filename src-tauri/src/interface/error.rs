@@ -1,6 +1,7 @@
 use serde::Serialize;
 
 use crate::application::catalog_service::CatalogServiceError;
+use crate::application::market_collection_service::MarketCollectionServiceError;
 use crate::application::settings_service::SettingsServiceError;
 use crate::infrastructure::database::DatabaseError;
 use crate::infrastructure::secrets::SecretStoreError;
@@ -54,6 +55,19 @@ impl From<CatalogServiceError> for CommandError {
                 "watchlist_limit_exceeded"
             }
             CatalogServiceError::Database(_) => "database_error",
+        };
+        Self {
+            code,
+            message: error.to_string(),
+        }
+    }
+}
+
+impl From<MarketCollectionServiceError> for CommandError {
+    fn from(error: MarketCollectionServiceError) -> Self {
+        let code = match error {
+            MarketCollectionServiceError::Database(_) => "database_error",
+            MarketCollectionServiceError::HttpClient => "market_client_error",
         };
         Self {
             code,

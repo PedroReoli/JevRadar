@@ -13,7 +13,9 @@ use crate::infrastructure::secrets::KeyringSecretStore;
 use crate::interface::commands::catalog::{
     add_watchlist_asset, get_default_watchlist, list_assets, remove_watchlist_asset,
 };
+use crate::interface::commands::collection::refresh_market_data;
 use crate::interface::commands::desktop::resolve_close_request;
+use crate::interface::commands::market::get_market_overview;
 use crate::interface::commands::settings::{
     delete_secret, get_app_settings, get_secret_status, save_secret, update_app_settings,
 };
@@ -42,6 +44,8 @@ pub fn run() {
             get_default_watchlist,
             add_watchlist_asset,
             remove_watchlist_asset,
+            refresh_market_data,
+            get_market_overview,
             get_system_status,
             get_app_settings,
             update_app_settings,

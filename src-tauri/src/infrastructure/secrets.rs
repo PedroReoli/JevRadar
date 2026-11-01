@@ -5,6 +5,7 @@ use crate::domain::settings::SecretKind;
 
 const SERVICE_NAME: &str = "com.pedrolucas.jevradar";
 
+#[derive(Clone, Copy)]
 pub struct KeyringSecretStore;
 
 #[derive(Debug, Error)]
@@ -45,6 +46,14 @@ impl KeyringSecretStore {
                     .map_err(|_| SecretStoreError::Unavailable)
             })
             .is_ok()
+    }
+
+    pub fn read(&self, kind: SecretKind) -> Result<Option<String>, SecretStoreError> {
+        match entry(kind)?.get_password() {
+            Ok(value) => Ok(Some(value)),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(_) => Err(SecretStoreError::Unavailable),
+        }
     }
 }
 

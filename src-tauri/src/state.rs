@@ -17,7 +17,11 @@ impl AppState {
             .read_bool_setting("background_collection_enabled")
             .unwrap_or(false);
         Self {
-            background: BackgroundRuntime::start(background_enabled),
+            background: BackgroundRuntime::start(
+                Arc::clone(&database),
+                secrets,
+                background_enabled,
+            ),
             database,
             secrets,
         }

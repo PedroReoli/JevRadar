@@ -14,7 +14,9 @@ impl SystemStatusService {
 
         let background_collection = match background.status() {
             BackgroundRuntimeStatus::Disabled => ComponentStatus::Disabled,
-            BackgroundRuntimeStatus::Idle => ComponentStatus::Pending,
+            BackgroundRuntimeStatus::Idle | BackgroundRuntimeStatus::Running => {
+                ComponentStatus::Ready
+            }
             BackgroundRuntimeStatus::Unavailable => ComponentStatus::Unavailable,
         };
         let local_api = configured_but_not_started_status(database, "local_api_enabled");

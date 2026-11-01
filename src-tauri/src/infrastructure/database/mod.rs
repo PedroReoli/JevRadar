@@ -6,10 +6,13 @@ use rusqlite::{Connection, OptionalExtension, params};
 use thiserror::Error;
 
 use crate::domain::assets::{Asset, AssetClass, Watchlist, WatchlistAsset};
+use crate::domain::collection::{MarketObservationInput, SourceCollectionResult};
+use crate::domain::market::{LatestCollectionRun, MarketSnapshot};
 
 const INITIAL_SCHEMA: &str = include_str!("migrations/0001_initial.sql");
 const SETTINGS_SCHEMA: &str = include_str!("migrations/0002_settings.sql");
 const MARKET_CORE_SCHEMA: &str = include_str!("migrations/0003_market_core.sql");
+const COLLECTION_SCHEMA: &str = include_str!("migrations/0004_collection_runs.sql");
 
 pub struct Database {
     connection: Mutex<Connection>,
@@ -42,6 +45,7 @@ impl Database {
         connection.execute_batch(INITIAL_SCHEMA)?;
         apply_migration(&connection, 2, SETTINGS_SCHEMA)?;
         apply_migration(&connection, 3, MARKET_CORE_SCHEMA)?;
+        apply_migration(&connection, 4, COLLECTION_SCHEMA)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -198,6 +202,176 @@ impl Database {
         Ok(())
     }
 
+    pub fn start_collection_run(
+        &self,
+        run_id: &str,
+        trigger_kind: &str,
+        started_at: &str,
+    ) -> Result<(), DatabaseError> {
+        self.connection.lock().execute(
+            "INSERT INTO collection_runs (id, trigger_kind, status, started_at)
+             VALUES (?1, ?2, 'running', ?3)",
+            params![run_id, trigger_kind, started_at],
+        )?;
+        Ok(())
+    }
+
+    pub fn store_market_observations(
+        &self,
+        observations: &[MarketObservationInput],
+    ) -> Result<usize, DatabaseError> {
+        let mut connection = self.connection.lock();
+        let transaction = connection.transaction()?;
+        let mut stored_count = 0;
+        for observation in observations {
+            stored_count += transaction.execute(
+                "INSERT INTO market_observations (
+                    id, asset_id, source_id, interval, observed_at,
+                    open_value, high_value, low_value, close_value, volume_value, collected_at
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+                 ON CONFLICT(asset_id, source_id, interval, observed_at) DO UPDATE SET
+                    open_value = excluded.open_value,
+                    high_value = excluded.high_value,
+                    low_value = excluded.low_value,
+                    close_value = excluded.close_value,
+                    volume_value = excluded.volume_value,
+                    collected_at = excluded.collected_at",
+                params![
+                    observation.id,
+                    observation.asset_id,
+                    observation.source_id,
+                    observation.interval,
+                    observation.observed_at,
+                    observation.open_value,
+                    observation.high_value,
+                    observation.low_value,
+                    observation.close_value,
+                    observation.volume_value,
+                    observation.collected_at,
+                ],
+            )?;
+        }
+        transaction.commit()?;
+        Ok(stored_count)
+    }
+
+    pub fn finish_collection_run(
+        &self,
+        run_id: &str,
+        status: &str,
+        completed_at: &str,
+        stored_observation_count: usize,
+        source_error_count: usize,
+        sources: &[SourceCollectionResult],
+    ) -> Result<(), DatabaseError> {
+        let mut connection = self.connection.lock();
+        let transaction = connection.transaction()?;
+        for source in sources {
+            transaction.execute(
+                "INSERT INTO collection_run_sources (
+                    run_id, source_id, status, stored_observation_count, skipped_asset_count, error_code
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![
+                    run_id,
+                    source.source_id,
+                    source.status,
+                    source.stored_observation_count as i64,
+                    source.skipped_asset_count as i64,
+                    source.error_code,
+                ],
+            )?;
+        }
+        transaction.execute(
+            "UPDATE collection_runs
+             SET status = ?2, completed_at = ?3, stored_observation_count = ?4, source_error_count = ?5
+             WHERE id = ?1",
+            params![
+                run_id,
+                status,
+                completed_at,
+                stored_observation_count as i64,
+                source_error_count as i64
+            ],
+        )?;
+        transaction.commit()?;
+        Ok(())
+    }
+
+    pub fn market_snapshots(&self) -> Result<Vec<MarketSnapshot>, DatabaseError> {
+        let connection = self.connection.lock();
+        let mut statement = connection.prepare(
+            "WITH ranked AS (
+                SELECT mo.*,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY mo.asset_id
+                           ORDER BY mo.observed_at DESC, mo.collected_at DESC
+                       ) AS position
+                FROM market_observations mo
+             )
+             SELECT a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency, a.country_code,
+                    latest.close_value, previous.close_value, latest.observed_at,
+                    source.name, latest.interval
+             FROM watchlist_assets wa
+             JOIN watchlists w ON w.id = wa.watchlist_id AND w.is_default = 1
+             JOIN assets a ON a.id = wa.asset_id
+             LEFT JOIN ranked latest ON latest.asset_id = a.id AND latest.position = 1
+             LEFT JOIN ranked previous ON previous.asset_id = a.id AND previous.position = 2
+             LEFT JOIN sources source ON source.id = latest.source_id
+             WHERE wa.enabled = 1
+             ORDER BY a.asset_class, a.symbol",
+        )?;
+        let snapshots = statement
+            .query_map([], |row| {
+                let close_value = row.get::<_, Option<f64>>(7)?;
+                let previous_close_value = row.get::<_, Option<f64>>(8)?;
+                let change_percent = close_value.zip(previous_close_value).and_then(
+                    |(current, previous)| {
+                        if previous == 0.0 {
+                            None
+                        } else {
+                            Some(((current / previous) - 1.0) * 100.0)
+                        }
+                    },
+                );
+                Ok(MarketSnapshot {
+                    asset: map_asset(row)?,
+                    close_value,
+                    previous_close_value,
+                    change_percent,
+                    observed_at: row.get(9)?,
+                    source_name: row.get(10)?,
+                    interval: row.get(11)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(snapshots)
+    }
+
+    pub fn latest_collection_run(&self) -> Result<Option<LatestCollectionRun>, DatabaseError> {
+        self.connection
+            .lock()
+            .query_row(
+                "SELECT id, status, started_at, completed_at,
+                        stored_observation_count, source_error_count
+                 FROM collection_runs
+                 ORDER BY started_at DESC
+                 LIMIT 1",
+                [],
+                |row| {
+                    Ok(LatestCollectionRun {
+                        run_id: row.get(0)?,
+                        status: row.get(1)?,
+                        started_at: row.get(2)?,
+                        completed_at: row.get(3)?,
+                        stored_observation_count: row.get::<_, i64>(4)? as usize,
+                        source_error_count: row.get::<_, i64>(5)? as usize,
+                    })
+                },
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
     fn read_setting(&self, key: &str) -> Result<Option<String>, DatabaseError> {
         Ok(self
             .connection
@@ -348,5 +522,22 @@ mod tests {
                 .to_string()
                 .contains("watchlist_limit_exceeded")
         );
+    }
+
+    #[test]
+    fn applies_collection_schema() {
+        let directory = tempdir().expect("diretório temporário");
+        let database = Database::open(directory.path().join("collection.sqlite3"))
+            .expect("banco inicializado");
+        let applied: bool = database
+            .connection
+            .lock()
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = 4)",
+                [],
+                |row| row.get(0),
+            )
+            .expect("migration registrada");
+        assert!(applied);
     }
 }
