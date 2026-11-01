@@ -1,7 +1,8 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { z } from "zod";
 
-import type { ContentCollectionSummary, ContentOverview } from "@/types/content";
+import { assetSchema } from "@/services/contractSchemas";
+import type { ContentCollectionSummary, ContentOverview, DocumentFeedFilter, DocumentFeedPage } from "@/types/content";
 
 const runStatusSchema = z.enum(["completed", "failed", "skipped"]);
 const sourceSchema = z.object({
@@ -31,6 +32,34 @@ const collectionSummarySchema = z.object({
     errorCode: z.string().nullable(),
   })),
 });
+const documentFeedPageSchema = z.object({
+  items: z.array(z.object({
+    id: z.string().min(1),
+    sourceId: z.string().min(1),
+    sourceName: z.string().min(1),
+    sourceKind: z.enum(["rss", "reddit", "forum", "x"]),
+    title: z.string().nullable(),
+    excerpt: z.string(),
+    canonicalUrl: z.string().url().nullable(),
+    language: z.string().nullable(),
+    publishedAt: z.string().min(1),
+    analysisStatus: z.enum(["pending", "classified", "no_asset"]),
+    asset: assetSchema.nullable(),
+    sentiment: z.enum(["optimistic", "pessimistic", "neutral", "uncertain"]).nullable(),
+    sentimentProbability: z.number().min(0).max(1).nullable(),
+    relevanceExpected: z.number().min(0).max(3).nullable(),
+    contentType: z.enum(["news", "opinion", "technical_analysis", "meme", "spam", "uncertain"]).nullable(),
+    hypeProbability: z.number().min(0).max(1).nullable(),
+    factualClaimProbability: z.number().min(0).max(1).nullable(),
+    confidence: z.number().min(0).max(1).nullable(),
+    modelVersion: z.string().nullable(),
+    questionVersion: z.string().nullable(),
+  })),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().min(1).max(50),
+  totalItems: z.number().int().nonnegative(),
+  totalPages: z.number().int().positive(),
+});
 
 function requireDesktopRuntime() {
   if (!isTauri()) throw new Error("desktop_runtime_required");
@@ -58,4 +87,20 @@ export async function addRssSource(name: string, url: string): Promise<ContentOv
   requireDesktopRuntime();
   const response: unknown = await invoke("add_rss_source", { name, url });
   return overviewSchema.parse(response);
+}
+
+export async function listDocumentFeed(filter: DocumentFeedFilter): Promise<DocumentFeedPage> {
+  requireDesktopRuntime();
+  const response: unknown = await invoke("list_document_feed", {
+    query: filter.query || null,
+    sourceKind: filter.sourceKind || null,
+    contentType: filter.contentType || null,
+    sentiment: filter.sentiment || null,
+    analysisStatus: filter.analysisStatus || null,
+    assetId: null,
+    minimumConfidence: filter.minimumConfidence,
+    page: filter.page,
+    pageSize: 25,
+  });
+  return documentFeedPageSchema.parse(response);
 }

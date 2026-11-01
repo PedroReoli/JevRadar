@@ -10,6 +10,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 import {
   addRssSource,
   getContentOverview,
+  listDocumentFeed,
   refreshContentSources,
   setContentSourceEnabled,
 } from "@/services/contentService";
@@ -73,5 +74,53 @@ describe("contentService", () => {
       sourceId: "source:reddit",
       enabled: false,
     });
+  });
+
+  it("valida e pagina o feed de evidências sem solicitar texto ilimitado", async () => {
+    invoke.mockResolvedValueOnce({
+      items: [{
+        id: "document:1",
+        sourceId: "source:reddit",
+        sourceName: "Reddit",
+        sourceKind: "reddit",
+        title: "Discussão sobre PETR4",
+        excerpt: "Trecho limitado e persistido localmente.",
+        canonicalUrl: "https://reddit.com/r/investimentos/1",
+        language: "pt-BR",
+        publishedAt: "2026-11-01T12:00:00Z",
+        analysisStatus: "classified",
+        asset: { id: "asset:b3:PETR4", symbol: "PETR4", name: "Petrobras PN", assetClass: "b3Equity", exchange: "B3", currency: "BRL", countryCode: "BR" },
+        sentiment: "optimistic",
+        sentimentProbability: 0.8,
+        relevanceExpected: 2.5,
+        contentType: "opinion",
+        hypeProbability: 0.1,
+        factualClaimProbability: 0.6,
+        confidence: 0.82,
+        modelVersion: "jev-v1",
+        questionVersion: "questions-v1",
+      }],
+      page: 1,
+      pageSize: 25,
+      totalItems: 1,
+      totalPages: 1,
+    });
+
+    const page = await listDocumentFeed({
+      query: "PETR4",
+      sourceKind: "reddit",
+      contentType: "opinion",
+      sentiment: "optimistic",
+      analysisStatus: "classified",
+      minimumConfidence: 0.7,
+      page: 1,
+    });
+
+    expect(page.items[0]?.asset?.symbol).toBe("PETR4");
+    expect(invoke).toHaveBeenCalledWith("list_document_feed", expect.objectContaining({
+      query: "PETR4",
+      pageSize: 25,
+      assetId: null,
+    }));
   });
 });

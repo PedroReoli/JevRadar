@@ -64,6 +64,7 @@ As telas novas usam consultas dedicadas e paginadas. Migrations são somente adi
 Rotas reproduzíveis:
 
 - `/signals?period=&direction=&asset=&confidence=`
+- `/feed?q=&source=&type=&sentiment=&status=&confidence=&page=`
 - `/assets/:assetId`
 - `/signals/:signalId`
 - `/alerts?level=&asset=`

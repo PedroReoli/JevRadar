@@ -16,7 +16,8 @@ use crate::domain::classification::{
 };
 use crate::domain::collection::{MarketObservationInput, SourceCollectionResult};
 use crate::domain::content::{
-    ContentOverview, ContentSource, ContentSourceResult, ContentSourceStatus, SourceDocumentInput,
+    ContentOverview, ContentSource, ContentSourceResult, ContentSourceStatus, DocumentFeedItem,
+    SourceDocumentInput,
 };
 use crate::domain::events::MarketEventSnapshot;
 use crate::domain::insights::{AlertHistoryItem, CollectionRunSnapshot};
@@ -783,6 +784,132 @@ impl Database {
             total_document_count,
             unclassified_document_count,
         })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_document_feed_page(
+        &self,
+        query: Option<&str>,
+        source_kind: Option<&str>,
+        content_type: Option<&str>,
+        sentiment: Option<&str>,
+        analysis_status: Option<&str>,
+        asset_id: Option<&str>,
+        minimum_confidence: f64,
+        limit: u32,
+        offset: u32,
+    ) -> Result<(Vec<DocumentFeedItem>, u64), DatabaseError> {
+        let query_pattern = query.map(|value| format!("%{}%", escape_like(value)));
+        let connection = self.connection.lock();
+        let joins = "LEFT JOIN document_analysis_runs dar ON dar.id = (
+                         SELECT latest_dar.id FROM document_analysis_runs latest_dar
+                         WHERE latest_dar.document_id = sd.id
+                         ORDER BY latest_dar.analyzed_at DESC, latest_dar.id DESC LIMIT 1
+                     )
+                     LEFT JOIN document_assets da ON da.document_id = sd.id
+                         AND da.asset_id = dar.selected_asset_id
+                     LEFT JOIN document_classifications dc ON dc.id = (
+                         SELECT latest_dc.id FROM document_classifications latest_dc
+                         WHERE latest_dc.document_asset_id = da.id
+                         ORDER BY latest_dc.classified_at DESC, latest_dc.id DESC LIMIT 1
+                     )
+                     LEFT JOIN assets a ON a.id = da.asset_id";
+        let filters = "sd.duplicate_of_id IS NULL
+                       AND (?1 IS NULL OR s.source_kind = ?1)
+                       AND (?2 IS NULL OR dc.content_type = ?2)
+                       AND (?3 IS NULL OR dc.sentiment = ?3)
+                       AND (?4 IS NULL OR (
+                           CASE
+                               WHEN dar.id IS NULL THEN 'pending'
+                               WHEN dar.status = 'no_asset' THEN 'no_asset'
+                               ELSE 'classified'
+                           END
+                       ) = ?4)
+                       AND (?5 IS NULL OR a.id = ?5)
+                       AND (?6 = 0 OR dc.confidence >= ?6)
+                       AND (?7 IS NULL OR sd.title LIKE ?7 ESCAPE '\\' COLLATE NOCASE
+                           OR sd.raw_text LIKE ?7 ESCAPE '\\' COLLATE NOCASE
+                           OR s.name LIKE ?7 ESCAPE '\\' COLLATE NOCASE
+                           OR a.symbol LIKE ?7 ESCAPE '\\' COLLATE NOCASE)";
+        let count_sql = format!(
+            "SELECT COUNT(*) FROM source_documents sd
+             JOIN sources s ON s.id = sd.source_id
+             {joins}
+             WHERE {filters}"
+        );
+        let parameters = params![
+            source_kind,
+            content_type,
+            sentiment,
+            analysis_status,
+            asset_id,
+            minimum_confidence,
+            query_pattern,
+        ];
+        let total_items =
+            connection.query_row(&count_sql, parameters, |row| row.get::<_, i64>(0))? as u64;
+        let query_sql = format!(
+            "SELECT sd.id, s.id, s.name, s.source_kind, sd.title,
+                    SUBSTR(sd.raw_text, 1, 320), sd.canonical_url, sd.language,
+                    sd.published_at,
+                    CASE
+                        WHEN dar.id IS NULL THEN 'pending'
+                        WHEN dar.status = 'no_asset' THEN 'no_asset'
+                        ELSE 'classified'
+                    END,
+                    a.id, a.symbol, a.name, a.asset_class, a.exchange, a.currency,
+                    a.country_code, dc.sentiment, dc.sentiment_probability,
+                    COALESCE(dc.relevance_expected, dc.relevance_score), dc.content_type,
+                    dc.hype_probability, dc.factual_claim_probability, dc.confidence,
+                    dc.model_version, dc.question_version
+             FROM source_documents sd
+             JOIN sources s ON s.id = sd.source_id
+             {joins}
+             WHERE {filters}
+             ORDER BY sd.published_at DESC, sd.id DESC
+             LIMIT ?8 OFFSET ?9"
+        );
+        let mut statement = connection.prepare(&query_sql)?;
+        let items = statement
+            .query_map(
+                params![
+                    source_kind,
+                    content_type,
+                    sentiment,
+                    analysis_status,
+                    asset_id,
+                    minimum_confidence,
+                    query_pattern,
+                    limit,
+                    offset,
+                ],
+                |row| {
+                    Ok(DocumentFeedItem {
+                        id: row.get(0)?,
+                        source_id: row.get(1)?,
+                        source_name: row.get(2)?,
+                        source_kind: row.get(3)?,
+                        title: row.get(4)?,
+                        excerpt: row.get(5)?,
+                        canonical_url: row.get(6)?,
+                        language: row.get(7)?,
+                        published_at: row.get(8)?,
+                        analysis_status: row.get(9)?,
+                        asset: map_optional_asset_offset(row, 10)?,
+                        sentiment: row.get(17)?,
+                        sentiment_probability: row.get(18)?,
+                        relevance_expected: row.get(19)?,
+                        content_type: row.get(20)?,
+                        hype_probability: row.get(21)?,
+                        factual_claim_probability: row.get(22)?,
+                        confidence: row.get(23)?,
+                        model_version: row.get(24)?,
+                        question_version: row.get(25)?,
+                    })
+                },
+            )?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok((items, total_items))
     }
 
     pub fn pending_document_analyses(
@@ -1771,6 +1898,32 @@ fn map_asset_offset(row: &rusqlite::Row<'_>, offset: usize) -> Result<Asset, rus
         currency: row.get(offset + 5)?,
         country_code: row.get(offset + 6)?,
     })
+}
+
+fn map_optional_asset_offset(
+    row: &rusqlite::Row<'_>,
+    offset: usize,
+) -> Result<Option<Asset>, rusqlite::Error> {
+    let Some(id) = row.get::<_, Option<String>>(offset)? else {
+        return Ok(None);
+    };
+    let stored_class = row.get::<_, String>(offset + 3)?;
+    let asset_class = AssetClass::from_storage_value(&stored_class).ok_or_else(|| {
+        rusqlite::Error::FromSqlConversionFailure(
+            offset + 3,
+            rusqlite::types::Type::Text,
+            format!("classe de ativo inválida: {stored_class}").into(),
+        )
+    })?;
+    Ok(Some(Asset {
+        id,
+        symbol: row.get(offset + 1)?,
+        name: row.get(offset + 2)?,
+        asset_class,
+        exchange: row.get(offset + 4)?,
+        currency: row.get(offset + 5)?,
+        country_code: row.get(offset + 6)?,
+    }))
 }
 
 fn map_backtest_report(row: &rusqlite::Row<'_>) -> Result<BacktestReport, rusqlite::Error> {

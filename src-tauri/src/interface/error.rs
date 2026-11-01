@@ -3,6 +3,7 @@ use serde::Serialize;
 use crate::application::catalog_service::CatalogServiceError;
 use crate::application::classification_service::ClassificationServiceError;
 use crate::application::content_collection_service::ContentCollectionServiceError;
+use crate::application::content_query_service::ContentSourceManagementError;
 use crate::application::market_collection_service::MarketCollectionServiceError;
 use crate::application::settings_service::SettingsServiceError;
 use crate::infrastructure::database::DatabaseError;
@@ -86,6 +87,23 @@ impl From<ContentCollectionServiceError> for CommandError {
         let code = match error {
             ContentCollectionServiceError::Database(_) => "database_error",
             ContentCollectionServiceError::HttpClient => "content_client_error",
+        };
+        Self {
+            code,
+            message: error.to_string(),
+        }
+    }
+}
+
+impl From<ContentSourceManagementError> for CommandError {
+    fn from(error: ContentSourceManagementError) -> Self {
+        let code = match error {
+            ContentSourceManagementError::InvalidName
+            | ContentSourceManagementError::InvalidUrl
+            | ContentSourceManagementError::InvalidFeedQuery
+            | ContentSourceManagementError::InvalidFeedFilter
+            | ContentSourceManagementError::InvalidFeedPagination => "validation_error",
+            ContentSourceManagementError::Database(_) => "database_error",
         };
         Self {
             code,

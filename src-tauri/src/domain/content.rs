@@ -1,5 +1,7 @@
 use serde::Serialize;
 
+use crate::domain::assets::Asset;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContentSource {
     pub id: String,
@@ -62,4 +64,39 @@ pub struct ContentOverview {
     pub sources: Vec<ContentSourceStatus>,
     pub total_document_count: usize,
     pub unclassified_document_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentFeedItem {
+    pub id: String,
+    pub source_id: String,
+    pub source_name: String,
+    pub source_kind: String,
+    pub title: Option<String>,
+    pub excerpt: String,
+    pub canonical_url: Option<String>,
+    pub language: Option<String>,
+    pub published_at: String,
+    pub analysis_status: String,
+    pub asset: Option<Asset>,
+    pub sentiment: Option<String>,
+    pub sentiment_probability: Option<f64>,
+    pub relevance_expected: Option<f64>,
+    pub content_type: Option<String>,
+    pub hype_probability: Option<f64>,
+    pub factual_claim_probability: Option<f64>,
+    pub confidence: Option<f64>,
+    pub model_version: Option<String>,
+    pub question_version: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentFeedPage {
+    pub items: Vec<DocumentFeedItem>,
+    pub page: u32,
+    pub page_size: u32,
+    pub total_items: u64,
+    pub total_pages: u32,
 }

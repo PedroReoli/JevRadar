@@ -86,6 +86,7 @@ async function validateApplication(page) {
 
   const routes = [
     ["Sinais", "Central de sinais", "/signals"],
+    ["Evidências", "Feed de evidências", "/feed"],
     ["Alertas", "Central de alertas", "/alerts"],
     ["Eventos", "Eventos e relações", "/events"],
     ["Backtest", "Qualidade dos sinais", "/backtest"],

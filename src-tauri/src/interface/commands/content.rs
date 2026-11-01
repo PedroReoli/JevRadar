@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::application::content_collection_service::ContentCollectionService;
 use crate::application::content_query_service::ContentQueryService;
-use crate::domain::content::{ContentCollectionSummary, ContentOverview};
+use crate::domain::content::{ContentCollectionSummary, ContentOverview, DocumentFeedPage};
 use crate::interface::error::CommandError;
 use crate::state::AppState;
 
@@ -43,4 +43,33 @@ pub fn add_rss_source(
 ) -> Result<ContentOverview, CommandError> {
     ContentQueryService::add_rss_source(&state.database, &name, &url)
         .map_err(CommandError::internal)
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn list_document_feed(
+    state: State<'_, AppState>,
+    query: Option<String>,
+    source_kind: Option<String>,
+    content_type: Option<String>,
+    sentiment: Option<String>,
+    analysis_status: Option<String>,
+    asset_id: Option<String>,
+    minimum_confidence: f64,
+    page: u32,
+    page_size: u32,
+) -> Result<DocumentFeedPage, CommandError> {
+    ContentQueryService::document_feed(
+        &state.database,
+        query,
+        source_kind,
+        content_type,
+        sentiment,
+        analysis_status,
+        asset_id,
+        minimum_confidence,
+        page,
+        page_size,
+    )
+    .map_err(Into::into)
 }

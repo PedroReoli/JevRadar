@@ -14,7 +14,9 @@ use utoipa::{Modify, OpenApi, ToSchema};
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::application::backtest_service::BacktestService;
-use crate::application::content_query_service::ContentQueryService;
+use crate::application::content_query_service::{
+    ContentQueryService, ContentSourceManagementError,
+};
 use crate::application::insights_query_service::InsightsQueryService;
 use crate::application::market_query_service::MarketQueryService;
 use crate::domain::market::MarketOverviewFilter;
@@ -46,6 +48,20 @@ struct ListQuery {
 struct BacktestHistoryQuery {
     asset_id: Option<String>,
     limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DocumentFeedQuery {
+    query: Option<String>,
+    source_kind: Option<String>,
+    content_type: Option<String>,
+    sentiment: Option<String>,
+    analysis_status: Option<String>,
+    asset_id: Option<String>,
+    minimum_confidence: Option<f64>,
+    page: Option<u32>,
+    page_size: Option<u32>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -114,6 +130,7 @@ impl From<SignalEvidenceSnapshot> for SignalEvidenceResponse {
         health,
         market_overview,
         content_overview,
+        document_feed,
         signal_report,
         signal_evidence,
         alert_history,
@@ -155,6 +172,7 @@ pub async fn serve(
         .route("/health", get(health))
         .route("/v1/market", get(market_overview))
         .route("/v1/sources", get(content_overview))
+        .route("/v1/documents", get(document_feed))
         .route("/v1/signals/{signal_id}", get(signal_report))
         .route("/v1/signals/{signal_id}/evidence", get(signal_evidence))
         .route("/v1/alerts", get(alert_history))
@@ -215,6 +233,50 @@ async fn content_overview(
     serde_json::to_value(overview)
         .map(Json)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+#[utoipa::path(
+    get,
+    path = "/v1/documents",
+    params(
+        ("query" = Option<String>, Query, description = "Busca em título, trecho, fonte ou ticker; até 100 caracteres"),
+        ("sourceKind" = Option<String>, Query, description = "rss, reddit, forum ou x"),
+        ("contentType" = Option<String>, Query, description = "news, opinion, technical_analysis, meme, spam ou uncertain"),
+        ("sentiment" = Option<String>, Query, description = "optimistic, pessimistic, neutral ou uncertain"),
+        ("analysisStatus" = Option<String>, Query, description = "pending, classified ou no_asset"),
+        ("assetId" = Option<String>, Query, description = "ID local do ativo"),
+        ("minimumConfidence" = Option<f64>, Query, description = "0 a 1"),
+        ("page" = Option<u32>, Query, description = "Página a partir de 1"),
+        ("pageSize" = Option<u32>, Query, description = "1 a 50; padrão 25")
+    ),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "Feed local e paginado de documentos", body = Object),
+        (status = 400, description = "Filtro ou paginação inválidos"),
+        (status = 401, description = "Token local ausente ou inválido"),
+        (status = 500, description = "Falha ao consultar o banco local")
+    )
+)]
+async fn document_feed(
+    State(state): State<ApiState>,
+    Query(query): Query<DocumentFeedQuery>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    authorize(&headers, &state.token)?;
+    let page = ContentQueryService::document_feed(
+        &state.database,
+        query.query,
+        query.source_kind,
+        query.content_type,
+        query.sentiment,
+        query.analysis_status,
+        query.asset_id,
+        query.minimum_confidence.unwrap_or(0.0),
+        query.page.unwrap_or(1),
+        query.page_size.unwrap_or(25),
+    )
+    .map_err(content_query_status)?;
+    serialize_json(page)
 }
 
 #[utoipa::path(
@@ -380,6 +442,13 @@ fn serialize_json(value: impl Serialize) -> Result<Json<Value>, StatusCode> {
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
+fn content_query_status(error: ContentSourceManagementError) -> StatusCode {
+    match error {
+        ContentSourceManagementError::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        _ => StatusCode::BAD_REQUEST,
+    }
+}
+
 fn bounded_limit(value: Option<usize>, default: usize) -> usize {
     value.unwrap_or(default).clamp(1, 200)
 }
@@ -446,6 +515,7 @@ mod tests {
         );
         for path in [
             "/v1/signals/{signal_id}",
+            "/v1/documents",
             "/v1/alerts",
             "/v1/collections",
             "/v1/backtests",
