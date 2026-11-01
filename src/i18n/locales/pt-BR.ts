@@ -256,7 +256,6 @@ export const ptBR = {
     closeAsk: "Perguntar sempre",
     closeMinimize: "Minimizar para a bandeja",
     closeQuit: "Encerrar o JevRadar",
-    telemetryDescription: "Envio externo permanece desligado por padrão e só ocorre com consentimento explícito.",
     localApiAccessTitle: "Acesso à API local",
     localApiAccessDescription: "O token fica no Credential Manager. Revele somente quando for configurar uma integração confiável.",
     localApiBaseUrl: "URL base",

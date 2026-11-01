@@ -18,7 +18,6 @@ describe("settingsService no preview web", () => {
       setupCompleted: false,
       launchOnStartupEnabled: false,
       localApiEnabled: false,
-      telemetryEnabled: false,
       alertsEnabled: true,
       alertWindowHours: 24,
       alertQuietHoursEnabled: false,
@@ -28,6 +27,7 @@ describe("settingsService no preview web", () => {
       jevBatchLimit: 25,
       jevDailyDocumentLimit: 250,
     });
+    expect(initial).not.toHaveProperty("telemetryEnabled");
 
     const updated = await updateAppSettings({
       ...initial,

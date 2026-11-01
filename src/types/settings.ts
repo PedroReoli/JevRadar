@@ -15,7 +15,6 @@ export interface AppSettings {
   launchOnStartupEnabled: boolean;
   closeBehavior: CloseBehavior;
   localApiEnabled: boolean;
-  telemetryEnabled: boolean;
   alertLevel: 1 | 2 | 3 | 4;
   alertsEnabled: boolean;
   alertWindowHours: number;

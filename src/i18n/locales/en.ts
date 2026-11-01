@@ -256,7 +256,6 @@ export const en = {
     closeAsk: "Always ask",
     closeMinimize: "Minimize to system tray",
     closeQuit: "Quit JevRadar",
-    telemetryDescription: "External telemetry stays off by default and only runs with explicit consent.",
     localApiAccessTitle: "Local API access",
     localApiAccessDescription: "The token stays in Windows Credential Manager. Reveal it only when configuring a trusted integration.",
     localApiBaseUrl: "Base URL",

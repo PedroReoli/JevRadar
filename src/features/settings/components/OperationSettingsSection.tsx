@@ -56,13 +56,6 @@ export function OperationSettingsSection({ disabled, settings, update }: Operati
         onChange={(value) => update("localApiEnabled", value)}
       />
       {settings.localApiEnabled ? <LocalApiAccessPanel disabled={disabled} /> : null}
-      <ToggleField
-        checked={settings.telemetryEnabled}
-        description={t("settings.telemetryDescription")}
-        disabled={disabled}
-        label={t("setup.telemetryLabel")}
-        onChange={(value) => update("telemetryEnabled", value)}
-      />
       <NumberField
         description={t("settings.watchlistLimitDescription")}
         disabled={disabled}
