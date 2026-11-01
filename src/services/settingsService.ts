@@ -1,7 +1,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { z } from "zod";
 
-import type { AppSettings, SecretKind, SecretStatus } from "@/types/settings";
+import type { AppSettings, LocalApiAccess, SecretKind, SecretStatus } from "@/types/settings";
 
 const settingsSchema = z.object({
   setupCompleted: z.boolean(),
@@ -23,6 +23,11 @@ const secretStatusSchema = z.object({
   redditClientSecret: z.boolean(),
   xBearerToken: z.boolean(),
   brapiToken: z.boolean(),
+});
+const localApiAccessSchema = z.object({
+  baseUrl: z.string().url(),
+  docsUrl: z.string().url(),
+  token: z.string().min(32),
 });
 
 let previewSettings: AppSettings = {
@@ -84,4 +89,18 @@ export async function deleteSecret(kind: SecretKind): Promise<void> {
     return;
   }
   await invoke("delete_secret", { kind });
+}
+
+export async function getLocalApiAccess(): Promise<LocalApiAccess | null> {
+  if (!isTauri()) return null;
+  const response: unknown = await invoke("get_local_api_access");
+  return localApiAccessSchema.nullable().parse(response);
+}
+
+export async function regenerateLocalApiToken(): Promise<LocalApiAccess> {
+  if (!isTauri()) {
+    return { baseUrl: "http://127.0.0.1:47831", docsUrl: "http://127.0.0.1:47831/docs/", token: "preview-token-not-for-production-000000" };
+  }
+  const response: unknown = await invoke("regenerate_local_api_token");
+  return localApiAccessSchema.parse(response);
 }

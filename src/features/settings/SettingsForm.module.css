@@ -69,6 +69,53 @@
   border-bottom: var(--border-width-thin) solid var(--color-border-subtle);
 }
 
+.apiAccessPanel {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  border-bottom: var(--border-width-thin) solid var(--color-border-subtle);
+  background: var(--color-accent-surface-subtle);
+}
+
+.apiAccessPanel > div:first-child,
+.apiCredentials label {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.apiAccessPanel strong,
+.apiCredentials span {
+  color: var(--color-text-primary);
+  font: var(--font-label-md);
+}
+
+.apiAccessPanel small {
+  color: var(--color-text-muted);
+  font: var(--font-body-sm);
+}
+
+.apiCredentials {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+}
+
+.apiCredentials input {
+  min-height: var(--control-height-md);
+  width: 100%;
+  padding-inline: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  background: var(--color-surface-canvas);
+  font: var(--font-code-label);
+}
+
+.apiActions {
+  display: flex;
+  gap: var(--space-2);
+}
+
 .sectionBody > :last-child {
   border-bottom: 0;
 }
@@ -271,6 +318,14 @@
   .selectField,
   .secretField {
     padding-inline: var(--space-4);
+  }
+
+  .apiAccessPanel {
+    padding-inline: var(--space-4);
+  }
+
+  .apiActions {
+    display: grid;
   }
 
   .toggleField,

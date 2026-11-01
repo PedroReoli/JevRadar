@@ -29,3 +29,9 @@ export interface SecretStatus {
   xBearerToken: boolean;
   brapiToken: boolean;
 }
+
+export interface LocalApiAccess {
+  baseUrl: string;
+  docsUrl: string;
+  token: string;
+}

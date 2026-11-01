@@ -2,6 +2,7 @@ import { Activity } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { NumberField, SelectField, ToggleField } from "@/features/settings/components/SettingsFields";
+import { LocalApiAccessPanel } from "@/features/settings/components/LocalApiAccessPanel";
 import { SettingsSection } from "@/features/settings/components/SettingsSection";
 import type { AppSettings } from "@/types/settings";
 
@@ -54,6 +55,7 @@ export function OperationSettingsSection({ disabled, settings, update }: Operati
         label={t("setup.localApiLabel")}
         onChange={(value) => update("localApiEnabled", value)}
       />
+      {settings.localApiEnabled ? <LocalApiAccessPanel disabled={disabled} /> : null}
       <ToggleField
         checked={settings.telemetryEnabled}
         description={t("settings.telemetryDescription")}

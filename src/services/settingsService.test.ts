@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   deleteSecret,
   getAppSettings,
+  getLocalApiAccess,
   getSecretStatus,
   saveSecret,
+  regenerateLocalApiToken,
   updateAppSettings,
 } from "@/services/settingsService";
 
@@ -41,5 +43,12 @@ describe("settingsService no preview web", () => {
 
     await deleteSecret("typesafeApiKey");
     expect((await getSecretStatus()).typesafeApiKey).toBe(false);
+  });
+
+  it("só revela o acesso local sob ação explícita", async () => {
+    expect(await getLocalApiAccess()).toBeNull();
+    const access = await regenerateLocalApiToken();
+    expect(access.baseUrl).toBe("http://127.0.0.1:47831");
+    expect(access.token.length).toBeGreaterThanOrEqual(32);
   });
 });
