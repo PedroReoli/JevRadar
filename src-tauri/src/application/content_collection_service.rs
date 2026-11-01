@@ -4,7 +4,7 @@ use chrono::Utc;
 use reqwest::blocking::Client;
 
 use crate::domain::content::{ContentCollectionSummary, ContentSourceResult};
-use crate::domain::settings::SecretKind;
+use crate::domain::settings::{SecretKind, default_reddit_communities, valid_reddit_communities};
 use crate::infrastructure::content::{
     ContentProviderError, collect_reddit, collect_rss, collect_x,
 };
@@ -38,6 +38,7 @@ impl ContentCollectionService {
             .map_err(|_| ContentCollectionServiceError::HttpClient)?;
         let sources = database.enabled_content_sources()?;
         let reddit_credentials = read_reddit_credentials(secrets);
+        let reddit_communities = read_reddit_communities(database)?;
         let x_bearer_token = read_x_bearer_token(secrets);
         let x_query = build_x_query(database)?;
         let mut results = Vec::new();
@@ -47,7 +48,7 @@ impl ContentCollectionService {
                 "rss" => collect_rss(&client, &source),
                 "reddit" => match &reddit_credentials {
                     Ok((client_id, client_secret)) => {
-                        collect_reddit(&client, client_id, client_secret)
+                        collect_reddit(&client, client_id, client_secret, &reddit_communities)
                     }
                     Err(error_code) => {
                         let result = ContentSourceResult {
@@ -156,6 +157,17 @@ fn read_reddit_credentials(secrets: &KeyringSecretStore) -> Result<(String, Stri
     }
 }
 
+fn read_reddit_communities(database: &Database) -> Result<Vec<String>, DatabaseError> {
+    let stored = database.read_setting_or("reddit_communities", "[]")?;
+    let communities =
+        serde_json::from_str(&stored).unwrap_or_else(|_| default_reddit_communities());
+    Ok(if valid_reddit_communities(&communities) {
+        communities
+    } else {
+        default_reddit_communities()
+    })
+}
+
 fn failed_source(source_id: &str, error: ContentProviderError) -> ContentSourceResult {
     ContentSourceResult {
         source_id: source_id.to_owned(),
@@ -169,7 +181,7 @@ fn failed_source(source_id: &str, error: ContentProviderError) -> ContentSourceR
 mod tests {
     use tempfile::tempdir;
 
-    use super::build_x_query;
+    use super::{build_x_query, read_reddit_communities};
     use crate::infrastructure::database::Database;
 
     #[test]
@@ -186,5 +198,18 @@ mod tests {
         assert!(query.contains("\"Petrobras\""));
         assert!(query.ends_with("-is:retweet"));
         assert!(query.len() <= 512);
+    }
+
+    #[test]
+    fn falls_back_when_reddit_communities_are_tampered_with() {
+        let directory = tempdir().expect("diretório");
+        let database =
+            Database::open(directory.path().join("reddit-query.sqlite3")).expect("banco");
+        database
+            .write_settings(&[("reddit_communities", "[\"../unsafe\"]".to_owned())])
+            .expect("altera configuração");
+        let communities = read_reddit_communities(&database).expect("comunidades");
+        assert!(communities.iter().any(|value| value == "investimentos"));
+        assert!(!communities.iter().any(|value| value.contains("..")));
     }
 }

@@ -24,6 +24,12 @@ describe("SettingsPage", () => {
     expect(await screen.findByText("Preferências salvas nesta máquina.")).toBeInTheDocument();
     expect(alertLevel).toHaveValue("3");
 
+    const communities = screen.getByLabelText(/Comunidades do Reddit/i);
+    fireEvent.change(communities, { target: { value: "investimentos, BogleheadsBrasil, BrasilBitcoin" } });
+    expect(screen.getByText("3 comunidades serão consultadas em posts e comentários recentes.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Salvar preferências" }));
+    expect(await screen.findByText("Preferências salvas nesta máquina.")).toBeInTheDocument();
+
     fireEvent.change(screen.getByLabelText("TypeSafe API key"), {
       target: { value: "not-a-real-key" },
     });

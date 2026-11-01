@@ -39,6 +39,7 @@ const ALERT_PREFERENCES_SCHEMA: &str = include_str!("migrations/0011_alert_prefe
 const SIGNAL_WEIGHT_AUDIT_SCHEMA: &str = include_str!("migrations/0012_signal_weight_audit.sql");
 const VERSIONED_SIGNALS_SCHEMA: &str = include_str!("migrations/0013_versioned_signals.sql");
 const OFFICIAL_FEEDS_SCHEMA: &str = include_str!("migrations/0014_official_feeds.sql");
+const REDDIT_COMMUNITIES_SCHEMA: &str = include_str!("migrations/0015_reddit_communities.sql");
 
 pub struct Database {
     connection: Mutex<Connection>,
@@ -82,6 +83,7 @@ impl Database {
         apply_migration(&connection, 12, SIGNAL_WEIGHT_AUDIT_SCHEMA)?;
         apply_migration(&connection, 13, VERSIONED_SIGNALS_SCHEMA)?;
         apply_migration(&connection, 14, OFFICIAL_FEEDS_SCHEMA)?;
+        apply_migration(&connection, 15, REDDIT_COMMUNITIES_SCHEMA)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -1995,6 +1997,19 @@ mod tests {
             )
             .expect("migration registrada");
         assert!(applied);
+    }
+
+    #[test]
+    fn applies_reddit_communities_setting() {
+        let directory = tempdir().expect("diretório temporário");
+        let database = Database::open(directory.path().join("reddit-settings.sqlite3"))
+            .expect("banco inicializado");
+        let stored = database
+            .read_setting_or("reddit_communities", "[]")
+            .expect("configuração");
+        let communities: Vec<String> = serde_json::from_str(&stored).expect("json válido");
+        assert!(communities.iter().any(|value| value == "investimentos"));
+        assert!(communities.iter().any(|value| value == "BogleheadsBrasil"));
     }
 
     #[test]

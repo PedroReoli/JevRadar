@@ -361,6 +361,46 @@
   border-bottom: var(--border-width-thin) solid var(--color-border-subtle);
 }
 
+.communityField {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+}
+
+.communityField > span {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.communityField strong {
+  color: var(--color-text-primary);
+  font: var(--font-label-md);
+}
+
+.communityField small {
+  color: var(--color-text-muted);
+  font: var(--font-body-sm);
+}
+
+.communityField small.fieldError {
+  color: var(--color-negative-text);
+}
+
+.communityField textarea {
+  min-height: calc(var(--control-height-xl) * 2);
+  resize: vertical;
+  padding: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  background: var(--color-surface-canvas);
+  font: var(--font-body-sm);
+}
+
+.communityField textarea[aria-invalid="true"] {
+  border-color: var(--color-negative-border);
+}
+
 .dataActions > div {
   min-width: 0;
   display: grid;

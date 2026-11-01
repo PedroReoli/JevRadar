@@ -99,6 +99,15 @@ async function validateApplication(page) {
     assert(pathName === expectedPath, `Rota ${linkName} abriu ${pathName}, esperado ${expectedPath}.`);
   }
 
+  await page.getByRole("heading", { name: "Comunidades monitoradas" }).waitFor();
+  await page.getByLabel("Comunidades do Reddit").fill("investimentos, BogleheadsBrasil");
+  await page.getByText("2 comunidades serão consultadas em posts e comentários recentes.").waitFor();
+  await page.getByRole("button", { name: "Salvar preferências" }).click();
+  await page.getByText("Preferências salvas nesta máquina.").waitFor();
+  await page.reload();
+  await page.getByRole("heading", { name: "Configurações", exact: true }).waitFor();
+  assert((await page.getByLabel("Comunidades do Reddit").inputValue()).includes("BogleheadsBrasil"), "As comunidades do Reddit não foram persistidas.");
+
   await page.getByRole("heading", { name: "Atualizações do aplicativo" }).waitFor();
   await page.getByRole("button", { name: "Verificar atualização" }).click();
   await page.getByText("Não foi possível consultar o canal de atualização").waitFor();

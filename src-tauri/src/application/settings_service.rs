@@ -2,6 +2,7 @@ use tauri_plugin_autostart::ManagerExt;
 
 use crate::domain::settings::{
     AppSettings, CloseBehavior, SecretKind, SecretStatus, UpdateAppSettings,
+    default_reddit_communities,
 };
 use crate::infrastructure::background::BackgroundRuntime;
 use crate::infrastructure::database::{Database, DatabaseError};
@@ -42,6 +43,11 @@ impl SettingsService {
             alert_quiet_end: database.read_setting_or("alert_quiet_end", "08:00")?,
             alert_asset_ids: read_string_list(database, "alert_asset_ids")?,
             alert_source_ids: read_string_list(database, "alert_source_ids")?,
+            reddit_communities: read_string_list_or(
+                database,
+                "reddit_communities",
+                default_reddit_communities(),
+            )?,
             watchlist_limit: database.read_u8_setting("watchlist_limit", 50)?,
             jev_batch_limit: database.read_u8_setting("jev_batch_limit", 25)?,
             jev_daily_document_limit: database.read_u16_setting("jev_daily_document_limit", 250)?,
@@ -104,6 +110,11 @@ impl SettingsService {
                 "alert_source_ids",
                 serde_json::to_string(&update.alert_source_ids).unwrap_or_else(|_| "[]".to_owned()),
             ),
+            (
+                "reddit_communities",
+                serde_json::to_string(&update.reddit_communities)
+                    .unwrap_or_else(|_| "[]".to_owned()),
+            ),
             ("watchlist_limit", update.watchlist_limit.to_string()),
             ("jev_batch_limit", update.jev_batch_limit.to_string()),
             (
@@ -131,6 +142,14 @@ impl SettingsService {
 }
 
 fn read_string_list(database: &Database, key: &str) -> Result<Vec<String>, DatabaseError> {
+    read_string_list_or(database, key, Vec::new())
+}
+
+fn read_string_list_or(
+    database: &Database,
+    key: &str,
+    default: Vec<String>,
+) -> Result<Vec<String>, DatabaseError> {
     let stored = database.read_setting_or(key, "[]")?;
-    Ok(serde_json::from_str(&stored).unwrap_or_default())
+    Ok(serde_json::from_str(&stored).unwrap_or(default))
 }

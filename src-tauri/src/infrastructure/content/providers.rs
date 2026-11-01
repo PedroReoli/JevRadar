@@ -12,7 +12,6 @@ use crate::infrastructure::http::{RetryPolicy, send_with_retry};
 const MAX_DOCUMENT_CHARS: usize = 8_000;
 const REDDIT_SOURCE_ID: &str = "source:reddit";
 const X_SOURCE_ID: &str = "source:x";
-const REDDIT_COMMUNITIES: &str = "investimentos+BogleheadsBrasil+BrasilBitcoin+farialimabets+stocks+SecurityAnalysis+CryptoCurrency+Bitcoin+ethereum+economics+geopolitics";
 
 #[derive(Debug, Error)]
 pub enum ContentProviderError {
@@ -113,6 +112,7 @@ pub fn collect_reddit(
     client: &Client,
     client_id: &str,
     client_secret: &str,
+    communities: &[String],
 ) -> Result<Vec<SourceDocumentInput>, ContentProviderError> {
     let token = send_with_retry(
         || {
@@ -127,8 +127,9 @@ pub fn collect_reddit(
     .map_err(|_| ContentProviderError::Request)?
     .json::<RedditToken>()
     .map_err(|_| ContentProviderError::InvalidPayload)?;
-    let posts_url = format!("https://oauth.reddit.com/r/{REDDIT_COMMUNITIES}/new");
-    let comments_url = format!("https://oauth.reddit.com/r/{REDDIT_COMMUNITIES}/comments");
+    let multi = communities.join("+");
+    let posts_url = format!("https://oauth.reddit.com/r/{multi}/new");
+    let comments_url = format!("https://oauth.reddit.com/r/{multi}/comments");
     let posts: RedditListing<RedditPost> =
         fetch_reddit_listing(client, &token.access_token, &posts_url)?;
     let comments: RedditListing<RedditComment> =

@@ -18,6 +18,11 @@ const settingsSchema = z.object({
   alertQuietEnd: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   alertAssetIds: z.array(z.string().startsWith("asset:")).max(50),
   alertSourceIds: z.array(z.string().startsWith("source:")).max(100),
+  redditCommunities: z
+    .array(z.string().regex(/^[A-Za-z0-9_]{2,21}$/))
+    .min(1)
+    .max(25)
+    .refine((values) => new Set(values.map((value) => value.toLowerCase())).size === values.length),
   watchlistLimit: z.number().int().min(1).max(50),
   jevBatchLimit: z.number().int().min(1).max(100),
   jevDailyDocumentLimit: z.number().int().min(1).max(5000),
@@ -53,6 +58,19 @@ let previewSettings: AppSettings = {
   alertQuietEnd: "08:00",
   alertAssetIds: [],
   alertSourceIds: [],
+  redditCommunities: [
+    "investimentos",
+    "BogleheadsBrasil",
+    "BrasilBitcoin",
+    "farialimabets",
+    "stocks",
+    "SecurityAnalysis",
+    "CryptoCurrency",
+    "Bitcoin",
+    "ethereum",
+    "economics",
+    "geopolitics",
+  ],
   watchlistLimit: 50,
   jevBatchLimit: 25,
   jevDailyDocumentLimit: 250,

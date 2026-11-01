@@ -12,6 +12,7 @@ O repositório está em **alpha para Windows**. O núcleo público funciona sem 
 - watchlist de até 50 ativos;
 - preços de Binance e brapi, indicadores do Banco Central e conteúdo via RSS, Reddit oficial (posts e comentários de comunidades BR/globais) e X opcional BYOK;
 - feeds RSS personalizados para fóruns, blogs e publicações que exponham um feed público;
+- lista configurável de até 25 comunidades do Reddit, com coleta oficial de posts e comentários;
 - classificação Jev por ativo, sentimento, relevância, tipo, alegação factual, hype e contexto externo;
 - agregação auditável, alertas locais em quatro níveis e coleta em background configurável;
 - dashboard com filtros na URL, mapa de calor, preço × sentimento, eventos, contexto educacional e lacunas de cobertura;

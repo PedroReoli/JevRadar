@@ -23,6 +23,7 @@ describe("settingsService no preview web", () => {
       alertQuietHoursEnabled: false,
       alertAssetIds: [],
       alertSourceIds: [],
+      redditCommunities: expect.arrayContaining(["investimentos", "BogleheadsBrasil"]),
       watchlistLimit: 50,
       jevBatchLimit: 25,
       jevDailyDocumentLimit: 250,
@@ -39,6 +40,9 @@ describe("settingsService no preview web", () => {
 
     await expect(
       updateAppSettings({ ...initial, watchlistLimit: 51 } as typeof initial),
+    ).rejects.toThrow();
+    await expect(
+      updateAppSettings({ ...initial, redditCommunities: ["investimentos", "Investimentos"] }),
     ).rejects.toThrow();
   });
 

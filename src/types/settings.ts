@@ -23,6 +23,7 @@ export interface AppSettings {
   alertQuietEnd: string;
   alertAssetIds: string[];
   alertSourceIds: string[];
+  redditCommunities: string[];
   watchlistLimit: number;
   jevBatchLimit: number;
   jevDailyDocumentLimit: number;
