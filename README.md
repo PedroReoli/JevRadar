@@ -10,7 +10,7 @@ O repositório está em **alpha para Windows**. O núcleo público funciona sem 
 
 - wizard inicial bilíngue, preferências locais e credenciais no Windows Credential Manager;
 - watchlist de até 50 ativos;
-- preços de Binance e brapi, indicadores do Banco Central e conteúdo via RSS, Reddit oficial e X opcional BYOK;
+- preços de Binance e brapi, indicadores do Banco Central e conteúdo via RSS, Reddit oficial (posts e comentários de comunidades BR/globais) e X opcional BYOK;
 - feeds RSS personalizados para fóruns, blogs e publicações que exponham um feed público;
 - classificação Jev por ativo, sentimento, relevância, tipo, alegação factual, hype e contexto externo;
 - agregação auditável, alertas locais em quatro níveis e coleta em background configurável;

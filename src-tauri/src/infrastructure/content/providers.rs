@@ -2,6 +2,7 @@ use chrono::{Duration, TimeZone, Utc};
 use feed_rs::parser;
 use reqwest::blocking::Client;
 use serde::Deserialize;
+use serde::de::DeserializeOwned;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -11,7 +12,7 @@ use crate::infrastructure::http::{RetryPolicy, send_with_retry};
 const MAX_DOCUMENT_CHARS: usize = 8_000;
 const REDDIT_SOURCE_ID: &str = "source:reddit";
 const X_SOURCE_ID: &str = "source:x";
-const REDDIT_COMMUNITIES: &str = "investimentos+farialimabets+stocks+SecurityAnalysis+CryptoCurrency+Bitcoin+ethereum+economics+geopolitics";
+const REDDIT_COMMUNITIES: &str = "investimentos+BogleheadsBrasil+BrasilBitcoin+farialimabets+stocks+SecurityAnalysis+CryptoCurrency+Bitcoin+ethereum+economics+geopolitics";
 
 #[derive(Debug, Error)]
 pub enum ContentProviderError {
@@ -126,55 +127,123 @@ pub fn collect_reddit(
     .map_err(|_| ContentProviderError::Request)?
     .json::<RedditToken>()
     .map_err(|_| ContentProviderError::InvalidPayload)?;
-    let url = format!("https://oauth.reddit.com/r/{REDDIT_COMMUNITIES}/new");
-    let listing = send_with_retry(
+    let posts_url = format!("https://oauth.reddit.com/r/{REDDIT_COMMUNITIES}/new");
+    let comments_url = format!("https://oauth.reddit.com/r/{REDDIT_COMMUNITIES}/comments");
+    let posts: RedditListing<RedditPost> =
+        fetch_reddit_listing(client, &token.access_token, &posts_url)?;
+    let comments: RedditListing<RedditComment> =
+        fetch_reddit_listing(client, &token.access_token, &comments_url)?;
+    let collected_at = Utc::now();
+    let retention_expires_at = (collected_at + Duration::days(30)).to_rfc3339();
+
+    let mut documents = posts
+        .data
+        .children
+        .into_iter()
+        .map(|child| reddit_post_document(child.data, &collected_at, &retention_expires_at))
+        .collect::<Result<Vec<_>, _>>()?;
+    documents.extend(
+        comments
+            .data
+            .children
+            .into_iter()
+            .filter_map(|child| {
+                reddit_comment_document(child.data, &collected_at, &retention_expires_at)
+                    .transpose()
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+    );
+    Ok(documents)
+}
+
+fn fetch_reddit_listing<T: DeserializeOwned>(
+    client: &Client,
+    access_token: &str,
+    url: &str,
+) -> Result<RedditListing<T>, ContentProviderError> {
+    send_with_retry(
         || {
             client
-                .get(&url)
-                .bearer_auth(&token.access_token)
+                .get(url)
+                .bearer_auth(access_token)
                 .query(&[("limit", "100"), ("raw_json", "1")])
         },
         RetryPolicy::Idempotent,
     )
     .and_then(reqwest::blocking::Response::error_for_status)
     .map_err(|_| ContentProviderError::Request)?
-    .json::<RedditListing>()
-    .map_err(|_| ContentProviderError::InvalidPayload)?;
-    let collected_at = Utc::now();
-    let retention_expires_at = (collected_at + Duration::days(30)).to_rfc3339();
+    .json::<RedditListing<T>>()
+    .map_err(|_| ContentProviderError::InvalidPayload)
+}
 
-    listing
-        .data
-        .children
-        .into_iter()
-        .map(|child| {
-            let post = child.data;
-            let raw_text = truncate_text(
-                &normalize_text(&format!("{}\n{}", post.title, post.selftext)),
-                MAX_DOCUMENT_CHARS,
-            );
-            let published_at = Utc
-                .timestamp_opt(post.created_utc as i64, 0)
-                .single()
-                .ok_or(ContentProviderError::InvalidPayload)?
-                .to_rfc3339();
-            let canonical_url = Some(format!("https://www.reddit.com{}", post.permalink));
-            Ok(SourceDocumentInput {
-                id: document_id(REDDIT_SOURCE_ID, &post.name),
-                source_id: REDDIT_SOURCE_ID.to_owned(),
-                external_id: post.name,
-                canonical_url,
-                title: Some(post.title),
-                raw_text: raw_text.clone(),
-                author_reference: Some(post.author),
-                language: None,
-                published_at,
-                collected_at: collected_at.to_rfc3339(),
-                content_hash: content_hash(&raw_text),
-                retention_expires_at: Some(retention_expires_at.clone()),
-            })
-        })
-        .collect()
+fn reddit_post_document(
+    post: RedditPost,
+    collected_at: &chrono::DateTime<Utc>,
+    retention_expires_at: &str,
+) -> Result<SourceDocumentInput, ContentProviderError> {
+    let raw_text = truncate_text(
+        &normalize_text(&format!("{}\n{}", post.title, post.selftext)),
+        MAX_DOCUMENT_CHARS,
+    );
+    Ok(SourceDocumentInput {
+        id: document_id(REDDIT_SOURCE_ID, &post.name),
+        source_id: REDDIT_SOURCE_ID.to_owned(),
+        external_id: post.name,
+        canonical_url: Some(format!("https://www.reddit.com{}", post.permalink)),
+        title: Some(post.title),
+        raw_text: raw_text.clone(),
+        author_reference: normalized_author(post.author),
+        language: None,
+        published_at: reddit_timestamp(post.created_utc)?,
+        collected_at: collected_at.to_rfc3339(),
+        content_hash: content_hash(&raw_text),
+        retention_expires_at: Some(retention_expires_at.to_owned()),
+    })
+}
+
+fn reddit_comment_document(
+    comment: RedditComment,
+    collected_at: &chrono::DateTime<Utc>,
+    retention_expires_at: &str,
+) -> Result<Option<SourceDocumentInput>, ContentProviderError> {
+    let body = comment.body.trim();
+    if body.is_empty() || body == "[deleted]" || body == "[removed]" {
+        return Ok(None);
+    }
+    let title = comment.link_title.filter(|value| !value.trim().is_empty());
+    let raw_text = truncate_text(
+        &normalize_text(&format!(
+            "{}\n{}",
+            title.as_deref().unwrap_or_default(),
+            body
+        )),
+        MAX_DOCUMENT_CHARS,
+    );
+    Ok(Some(SourceDocumentInput {
+        id: document_id(REDDIT_SOURCE_ID, &comment.name),
+        source_id: REDDIT_SOURCE_ID.to_owned(),
+        external_id: comment.name,
+        canonical_url: Some(format!("https://www.reddit.com{}", comment.permalink)),
+        title,
+        raw_text: raw_text.clone(),
+        author_reference: normalized_author(comment.author),
+        language: None,
+        published_at: reddit_timestamp(comment.created_utc)?,
+        collected_at: collected_at.to_rfc3339(),
+        content_hash: content_hash(&raw_text),
+        retention_expires_at: Some(retention_expires_at.to_owned()),
+    }))
+}
+
+fn reddit_timestamp(value: f64) -> Result<String, ContentProviderError> {
+    Utc.timestamp_opt(value as i64, 0)
+        .single()
+        .map(|value| value.to_rfc3339())
+        .ok_or(ContentProviderError::InvalidPayload)
+}
+
+fn normalized_author(author: String) -> Option<String> {
+    (!author.trim().is_empty() && author != "[deleted]").then_some(author)
 }
 
 pub fn collect_x(
@@ -252,18 +321,18 @@ struct RedditToken {
 }
 
 #[derive(Debug, Deserialize)]
-struct RedditListing {
-    data: RedditListingData,
+struct RedditListing<T> {
+    data: RedditListingData<T>,
 }
 
 #[derive(Debug, Deserialize)]
-struct RedditListingData {
-    children: Vec<RedditChild>,
+struct RedditListingData<T> {
+    children: Vec<RedditChild<T>>,
 }
 
 #[derive(Debug, Deserialize)]
-struct RedditChild {
-    data: RedditPost,
+struct RedditChild<T> {
+    data: T,
 }
 
 #[derive(Debug, Deserialize)]
@@ -275,6 +344,17 @@ struct RedditPost {
     author: String,
     permalink: String,
     created_utc: f64,
+}
+
+#[derive(Debug, Deserialize)]
+struct RedditComment {
+    name: String,
+    body: String,
+    author: String,
+    permalink: String,
+    created_utc: f64,
+    #[serde(default)]
+    link_title: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -293,7 +373,11 @@ struct XPost {
 
 #[cfg(test)]
 mod tests {
-    use super::{content_hash, normalize_text, truncate_text};
+    use chrono::Utc;
+
+    use super::{
+        RedditComment, content_hash, normalize_text, reddit_comment_document, truncate_text,
+    };
 
     #[test]
     fn normalizes_and_bounds_untrusted_content() {
@@ -301,5 +385,43 @@ mod tests {
         assert_eq!(truncate_text("abcdef", 4), "abcd");
         assert_eq!(content_hash("same"), content_hash("same"));
         assert_ne!(content_hash("same"), content_hash("different"));
+    }
+
+    #[test]
+    fn maps_forum_comments_and_ignores_removed_content() {
+        let now = Utc::now();
+        let document = reddit_comment_document(
+            RedditComment {
+                name: "t1_comment".to_owned(),
+                body: "PETR4 reagiu ao anúncio".to_owned(),
+                author: "investidor".to_owned(),
+                permalink: "/r/investimentos/comments/post/comment".to_owned(),
+                created_utc: now.timestamp() as f64,
+                link_title: Some("Discussão sobre Petrobras".to_owned()),
+            },
+            &now,
+            "2099-01-01T00:00:00Z",
+        )
+        .expect("comentário válido")
+        .expect("documento criado");
+
+        assert_eq!(document.external_id, "t1_comment");
+        assert!(document.raw_text.contains("PETR4"));
+        assert_eq!(document.author_reference.as_deref(), Some("investidor"));
+
+        let removed = reddit_comment_document(
+            RedditComment {
+                body: "[removed]".to_owned(),
+                name: "t1_removed".to_owned(),
+                author: "[deleted]".to_owned(),
+                permalink: "/removed".to_owned(),
+                created_utc: now.timestamp() as f64,
+                link_title: None,
+            },
+            &now,
+            "2099-01-01T00:00:00Z",
+        )
+        .expect("payload válido");
+        assert!(removed.is_none());
     }
 }
