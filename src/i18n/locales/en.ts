@@ -76,6 +76,9 @@ export const en = {
     error: {
       reddit_credentials_missing: "Reddit credentials are not configured",
       reddit_credential_store_unavailable: "Credential store is unavailable",
+      x_bearer_token_missing: "X bearer token is not configured",
+      x_credential_store_unavailable: "X token store is unavailable",
+      x_watchlist_empty: "Add assets to the watchlist to build the X query",
       typesafe_api_key_missing: "TypeSafe key is not configured",
       typesafe_credential_store_unavailable: "TypeSafe credential store is unavailable",
     },

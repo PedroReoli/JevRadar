@@ -31,6 +31,7 @@ const DOCUMENT_ANALYSIS_SCHEMA: &str = include_str!("migrations/0006_document_an
 const BACKTEST_PARAMETERS_SCHEMA: &str = include_str!("migrations/0007_backtest_parameters.sql");
 const ALERT_DELIVERIES_SCHEMA: &str = include_str!("migrations/0008_alert_deliveries.sql");
 const JEV_USAGE_LIMITS_SCHEMA: &str = include_str!("migrations/0009_jev_usage_limits.sql");
+const X_SOURCE_SCHEMA: &str = include_str!("migrations/0010_x_source.sql");
 
 pub struct Database {
     connection: Mutex<Connection>,
@@ -69,6 +70,7 @@ impl Database {
         apply_migration(&connection, 7, BACKTEST_PARAMETERS_SCHEMA)?;
         apply_migration(&connection, 8, ALERT_DELIVERIES_SCHEMA)?;
         apply_migration(&connection, 9, JEV_USAGE_LIMITS_SCHEMA)?;
+        apply_migration(&connection, 10, X_SOURCE_SCHEMA)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -455,7 +457,7 @@ impl Database {
         let mut statement = connection.prepare(
             "SELECT id, name, source_kind, base_url
              FROM sources
-             WHERE enabled = 1 AND source_kind IN ('rss', 'reddit')
+             WHERE enabled = 1 AND source_kind IN ('rss', 'reddit', 'x')
              ORDER BY source_kind, name",
         )?;
         statement
@@ -467,6 +469,34 @@ impl Database {
                     base_url: row.get(3)?,
                 })
             })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(Into::into)
+    }
+
+    pub fn watchlist_search_terms(&self) -> Result<Vec<String>, DatabaseError> {
+        let connection = self.connection.lock();
+        let mut statement = connection.prepare(
+            "SELECT term FROM (
+                 SELECT a.id AS asset_id, a.symbol AS term, 0 AS priority
+                 FROM watchlist_assets wa
+                 JOIN assets a ON a.id = wa.asset_id
+                 WHERE wa.watchlist_id = 'watchlist:default' AND wa.enabled = 1
+                 UNION ALL
+                 SELECT a.id, a.name, 1
+                 FROM watchlist_assets wa
+                 JOIN assets a ON a.id = wa.asset_id
+                 WHERE wa.watchlist_id = 'watchlist:default' AND wa.enabled = 1
+                 UNION ALL
+                 SELECT aa.asset_id, aa.alias, 2
+                 FROM watchlist_assets wa
+                 JOIN asset_aliases aa ON aa.asset_id = wa.asset_id
+                 WHERE wa.watchlist_id = 'watchlist:default' AND wa.enabled = 1
+             )
+             GROUP BY asset_id, term
+             ORDER BY priority, asset_id, term",
+        )?;
+        statement
+            .query_map([], |row| row.get(0))?
             .collect::<Result<Vec<_>, _>>()
             .map_err(Into::into)
     }
@@ -1494,6 +1524,7 @@ mod tests {
             Database::open(directory.path().join("content.sqlite3")).expect("banco inicializado");
         let sources = database.enabled_content_sources().expect("fontes");
         assert!(sources.iter().any(|source| source.id == "source:reddit"));
+        assert!(sources.iter().any(|source| source.id == "source:x"));
         assert!(
             sources
                 .iter()

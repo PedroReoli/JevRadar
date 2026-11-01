@@ -9,6 +9,7 @@ use crate::domain::content::{ContentSource, SourceDocumentInput};
 
 const MAX_DOCUMENT_CHARS: usize = 8_000;
 const REDDIT_SOURCE_ID: &str = "source:reddit";
+const X_SOURCE_ID: &str = "source:x";
 const REDDIT_COMMUNITIES: &str = "investimentos+farialimabets+stocks+SecurityAnalysis+CryptoCurrency+Bitcoin+ethereum+economics+geopolitics";
 
 #[derive(Debug, Error)]
@@ -169,6 +170,54 @@ pub fn collect_reddit(
         .collect()
 }
 
+pub fn collect_x(
+    client: &Client,
+    bearer_token: &str,
+    query: &str,
+) -> Result<Vec<SourceDocumentInput>, ContentProviderError> {
+    let response = client
+        .get("https://api.x.com/2/tweets/search/recent")
+        .bearer_auth(bearer_token)
+        .query(&[
+            ("query", query),
+            ("tweet.fields", "created_at,author_id,lang"),
+            ("max_results", "100"),
+        ])
+        .send()
+        .and_then(reqwest::blocking::Response::error_for_status)
+        .map_err(|_| ContentProviderError::Request)?
+        .json::<XSearchResponse>()
+        .map_err(|_| ContentProviderError::InvalidPayload)?;
+    let collected_at = Utc::now();
+    let retention_expires_at = (collected_at + Duration::days(30)).to_rfc3339();
+
+    Ok(response
+        .data
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|post| {
+            let raw_text = truncate_text(&normalize_text(&post.text), MAX_DOCUMENT_CHARS);
+            if raw_text.is_empty() {
+                return None;
+            }
+            Some(SourceDocumentInput {
+                id: document_id(X_SOURCE_ID, &post.id),
+                source_id: X_SOURCE_ID.to_owned(),
+                external_id: post.id.clone(),
+                canonical_url: Some(format!("https://x.com/i/web/status/{}", post.id)),
+                title: None,
+                raw_text: raw_text.clone(),
+                author_reference: post.author_id,
+                language: post.lang,
+                published_at: post.created_at.unwrap_or_else(|| collected_at.to_rfc3339()),
+                collected_at: collected_at.to_rfc3339(),
+                content_hash: content_hash(&raw_text),
+                retention_expires_at: Some(retention_expires_at.clone()),
+            })
+        })
+        .collect())
+}
+
 fn normalize_text(value: &str) -> String {
     value.split_whitespace().collect::<Vec<_>>().join(" ")
 }
@@ -215,6 +264,20 @@ struct RedditPost {
     author: String,
     permalink: String,
     created_utc: f64,
+}
+
+#[derive(Debug, Deserialize)]
+struct XSearchResponse {
+    data: Option<Vec<XPost>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct XPost {
+    id: String,
+    text: String,
+    created_at: Option<String>,
+    author_id: Option<String>,
+    lang: Option<String>,
 }
 
 #[cfg(test)]

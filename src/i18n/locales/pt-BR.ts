@@ -76,6 +76,9 @@ export const ptBR = {
     error: {
       reddit_credentials_missing: "Credenciais do Reddit não configuradas",
       reddit_credential_store_unavailable: "Cofre de credenciais indisponível",
+      x_bearer_token_missing: "Bearer token do X não configurado",
+      x_credential_store_unavailable: "Cofre do token do X indisponível",
+      x_watchlist_empty: "Adicione ativos à watchlist para montar a busca do X",
       typesafe_api_key_missing: "Chave da TypeSafe não configurada",
       typesafe_credential_store_unavailable: "Cofre da chave TypeSafe indisponível",
     },

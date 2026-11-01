@@ -5,7 +5,9 @@ use reqwest::blocking::Client;
 
 use crate::domain::content::{ContentCollectionSummary, ContentSourceResult};
 use crate::domain::settings::SecretKind;
-use crate::infrastructure::content::{ContentProviderError, collect_reddit, collect_rss};
+use crate::infrastructure::content::{
+    ContentProviderError, collect_reddit, collect_rss, collect_x,
+};
 use crate::infrastructure::database::{Database, DatabaseError};
 use crate::infrastructure::secrets::KeyringSecretStore;
 
@@ -36,6 +38,8 @@ impl ContentCollectionService {
             .map_err(|_| ContentCollectionServiceError::HttpClient)?;
         let sources = database.enabled_content_sources()?;
         let reddit_credentials = read_reddit_credentials(secrets);
+        let x_bearer_token = read_x_bearer_token(secrets);
+        let x_query = build_x_query(database)?;
         let mut results = Vec::new();
 
         for source in sources {
@@ -46,6 +50,31 @@ impl ContentCollectionService {
                         collect_reddit(&client, client_id, client_secret)
                     }
                     Err(error_code) => {
+                        let result = ContentSourceResult {
+                            source_id: source.id,
+                            status: "skipped".to_owned(),
+                            stored_document_count: 0,
+                            error_code: Some(error_code.clone()),
+                        };
+                        database.update_content_source_state(&result, &Utc::now().to_rfc3339())?;
+                        results.push(result);
+                        continue;
+                    }
+                },
+                "x" => match (&x_bearer_token, &x_query) {
+                    (Ok(token), Some(query)) => collect_x(&client, token, query),
+                    (_, None) => {
+                        let result = ContentSourceResult {
+                            source_id: source.id,
+                            status: "skipped".to_owned(),
+                            stored_document_count: 0,
+                            error_code: Some("x_watchlist_empty".to_owned()),
+                        };
+                        database.update_content_source_state(&result, &Utc::now().to_rfc3339())?;
+                        results.push(result);
+                        continue;
+                    }
+                    (Err(error_code), Some(_)) => {
                         let result = ContentSourceResult {
                             source_id: source.id,
                             status: "skipped".to_owned(),
@@ -89,6 +118,31 @@ impl ContentCollectionService {
     }
 }
 
+fn read_x_bearer_token(secrets: &KeyringSecretStore) -> Result<String, String> {
+    secrets
+        .read(SecretKind::XBearerToken)
+        .map_err(|_| "x_credential_store_unavailable".to_owned())?
+        .ok_or_else(|| "x_bearer_token_missing".to_owned())
+}
+
+fn build_x_query(database: &Database) -> Result<Option<String>, DatabaseError> {
+    let mut terms = Vec::new();
+    for candidate in database.watchlist_search_terms()? {
+        let escaped = candidate.replace('"', "");
+        let term = format!("\"{escaped}\"");
+        let projected = terms.join(" OR ").len() + term.len() + 19;
+        if projected > 500 {
+            break;
+        }
+        terms.push(term);
+    }
+    if terms.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(format!("({}) -is:retweet", terms.join(" OR "))))
+    }
+}
+
 fn read_reddit_credentials(secrets: &KeyringSecretStore) -> Result<(String, String), String> {
     let client_id = secrets
         .read(SecretKind::RedditClientId)
@@ -108,5 +162,29 @@ fn failed_source(source_id: &str, error: ContentProviderError) -> ContentSourceR
         status: "failed".to_owned(),
         stored_document_count: 0,
         error_code: Some(error.code().to_owned()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tempfile::tempdir;
+
+    use super::build_x_query;
+    use crate::infrastructure::database::Database;
+
+    #[test]
+    fn builds_a_bounded_x_query_from_the_local_watchlist() {
+        let directory = tempdir().expect("diretório");
+        let database = Database::open(directory.path().join("x-query.sqlite3")).expect("banco");
+        assert_eq!(build_x_query(&database).expect("consulta"), None);
+
+        database
+            .add_default_watchlist_asset("asset:b3:PETR4", 50)
+            .expect("watchlist");
+        let query = build_x_query(&database).expect("consulta").expect("query");
+        assert!(query.contains("\"PETR4\""));
+        assert!(query.contains("\"Petrobras\""));
+        assert!(query.ends_with("-is:retweet"));
+        assert!(query.len() <= 512);
     }
 }
