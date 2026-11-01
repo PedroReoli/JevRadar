@@ -11,7 +11,7 @@ O repositório está em **alpha para Windows**. O núcleo público funciona sem 
 - wizard inicial bilíngue, preferências locais e credenciais no Windows Credential Manager;
 - watchlist de até 50 ativos;
 - preços de Binance e brapi, indicadores do Banco Central e conteúdo via RSS, Reddit oficial (posts e comentários de comunidades BR/globais) e X opcional BYOK;
-- feeds RSS personalizados para fóruns, blogs e publicações que exponham um feed público;
+- fontes personalizadas tipadas como publicação ou fórum público, coletadas por RSS/Atom HTTPS com deduplicação;
 - lista configurável de até 25 comunidades do Reddit, com coleta oficial de posts e comentários;
 - classificação Jev por ativo, sentimento, relevância, tipo, alegação factual, hype e contexto externo;
 - validação estrita do contrato Jev, consumo diário de tokens visível na central operacional e tratamento explícito de autenticação, limite de uso e sobrecarga;
@@ -29,7 +29,7 @@ O repositório está em **alpha para Windows**. O núcleo público funciona sem 
 - atualização confirmada pelo usuário em builds assinados, com verificação criptográfica do artefato;
 - exportação do SQLite e exclusão confirmada do histórico local.
 
-Scraping de fóruns e mercados internacionais são adapters futuros, não funcionalidades simuladas. Novos scrapers exigem revisão individual de termos e `robots.txt`. Fontes pagas são sempre opcionais e usam credenciais do próprio usuário.
+Scraping HTML de fóruns e mercados internacionais são adapters futuros, não funcionalidades simuladas. Hoje, fóruns que exponham RSS/Atom público podem ser cadastrados e auditados como fóruns, sem se confundirem com fontes editoriais. Novos scrapers exigem revisão individual de termos e `robots.txt`. Fontes pagas são sempre opcionais e usam credenciais do próprio usuário.
 
 ## Arquitetura
 

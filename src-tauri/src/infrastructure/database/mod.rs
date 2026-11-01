@@ -791,21 +791,23 @@ impl Database {
         Ok(changed == 1)
     }
 
-    pub fn upsert_custom_rss_source(
+    pub fn upsert_custom_feed_source(
         &self,
         source_id: &str,
         name: &str,
         url: &str,
+        source_kind: &str,
     ) -> Result<(), DatabaseError> {
         self.connection.lock().execute(
             "INSERT INTO sources (id, name, source_kind, collection_method, base_url, enabled)
-             VALUES (?1, ?2, 'rss', 'rss', ?3, 1)
+             VALUES (?1, ?2, ?4, 'rss', ?3, 1)
              ON CONFLICT(id) DO UPDATE SET
                  name = excluded.name,
+                 source_kind = excluded.source_kind,
                  base_url = excluded.base_url,
                  enabled = 1,
                  updated_at = CURRENT_TIMESTAMP",
-            params![source_id, name, url],
+            params![source_id, name, url, source_kind],
         )?;
         Ok(())
     }
@@ -900,7 +902,7 @@ impl Database {
         let connection = self.connection.lock();
         let mut statement = connection.prepare(
             "SELECT s.id, s.name, s.source_kind, s.collection_method, s.enabled,
-                    CASE WHEN s.id LIKE 'source:custom:rss:%' THEN 1 ELSE 0 END,
+                    CASE WHEN s.id LIKE 'source:custom:%' THEN 1 ELSE 0 END,
                     COUNT(sd.id) AS document_count,
                     scs.status, scs.last_collected_at, scs.error_code
              FROM sources s
@@ -2665,10 +2667,11 @@ mod tests {
                 .any(|source| source.id == "source:x")
         );
         database
-            .upsert_custom_rss_source(
+            .upsert_custom_feed_source(
                 "source:custom:rss:test",
                 "Fórum com RSS",
                 "https://example.com/feed.xml",
+                "rss",
             )
             .expect("feed personalizado");
         assert!(
@@ -2679,6 +2682,23 @@ mod tests {
                 .iter()
                 .any(|source| source.id == "source:custom:rss:test" && source.user_managed)
         );
+        database
+            .upsert_custom_feed_source(
+                "source:custom:forum:test",
+                "Fórum público",
+                "https://forum.example.com/latest.atom",
+                "forum",
+            )
+            .expect("fórum personalizado");
+        let forum = database
+            .content_overview()
+            .expect("inventário")
+            .sources
+            .into_iter()
+            .find(|source| source.id == "source:custom:forum:test")
+            .expect("fórum cadastrado");
+        assert_eq!(forum.source_kind, "forum");
+        assert_eq!(forum.collection_method, "rss");
 
         let document = SourceDocumentInput {
             id: "document:test".to_owned(),

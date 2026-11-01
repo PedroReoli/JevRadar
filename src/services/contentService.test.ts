@@ -8,6 +8,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 import {
+  addFeedSource,
   addRssSource,
   getContentOverview,
   listDocumentFeed,
@@ -60,6 +61,17 @@ describe("contentService", () => {
     expect(invoke).toHaveBeenCalledWith("add_rss_source", {
       name: "Fórum oficial",
       url: "https://example.com/feed.xml",
+      sourceKind: "rss",
+    });
+  });
+
+  it("registra feeds públicos de fóruns sem habilitar scraping genérico", async () => {
+    invoke.mockResolvedValueOnce({ sources: [], totalDocumentCount: 0, unclassifiedDocumentCount: 0 });
+    await addFeedSource("Fórum público", "https://example.com/forum.atom", "forum");
+    expect(invoke).toHaveBeenCalledWith("add_rss_source", {
+      name: "Fórum público",
+      url: "https://example.com/forum.atom",
+      sourceKind: "forum",
     });
   });
 

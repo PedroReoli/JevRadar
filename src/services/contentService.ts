@@ -2,7 +2,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { z } from "zod";
 
 import { assetSchema } from "@/services/contractSchemas";
-import type { ContentCollectionSummary, ContentOverview, DocumentFeedFilter, DocumentFeedPage } from "@/types/content";
+import type { ContentCollectionSummary, ContentOverview, CustomFeedKind, DocumentFeedFilter, DocumentFeedPage } from "@/types/content";
 
 const runStatusSchema = z.enum(["completed", "failed", "skipped"]);
 const sourceSchema = z.object({
@@ -84,8 +84,12 @@ export async function setContentSourceEnabled(sourceId: string, enabled: boolean
 }
 
 export async function addRssSource(name: string, url: string): Promise<ContentOverview> {
+  return addFeedSource(name, url, "rss");
+}
+
+export async function addFeedSource(name: string, url: string, sourceKind: CustomFeedKind): Promise<ContentOverview> {
   requireDesktopRuntime();
-  const response: unknown = await invoke("add_rss_source", { name, url });
+  const response: unknown = await invoke("add_rss_source", { name, url, sourceKind });
   return overviewSchema.parse(response);
 }
 

@@ -9,6 +9,8 @@ pub enum ContentSourceManagementError {
     InvalidName,
     #[error("a URL precisa usar HTTPS")]
     InvalidUrl,
+    #[error("tipo de fonte personalizada inválido")]
+    InvalidSourceKind,
     #[error("consulta do feed inválida")]
     InvalidFeedQuery,
     #[error("filtro do feed inválido")]
@@ -35,14 +37,18 @@ impl ContentQueryService {
         database.content_overview()
     }
 
-    pub fn add_rss_source(
+    pub fn add_feed_source(
         database: &Database,
         name: &str,
         url: &str,
+        source_kind: &str,
     ) -> Result<ContentOverview, ContentSourceManagementError> {
         let name = name.trim();
         if !(2..=80).contains(&name.chars().count()) {
             return Err(ContentSourceManagementError::InvalidName);
+        }
+        if !["rss", "forum"].contains(&source_kind) {
+            return Err(ContentSourceManagementError::InvalidSourceKind);
         }
         let parsed =
             Url::parse(url.trim()).map_err(|_| ContentSourceManagementError::InvalidUrl)?;
@@ -50,8 +56,8 @@ impl ContentQueryService {
             return Err(ContentSourceManagementError::InvalidUrl);
         }
         let digest = format!("{:x}", Sha256::digest(parsed.as_str().as_bytes()));
-        let id = format!("source:custom:rss:{}", &digest[..16]);
-        database.upsert_custom_rss_source(&id, name, parsed.as_str())?;
+        let id = format!("source:custom:{source_kind}:{}", &digest[..16]);
+        database.upsert_custom_feed_source(&id, name, parsed.as_str(), source_kind)?;
         database.content_overview().map_err(Into::into)
     }
 
@@ -280,6 +286,38 @@ mod tests {
         assert!(matches!(
             invalid_page,
             ContentSourceManagementError::InvalidFeedPagination
+        ));
+    }
+
+    #[test]
+    fn registers_public_forum_feeds_without_enabling_generic_scraping() {
+        let database = database();
+        let overview = ContentQueryService::add_feed_source(
+            &database,
+            "Fórum de investidores",
+            "https://forum.example.com/latest.rss",
+            "forum",
+        )
+        .expect("fórum com feed público");
+        let source = overview
+            .sources
+            .iter()
+            .find(|source| source.name == "Fórum de investidores")
+            .expect("fonte cadastrada");
+        assert_eq!(source.source_kind, "forum");
+        assert_eq!(source.collection_method, "rss");
+        assert!(source.user_managed);
+
+        let invalid = ContentQueryService::add_feed_source(
+            &database,
+            "Scraper genérico",
+            "https://example.com/page",
+            "scraper",
+        )
+        .expect_err("scraper genérico não deve ser aceito");
+        assert!(matches!(
+            invalid,
+            ContentSourceManagementError::InvalidSourceKind
         ));
     }
 }

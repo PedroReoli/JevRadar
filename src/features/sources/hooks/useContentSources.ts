@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { addRssSource, getContentOverview, refreshContentSources, setContentSourceEnabled } from "@/services/contentService";
+import { addFeedSource, getContentOverview, refreshContentSources, setContentSourceEnabled } from "@/services/contentService";
+import type { CustomFeedKind } from "@/types/content";
 
 const contentOverviewKey = ["content-overview"] as const;
 
@@ -23,10 +24,10 @@ export function useSetContentSourceEnabled() {
   });
 }
 
-export function useAddRssSource() {
+export function useAddFeedSource() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ name, url }: { name: string; url: string }) => addRssSource(name, url),
+    mutationFn: ({ name, url, sourceKind }: { name: string; url: string; sourceKind: CustomFeedKind }) => addFeedSource(name, url, sourceKind),
     onSuccess: (overview) => queryClient.setQueryData(contentOverviewKey, overview),
   });
 }

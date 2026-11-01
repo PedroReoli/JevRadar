@@ -45,7 +45,7 @@ impl ContentCollectionService {
 
         for source in sources {
             let provider_result = match source.source_kind.as_str() {
-                "rss" => collect_rss(&client, &source),
+                "rss" | "forum" => collect_rss(&client, &source),
                 "reddit" => match &reddit_credentials {
                     Ok((client_id, client_secret)) => {
                         collect_reddit(&client, client_id, client_secret, &reddit_communities)

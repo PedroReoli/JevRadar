@@ -100,6 +100,7 @@ impl From<ContentSourceManagementError> for CommandError {
         let code = match error {
             ContentSourceManagementError::InvalidName
             | ContentSourceManagementError::InvalidUrl
+            | ContentSourceManagementError::InvalidSourceKind
             | ContentSourceManagementError::InvalidFeedQuery
             | ContentSourceManagementError::InvalidFeedFilter
             | ContentSourceManagementError::InvalidFeedPagination => "validation_error",

@@ -1,6 +1,7 @@
 import type { Asset } from "@/types/assets";
 
 export type ContentSourceKind = "rss" | "reddit" | "forum" | "x";
+export type CustomFeedKind = Extract<ContentSourceKind, "rss" | "forum">;
 export type ContentSourceRunStatus = "completed" | "failed" | "skipped";
 
 export interface ContentSourceStatus {

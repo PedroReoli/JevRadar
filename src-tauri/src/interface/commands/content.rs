@@ -40,9 +40,15 @@ pub fn add_rss_source(
     state: State<'_, AppState>,
     name: String,
     url: String,
+    source_kind: Option<String>,
 ) -> Result<ContentOverview, CommandError> {
-    ContentQueryService::add_rss_source(&state.database, &name, &url)
-        .map_err(CommandError::internal)
+    ContentQueryService::add_feed_source(
+        &state.database,
+        &name,
+        &url,
+        source_kind.as_deref().unwrap_or("rss"),
+    )
+    .map_err(CommandError::internal)
 }
 
 #[tauri::command]
