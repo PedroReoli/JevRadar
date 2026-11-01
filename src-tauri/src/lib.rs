@@ -10,6 +10,9 @@ use tracing_subscriber::EnvFilter;
 use crate::infrastructure::database::Database;
 use crate::infrastructure::desktop::{create_system_tray, register_main_window_lifecycle};
 use crate::infrastructure::secrets::KeyringSecretStore;
+use crate::interface::commands::catalog::{
+    add_watchlist_asset, get_default_watchlist, list_assets, remove_watchlist_asset,
+};
 use crate::interface::commands::desktop::resolve_close_request;
 use crate::interface::commands::settings::{
     delete_secret, get_app_settings, get_secret_status, save_secret, update_app_settings,
@@ -35,6 +38,10 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            list_assets,
+            get_default_watchlist,
+            add_watchlist_asset,
+            remove_watchlist_asset,
             get_system_status,
             get_app_settings,
             update_app_settings,
