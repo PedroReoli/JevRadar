@@ -585,11 +585,16 @@ impl Database {
         Ok(stored_count)
     }
 
-    pub fn purge_expired_source_documents(&self, now: &str) -> Result<usize, DatabaseError> {
+    pub fn redact_expired_source_documents(&self, now: &str) -> Result<usize, DatabaseError> {
         self.connection
             .lock()
             .execute(
-                "DELETE FROM source_documents
+                "UPDATE source_documents
+                 SET canonical_url = NULL,
+                     title = NULL,
+                     raw_text = '[conteúdo removido pela política de retenção]',
+                     author_reference = NULL,
+                     retention_expires_at = NULL
                  WHERE retention_expires_at IS NOT NULL AND retention_expires_at <= ?1",
                 params![now],
             )
@@ -1840,6 +1845,70 @@ mod tests {
             .expect("fonte CVM");
         assert_eq!(cvm.status.as_deref(), Some("completed"));
         assert_eq!(cvm.document_count, 1);
+    }
+
+    #[test]
+    fn redacts_expired_content_without_removing_its_audit_record() {
+        use crate::domain::content::SourceDocumentInput;
+
+        let directory = tempdir().expect("diretório temporário");
+        let database =
+            Database::open(directory.path().join("retention.sqlite3")).expect("banco inicializado");
+        database
+            .store_source_documents(&[SourceDocumentInput {
+                id: "document:expired".to_owned(),
+                source_id: "source:reddit".to_owned(),
+                external_id: "expired".to_owned(),
+                canonical_url: Some("https://example.com/expired".to_owned()),
+                title: Some("Conteúdo social".to_owned()),
+                raw_text: "Texto que não deve permanecer após o prazo.".to_owned(),
+                author_reference: Some("author".to_owned()),
+                language: Some("pt-BR".to_owned()),
+                published_at: "2026-09-01T00:00:00Z".to_owned(),
+                collected_at: "2026-09-01T00:01:00Z".to_owned(),
+                content_hash: "expired-hash".to_owned(),
+                retention_expires_at: Some("2026-10-01T00:00:00Z".to_owned()),
+            }])
+            .expect("documento expirável");
+
+        assert_eq!(
+            database
+                .redact_expired_source_documents("2026-11-01T00:00:00Z")
+                .expect("redação"),
+            1
+        );
+        let connection = database.connection.lock();
+        let (count, raw_text, title, author, url, retention): (
+            i64,
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        ) = connection
+            .query_row(
+                "SELECT COUNT(*), raw_text, title, author_reference, canonical_url,
+                        retention_expires_at
+                 FROM source_documents WHERE id = 'document:expired'",
+                [],
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                        row.get(5)?,
+                    ))
+                },
+            )
+            .expect("registro preservado");
+        assert_eq!(count, 1);
+        assert_eq!(raw_text, "[conteúdo removido pela política de retenção]");
+        assert!(title.is_none());
+        assert!(author.is_none());
+        assert!(url.is_none());
+        assert!(retention.is_none());
     }
 
     #[test]

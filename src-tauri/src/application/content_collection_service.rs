@@ -26,7 +26,7 @@ impl ContentCollectionService {
         database: &Database,
         secrets: &KeyringSecretStore,
     ) -> Result<ContentCollectionSummary, ContentCollectionServiceError> {
-        database.purge_expired_source_documents(&Utc::now().to_rfc3339())?;
+        database.redact_expired_source_documents(&Utc::now().to_rfc3339())?;
         let client = Client::builder()
             .timeout(Duration::from_secs(15))
             .user_agent(concat!(
