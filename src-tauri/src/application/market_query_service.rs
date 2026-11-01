@@ -1,6 +1,6 @@
 use chrono::{Duration, Utc};
 
-use crate::domain::market::{MarketOverview, MarketOverviewFilter};
+use crate::domain::market::{MarketOverview, MarketOverviewFilter, MarketSeries};
 use crate::infrastructure::database::{Database, DatabaseError};
 
 pub struct MarketQueryService;
@@ -32,5 +32,14 @@ impl MarketQueryService {
             events,
             latest_collection: database.latest_collection_run()?,
         })
+    }
+
+    pub fn series(
+        database: &Database,
+        asset_id: &str,
+        period_hours: u16,
+    ) -> Result<MarketSeries, DatabaseError> {
+        let cutoff = (Utc::now() - Duration::hours(i64::from(period_hours))).to_rfc3339();
+        database.market_series(asset_id, &cutoff)
     }
 }

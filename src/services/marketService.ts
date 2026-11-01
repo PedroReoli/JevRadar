@@ -1,7 +1,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { z } from "zod";
 
-import type { CollectionSummary, MarketOverview, MarketOverviewFilter } from "@/types/market";
+import type { CollectionSummary, MarketOverview, MarketOverviewFilter, MarketSeries } from "@/types/market";
 
 const assetSchema = z.object({
   id: z.string(),
@@ -76,6 +76,15 @@ const collectionSummarySchema = z.object({
     }),
   ),
 });
+const marketSeriesSchema = z.object({
+  assetId: z.string(),
+  points: z.array(z.object({
+    observedAt: z.string(),
+    closeValue: z.number().nullable(),
+    signalScore: z.number().min(-1).max(1).nullable(),
+    confidence: z.number().min(0).max(1).nullable(),
+  })),
+});
 
 function requireDesktopRuntime() {
   if (!isTauri()) throw new Error("desktop_runtime_required");
@@ -91,4 +100,10 @@ export async function refreshMarketData(): Promise<CollectionSummary> {
   requireDesktopRuntime();
   const response: unknown = await invoke("refresh_market_data");
   return collectionSummarySchema.parse(response);
+}
+
+export async function getMarketSeries(assetId: string, periodHours: number): Promise<MarketSeries> {
+  requireDesktopRuntime();
+  const response: unknown = await invoke("get_market_series", { assetId, periodHours });
+  return marketSeriesSchema.parse(response);
 }

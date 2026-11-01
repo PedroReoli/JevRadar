@@ -116,11 +116,49 @@
 .collectionCard,
 .marketPanel,
 .signalPanel,
-.eventPanel {
+.eventPanel,
+.chartPanel {
   border: var(--border-width-thin) solid var(--color-border-subtle);
   border-radius: var(--radius-xl);
   background: var(--color-surface-panel);
   box-shadow: var(--shadow-panel);
+}
+
+.chartPanel {
+  overflow: hidden;
+}
+
+.chartAssetSelect {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font: var(--font-label-xs);
+}
+
+.chartAssetSelect select {
+  min-width: var(--size-asset-symbol);
+  min-height: var(--control-height-sm);
+  padding-inline: var(--space-2);
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  background: var(--color-surface-raised);
+  font: var(--font-label-sm);
+}
+
+.chartCanvas {
+  width: 100%;
+  height: var(--size-market-chart);
+  padding: var(--space-4) var(--space-3) 0;
+}
+
+.chartLegend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5) var(--space-5);
+  color: var(--color-text-muted);
+  font: var(--font-label-xs);
 }
 
 .collectionCard {

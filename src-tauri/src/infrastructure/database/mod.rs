@@ -18,7 +18,7 @@ use crate::domain::content::{
     ContentOverview, ContentSource, ContentSourceResult, ContentSourceStatus, SourceDocumentInput,
 };
 use crate::domain::events::MarketEventSnapshot;
-use crate::domain::market::{LatestCollectionRun, MarketSnapshot};
+use crate::domain::market::{LatestCollectionRun, MarketSeries, MarketSeriesPoint, MarketSnapshot};
 use crate::domain::signals::{CalculatedSignal, MarketSignalSnapshot, SignalEvidenceInput};
 
 const INITIAL_SCHEMA: &str = include_str!("migrations/0001_initial.sql");
@@ -1032,6 +1032,46 @@ impl Database {
             prices,
             model_version,
             question_version,
+        })
+    }
+
+    pub fn market_series(
+        &self,
+        asset_id: &str,
+        cutoff: &str,
+    ) -> Result<MarketSeries, DatabaseError> {
+        let connection = self.connection.lock();
+        let exists = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM assets WHERE id = ?1 AND active = 1)",
+            params![asset_id],
+            |row| row.get::<_, bool>(0),
+        )?;
+        if !exists {
+            return Err(DatabaseError::AssetNotFound);
+        }
+        let mut statement = connection.prepare(
+            "SELECT observed_at, close_value, NULL, NULL
+             FROM market_observations
+             WHERE asset_id = ?1 AND observed_at >= ?2
+             UNION ALL
+             SELECT window_ended_at, NULL, signal_score, confidence
+             FROM market_signals
+             WHERE asset_id = ?1 AND window_ended_at >= ?2
+             ORDER BY 1",
+        )?;
+        let points = statement
+            .query_map(params![asset_id, cutoff], |row| {
+                Ok(MarketSeriesPoint {
+                    observed_at: row.get(0)?,
+                    close_value: row.get(1)?,
+                    signal_score: row.get(2)?,
+                    confidence: row.get(3)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(MarketSeries {
+            asset_id: asset_id.to_owned(),
+            points,
         })
     }
 

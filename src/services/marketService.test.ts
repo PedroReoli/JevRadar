@@ -7,7 +7,7 @@ vi.mock("@tauri-apps/api/core", () => ({
   isTauri: () => true,
 }));
 
-import { getMarketOverview, refreshMarketData } from "@/services/marketService";
+import { getMarketOverview, getMarketSeries, refreshMarketData } from "@/services/marketService";
 
 const asset = {
   id: "asset:crypto:BTC",
@@ -93,5 +93,20 @@ describe("marketService", () => {
     const summary = await refreshMarketData();
     expect(summary.status).toBe("partial");
     expect(summary.sourceErrorCount).toBe(1);
+  });
+
+  it("valida a série conjunta de preço e sentimento", async () => {
+    invoke.mockResolvedValueOnce({
+      assetId: asset.id,
+      points: [{
+        observedAt: "2026-11-01T00:00:00Z",
+        closeValue: 77918.01,
+        signalScore: null,
+        confidence: null,
+      }],
+    });
+    const series = await getMarketSeries(asset.id, 168);
+    expect(series.points[0]!.closeValue).toBe(77918.01);
+    expect(invoke).toHaveBeenCalledWith("get_market_series", { assetId: asset.id, periodHours: 168 });
   });
 });

@@ -6,10 +6,11 @@ import { useSearchParams } from "react-router-dom";
 import { CollectionStatusCard } from "@/features/dashboard/components/CollectionStatusCard";
 import { EventTimeline } from "@/features/dashboard/components/EventTimeline";
 import { MarketSnapshotPanel } from "@/features/dashboard/components/MarketSnapshotPanel";
+import { PriceSentimentChart } from "@/features/dashboard/components/PriceSentimentChart";
 import { RadarFilters } from "@/features/dashboard/components/RadarFilters";
 import { SignalRadarPanel } from "@/features/dashboard/components/SignalRadarPanel";
 import { SystemHealthCard } from "@/features/dashboard/components/SystemHealthCard";
-import { useMarketOverview, useRefreshMarketData } from "@/features/dashboard/hooks/useMarketOverview";
+import { useMarketOverview, useMarketSeries, useRefreshMarketData } from "@/features/dashboard/hooks/useMarketOverview";
 import { useSystemStatus } from "@/hooks/useSystemStatus";
 import styles from "@/pages/dashboard/DashboardPage.module.css";
 import type { ComponentStatus } from "@/types/system";
@@ -32,6 +33,12 @@ export function DashboardPage() {
   };
   const statusQuery = useSystemStatus();
   const marketQuery = useMarketOverview(filter);
+  const requestedAssetId = searchParams.get("asset");
+  const visibleAssets = marketQuery.data?.snapshots.map((snapshot) => snapshot.asset) ?? [];
+  const selectedAssetId = visibleAssets.some((asset) => asset.id === requestedAssetId)
+    ? requestedAssetId
+    : visibleAssets[0]?.id ?? null;
+  const seriesQuery = useMarketSeries(selectedAssetId, filter.periodHours);
   const refreshMutation = useRefreshMarketData();
   const fallbackStatus: ComponentStatus = statusQuery.isPending ? "pending" : "unavailable";
   const status = statusQuery.data;
@@ -40,6 +47,11 @@ export function DashboardPage() {
     const param = key === "periodHours" ? "period" : key === "assetClass" ? "class" : "confidence";
     if (value === null || value === 0) next.delete(param);
     else next.set(param, String(value));
+    setSearchParams(next, { replace: true });
+  };
+  const updateAsset = (assetId: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.set("asset", assetId);
     setSearchParams(next, { replace: true });
   };
 
@@ -81,6 +93,12 @@ export function DashboardPage() {
         <div className={styles.errorMessage} role="alert">{t("dashboard.marketLoadError")}</div>
       ) : (
         <>
+          <PriceSentimentChart
+            assets={visibleAssets}
+            onAssetChange={updateAsset}
+            points={seriesQuery.data?.points ?? []}
+            selectedAssetId={selectedAssetId}
+          />
           <SignalRadarPanel signals={marketQuery.data?.signals ?? []} />
           <EventTimeline events={marketQuery.data?.events ?? []} />
           <MarketSnapshotPanel snapshots={marketQuery.data?.snapshots ?? []} />

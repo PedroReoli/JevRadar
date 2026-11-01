@@ -33,6 +33,18 @@ export interface MarketOverview {
   latestCollection: LatestCollectionRun | null;
 }
 
+export interface MarketSeriesPoint {
+  observedAt: string;
+  closeValue: number | null;
+  signalScore: number | null;
+  confidence: number | null;
+}
+
+export interface MarketSeries {
+  assetId: string;
+  points: MarketSeriesPoint[];
+}
+
 export interface MarketEventSnapshot {
   id: string;
   title: string;

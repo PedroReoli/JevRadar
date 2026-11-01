@@ -20,7 +20,7 @@ use crate::interface::commands::content::{
     get_content_overview, refresh_content_sources, set_content_source_enabled,
 };
 use crate::interface::commands::desktop::resolve_close_request;
-use crate::interface::commands::market::get_market_overview;
+use crate::interface::commands::market::{get_market_overview, get_market_series};
 use crate::interface::commands::settings::{
     delete_secret, get_app_settings, get_local_api_access, get_secret_status,
     regenerate_local_api_token, save_secret, update_app_settings,
@@ -61,6 +61,7 @@ pub fn run() {
             get_content_overview,
             set_content_source_enabled,
             get_market_overview,
+            get_market_series,
             get_system_status,
             get_app_settings,
             update_app_settings,

@@ -36,6 +36,22 @@ pub struct MarketOverview {
     pub latest_collection: Option<LatestCollectionRun>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarketSeriesPoint {
+    pub observed_at: String,
+    pub close_value: Option<f64>,
+    pub signal_score: Option<f64>,
+    pub confidence: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarketSeries {
+    pub asset_id: String,
+    pub points: Vec<MarketSeriesPoint>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MarketOverviewFilter {
