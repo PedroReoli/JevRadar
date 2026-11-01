@@ -70,7 +70,7 @@ export function WatchlistPage() {
         <p className={pageStyles.statusMessage}>{t("watchlist.loading")}</p>
       ) : catalogQuery.data && watchlistQuery.data ? (
         <div className={pageStyles.grid}>
-          <section className={pageStyles.catalog} aria-label={t("watchlist.catalog")}> 
+          <section className={pageStyles.catalog} aria-label={t("watchlist.catalog")}>
             {actions.error ? <div className={pageStyles.errorMessage} role="alert">{t("watchlist.actionError")}</div> : null}
             <div className={styles.panel}>
               <AssetCatalogList
