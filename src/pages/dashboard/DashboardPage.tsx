@@ -144,7 +144,7 @@ export function DashboardPage() {
           </span>
           <h2>{t("dashboard.noSignalsTitle")}</h2>
           <p>{t("dashboard.noSignalsDescription")}</p>
-          <Link className={styles.primaryAction} to="/settings">
+          <Link className={styles.primaryAction} to="/getting-started">
             {t("dashboard.openSettings")}
             <ArrowRight aria-hidden="true" size="var(--icon-size-sm)" />
           </Link>
