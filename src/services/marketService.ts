@@ -1,17 +1,8 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { z } from "zod";
 
+import { assetSchema, marketSignalSchema, signalEvidenceSchema } from "@/services/contractSchemas";
 import type { CollectionSummary, MarketOverview, MarketOverviewFilter, MarketSeries, SignalEvidenceSnapshot } from "@/types/market";
-
-const assetSchema = z.object({
-  id: z.string(),
-  symbol: z.string(),
-  name: z.string(),
-  assetClass: z.enum(["b3Equity", "b3Fund", "crypto", "macro"]),
-  exchange: z.string(),
-  currency: z.string(),
-  countryCode: z.string().nullable(),
-});
 const marketOverviewSchema = z.object({
   snapshots: z.array(
     z.object({
@@ -24,21 +15,7 @@ const marketOverviewSchema = z.object({
       interval: z.string().nullable(),
     }),
   ),
-  signals: z.array(z.object({
-    id: z.string(),
-    asset: assetSchema,
-    signalScore: z.number().min(-1).max(1),
-    confidence: z.number().min(0).max(1),
-    sourceCount: z.number().int().nonnegative(),
-    independentSourceCount: z.number().int().nonnegative(),
-    evidenceCount: z.number().int().nonnegative(),
-    hypePenalty: z.number().min(0).max(1),
-    windowStartedAt: z.string(),
-    windowEndedAt: z.string(),
-    methodologyVersion: z.string(),
-    modelVersion: z.string(),
-    questionVersion: z.string(),
-  })),
+  signals: z.array(marketSignalSchema),
   events: z.array(z.object({
     id: z.string(),
     title: z.string(),
@@ -88,32 +65,6 @@ const marketSeriesSchema = z.object({
     confidence: z.number().min(0).max(1).nullable(),
   })),
 });
-const signalEvidenceSchema = z.array(z.object({
-  classificationId: z.string(),
-  sourceName: z.string(),
-  title: z.string().nullable(),
-  excerpt: z.string(),
-  canonicalUrl: z.string().url().nullable(),
-  publishedAt: z.string(),
-  sentiment: z.enum(["optimistic", "pessimistic", "neutral", "uncertain"]),
-  sentimentProbability: z.number().min(0).max(1),
-  relevanceExpected: z.number().min(0).max(3),
-  contentType: z.enum(["news", "opinion", "technical_analysis", "meme", "spam", "uncertain"]),
-  hypeProbability: z.number().min(0).max(1),
-  factualClaimProbability: z.number().min(0).max(1),
-  confidence: z.number().min(0).max(1),
-  contributionWeight: z.number(),
-  relevanceWeight: z.number().min(0).max(1),
-  contentTypeWeight: z.number().min(0).max(1),
-  factualWeight: z.number().min(0).max(1),
-  sourceCredibility: z.number().min(0).max(1),
-  diversityFactor: z.number().min(0).max(1),
-  recencyFactor: z.number().min(0).max(1),
-  hypeFactor: z.number().min(0).max(1),
-  confidenceFactor: z.number().min(0).max(1),
-  modelVersion: z.string(),
-  questionVersion: z.string(),
-}));
 
 function requireDesktopRuntime() {
   if (!isTauri()) throw new Error("desktop_runtime_required");
