@@ -38,6 +38,7 @@ const X_SOURCE_SCHEMA: &str = include_str!("migrations/0010_x_source.sql");
 const ALERT_PREFERENCES_SCHEMA: &str = include_str!("migrations/0011_alert_preferences.sql");
 const SIGNAL_WEIGHT_AUDIT_SCHEMA: &str = include_str!("migrations/0012_signal_weight_audit.sql");
 const VERSIONED_SIGNALS_SCHEMA: &str = include_str!("migrations/0013_versioned_signals.sql");
+const OFFICIAL_FEEDS_SCHEMA: &str = include_str!("migrations/0014_official_feeds.sql");
 
 pub struct Database {
     connection: Mutex<Connection>,
@@ -80,6 +81,7 @@ impl Database {
         apply_migration(&connection, 11, ALERT_PREFERENCES_SCHEMA)?;
         apply_migration(&connection, 12, SIGNAL_WEIGHT_AUDIT_SCHEMA)?;
         apply_migration(&connection, 13, VERSIONED_SIGNALS_SCHEMA)?;
+        apply_migration(&connection, 14, OFFICIAL_FEEDS_SCHEMA)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -1994,7 +1996,7 @@ mod tests {
                 .iter()
                 .filter(|source| source.source_kind == "rss")
                 .count()
-                >= 4
+                >= 9
         );
         assert!(
             database
