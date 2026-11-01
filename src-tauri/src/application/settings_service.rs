@@ -137,6 +137,7 @@ impl SettingsService {
             reddit_client_secret: secrets.exists(SecretKind::RedditClientSecret),
             x_bearer_token: secrets.exists(SecretKind::XBearerToken),
             brapi_token: secrets.exists(SecretKind::BrapiToken),
+            alpha_vantage_api_key: secrets.exists(SecretKind::AlphaVantageApiKey),
         }
     }
 }

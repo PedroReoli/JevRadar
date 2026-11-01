@@ -47,6 +47,7 @@ const EVENT_QUERY_INDEXES_SCHEMA: &str = include_str!("migrations/0016_event_que
 const JEV_TOKEN_USAGE_SCHEMA: &str = include_str!("migrations/0017_jev_token_usage.sql");
 const BACKTEST_PATTERN_INDEXES_SCHEMA: &str =
     include_str!("migrations/0018_backtest_pattern_indexes.sql");
+const US_MARKET_SCHEMA: &str = include_str!("migrations/0019_us_market.sql");
 
 pub struct Database {
     connection: Mutex<Connection>,
@@ -94,6 +95,7 @@ impl Database {
         apply_migration(&connection, 16, EVENT_QUERY_INDEXES_SCHEMA)?;
         apply_migration(&connection, 17, JEV_TOKEN_USAGE_SCHEMA)?;
         apply_migration(&connection, 18, BACKTEST_PATTERN_INDEXES_SCHEMA)?;
+        apply_migration(&connection, 19, US_MARKET_SCHEMA)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -2484,7 +2486,10 @@ mod tests {
     use rusqlite::params;
     use tempfile::tempdir;
 
-    use super::Database;
+    use super::{
+        Database, INITIAL_SCHEMA, MARKET_CORE_SCHEMA, SETTINGS_SCHEMA, US_MARKET_SCHEMA,
+        apply_migration,
+    };
 
     #[test]
     fn initializes_database_with_safe_defaults() {
@@ -2527,8 +2532,63 @@ mod tests {
         let asset_count: u8 = connection
             .query_row("SELECT COUNT(*) FROM assets", [], |row| row.get(0))
             .expect("catálogo");
+        let us_migration_applied: bool = connection
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = 19)",
+                [],
+                |row| row.get(0),
+            )
+            .expect("migration EUA registrada");
+        let foreign_key_issue_count: u8 = connection
+            .query_row("SELECT COUNT(*) FROM pragma_foreign_key_check", [], |row| {
+                row.get(0)
+            })
+            .expect("integridade referencial");
         assert!(migration_applied);
-        assert_eq!(asset_count, 9);
+        assert!(us_migration_applied);
+        assert_eq!(asset_count, 19);
+        assert_eq!(foreign_key_issue_count, 0);
+    }
+
+    #[test]
+    fn us_market_migration_preserves_existing_watchlist_references() {
+        let directory = tempdir().expect("diretório temporário");
+        let connection = rusqlite::Connection::open(directory.path().join("upgrade.sqlite3"))
+            .expect("banco legado");
+        connection
+            .execute_batch("PRAGMA foreign_keys = ON;")
+            .expect("foreign keys");
+        connection
+            .execute_batch(INITIAL_SCHEMA)
+            .expect("schema inicial");
+        apply_migration(&connection, 2, SETTINGS_SCHEMA).expect("configurações");
+        apply_migration(&connection, 3, MARKET_CORE_SCHEMA).expect("mercado legado");
+        connection
+            .execute(
+                "INSERT INTO watchlist_assets (watchlist_id, asset_id)
+                 VALUES ('watchlist:default', 'asset:b3:PETR4')",
+                [],
+            )
+            .expect("watchlist existente");
+
+        apply_migration(&connection, 19, US_MARKET_SCHEMA).expect("migração EUA");
+
+        let symbol: String = connection
+            .query_row(
+                "SELECT a.symbol FROM watchlist_assets wa
+                 JOIN assets a ON a.id = wa.asset_id
+                 WHERE wa.watchlist_id = 'watchlist:default'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("referência preservada");
+        let foreign_key_issue_count: u8 = connection
+            .query_row("SELECT COUNT(*) FROM pragma_foreign_key_check", [], |row| {
+                row.get(0)
+            })
+            .expect("integridade referencial");
+        assert_eq!(symbol, "PETR4");
+        assert_eq!(foreign_key_issue_count, 0);
     }
 
     #[test]

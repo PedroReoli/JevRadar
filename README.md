@@ -10,7 +10,7 @@ O repositório está em **alpha para Windows**. O núcleo público funciona sem 
 
 - wizard inicial bilíngue, preferências locais e credenciais no Windows Credential Manager;
 - watchlist de até 50 ativos;
-- preços de Binance e brapi, indicadores do Banco Central e conteúdo via RSS, Reddit oficial (posts e comentários de comunidades BR/globais) e X opcional BYOK;
+- preços de Binance e brapi, indicadores do Banco Central, ações/ETFs dos EUA via Alpha Vantage BYOK e conteúdo via RSS, Reddit oficial (posts e comentários de comunidades BR/globais) e X opcional BYOK;
 - fontes personalizadas tipadas como publicação ou fórum público, coletadas por RSS/Atom HTTPS com deduplicação;
 - lista configurável de até 25 comunidades do Reddit, com coleta oficial de posts e comentários;
 - classificação Jev por ativo, sentimento, relevância, tipo, alegação factual, hype e contexto externo;
@@ -30,7 +30,7 @@ O repositório está em **alpha para Windows**. O núcleo público funciona sem 
 - atualização confirmada pelo usuário em builds assinados, com verificação criptográfica do artefato;
 - exportação do SQLite e exclusão confirmada do histórico local.
 
-Scraping HTML de fóruns e mercados internacionais são adapters futuros, não funcionalidades simuladas. Hoje, fóruns que exponham RSS/Atom público podem ser cadastrados e auditados como fóruns, sem se confundirem com fontes editoriais. Novos scrapers exigem revisão individual de termos e `robots.txt`. Fontes pagas são sempre opcionais e usam credenciais do próprio usuário.
+Scraping HTML de fóruns e outras fontes internacionais são adapters futuros, não funcionalidades simuladas. Hoje, fóruns que exponham RSS/Atom público podem ser cadastrados e auditados como fóruns, sem se confundirem com fontes editoriais. A integração Alpha Vantage usa a chave do usuário, catálogo oficial de ações/ETFs ativos e histórico diário; a coleta rotaciona no máximo cinco ativos americanos por execução e não apresenta dados gratuitos como tempo real. Novos scrapers exigem revisão individual de termos e `robots.txt`. Fontes pagas são sempre opcionais e usam credenciais do próprio usuário.
 
 ## Arquitetura
 
@@ -41,7 +41,7 @@ flowchart LR
   APP --> DB[(SQLite local)]
   APP --> KEY[Credential Manager]
   APP --> JEV[Jev / System One]
-  APP --> DATA[Binance · brapi · BCB]
+  APP --> DATA[Binance · brapi · BCB · Alpha Vantage]
   APP --> CONTENT[RSS · Reddit · X opcional]
   APP --> API[API loopback + Swagger]
   APP --> BG[Worker em background]

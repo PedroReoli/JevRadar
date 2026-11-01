@@ -6,7 +6,7 @@ import { listHistoricalPatterns } from "@/services/patternService";
 import type { AssetClass } from "@/types/assets";
 import type { HistoricalPatternFilter, HistoricalPatternOutcome } from "@/types/patterns";
 
-const classes = new Set<AssetClass>(["b3Equity", "b3Fund", "crypto", "macro"]);
+const classes = new Set<AssetClass>(["b3Equity", "b3Fund", "usEquity", "usFund", "crypto", "macro"]);
 const horizons = new Set<HistoricalPatternFilter["horizonDays"]>([1, 7, 30]);
 const outcomes = new Set<HistoricalPatternOutcome>(["all", "outperformed", "underperformed", "insufficient"]);
 const samples = new Set<HistoricalPatternFilter["minimumSampleSize"]>([0, 5, 10, 30]);

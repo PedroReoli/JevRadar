@@ -22,10 +22,13 @@ pub async fn refresh_asset_catalog(
     state: State<'_, AppState>,
 ) -> Result<CatalogRefreshSummary, CommandError> {
     let database = std::sync::Arc::clone(&state.database);
-    tauri::async_runtime::spawn_blocking(move || CatalogService::refresh_assets(&database))
-        .await
-        .map_err(|_| CommandError::internal("catalog_task_failed"))?
-        .map_err(Into::into)
+    let secrets = state.secrets;
+    tauri::async_runtime::spawn_blocking(move || {
+        CatalogService::refresh_assets(&database, &secrets)
+    })
+    .await
+    .map_err(|_| CommandError::internal("catalog_task_failed"))?
+    .map_err(Into::into)
 }
 
 #[tauri::command]

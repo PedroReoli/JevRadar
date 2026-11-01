@@ -66,6 +66,8 @@ describe("WatchlistPage", () => {
     );
 
     expect(await screen.findByText("PETR4")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ações dos EUA" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "ETFs dos EUA" })).toBeInTheDocument();
     fireEvent.change(screen.getByRole("searchbox", { name: "Buscar ativos" }), {
       target: { value: "petrobras" },
     });

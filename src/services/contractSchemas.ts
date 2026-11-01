@@ -4,7 +4,7 @@ export const assetSchema = z.object({
   id: z.string(),
   symbol: z.string(),
   name: z.string(),
-  assetClass: z.enum(["b3Equity", "b3Fund", "crypto", "macro"]),
+  assetClass: z.enum(["b3Equity", "b3Fund", "usEquity", "usFund", "crypto", "macro"]),
   exchange: z.string(),
   currency: z.string(),
   countryCode: z.string().nullable(),

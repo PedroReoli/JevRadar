@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 pub enum AssetClass {
     B3Equity,
     B3Fund,
+    UsEquity,
+    UsFund,
     Crypto,
     Macro,
 }
@@ -14,6 +16,8 @@ impl AssetClass {
         match self {
             Self::B3Equity => "b3_equity",
             Self::B3Fund => "b3_fund",
+            Self::UsEquity => "us_equity",
+            Self::UsFund => "us_fund",
             Self::Crypto => "crypto",
             Self::Macro => "macro",
         }
@@ -23,6 +27,8 @@ impl AssetClass {
         match value {
             "b3_equity" => Some(Self::B3Equity),
             "b3_fund" => Some(Self::B3Fund),
+            "us_equity" => Some(Self::UsEquity),
+            "us_fund" => Some(Self::UsFund),
             "crypto" => Some(Self::Crypto),
             "macro" => Some(Self::Macro),
             _ => None,

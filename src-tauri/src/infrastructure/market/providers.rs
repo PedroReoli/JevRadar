@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, NaiveDate, Utc};
 use reqwest::blocking::Client;
 use serde::Deserialize;
@@ -11,6 +13,8 @@ use crate::infrastructure::http::{RetryPolicy, send_with_retry};
 const BINANCE_SOURCE_ID: &str = "source:binance";
 const BRAPI_SOURCE_ID: &str = "source:brapi";
 const BCB_SOURCE_ID: &str = "source:bcb";
+const ALPHA_VANTAGE_SOURCE_ID: &str = "source:alpha-vantage";
+const ALPHA_VANTAGE_ASSET_LIMIT_PER_RUN: usize = 5;
 const BRAPI_FREE_SYMBOLS: &[&str] = &["PETR4", "VALE3", "ITUB4", "MGLU3"];
 
 #[derive(Debug)]
@@ -26,6 +30,10 @@ pub enum MarketProviderError {
     Request,
     #[error("a fonte retornou um contrato de dados inválido")]
     InvalidPayload,
+    #[error("a fonte informou limite temporário de uso")]
+    RateLimited,
+    #[error("a fonte rejeitou a chave de API")]
+    Authentication,
 }
 
 impl MarketProviderError {
@@ -33,6 +41,8 @@ impl MarketProviderError {
         match self {
             Self::Request => "provider_request_failed",
             Self::InvalidPayload => "provider_invalid_payload",
+            Self::RateLimited => "provider_rate_limited",
+            Self::Authentication => "provider_authentication_failed",
         }
     }
 }
@@ -170,6 +180,98 @@ pub fn collect_bcb(
     })
 }
 
+pub fn collect_alpha_vantage(
+    client: &Client,
+    assets: &[Asset],
+    api_key: Option<&str>,
+    rotation_offset: usize,
+) -> Result<ProviderCollection, MarketProviderError> {
+    let us_assets = assets
+        .iter()
+        .filter(|asset| matches!(asset.asset_class, AssetClass::UsEquity | AssetClass::UsFund))
+        .collect::<Vec<_>>();
+    let Some(api_key) = api_key.filter(|value| !value.trim().is_empty()) else {
+        return Ok(ProviderCollection {
+            source_id: ALPHA_VANTAGE_SOURCE_ID,
+            observations: Vec::new(),
+            skipped_asset_count: us_assets.len(),
+        });
+    };
+    if us_assets.is_empty() {
+        return Ok(ProviderCollection {
+            source_id: ALPHA_VANTAGE_SOURCE_ID,
+            observations: Vec::new(),
+            skipped_asset_count: 0,
+        });
+    }
+
+    let selected = select_alpha_vantage_assets(&us_assets, rotation_offset);
+    let selected_count = selected.len();
+    let mut observations = Vec::new();
+    let mut skipped_asset_count = us_assets.len().saturating_sub(selected_count);
+    let mut last_error = None;
+
+    for (index, asset) in selected.into_iter().enumerate() {
+        let response = send_with_retry(
+            || {
+                client.get("https://www.alphavantage.co/query").query(&[
+                    ("function", "TIME_SERIES_DAILY"),
+                    ("symbol", asset.symbol.as_str()),
+                    ("outputsize", "compact"),
+                    ("apikey", api_key),
+                ])
+            },
+            RetryPolicy::Idempotent,
+        )
+        .and_then(reqwest::blocking::Response::error_for_status)
+        .map_err(|_| MarketProviderError::Request)
+        .and_then(|response| {
+            response
+                .json::<AlphaVantageDailyResponse>()
+                .map_err(|_| MarketProviderError::InvalidPayload)
+        })
+        .and_then(|payload| parse_alpha_vantage_daily(asset, payload));
+        match response {
+            Ok(points) => observations.extend(points),
+            Err(error) => {
+                let rate_limited = matches!(error, MarketProviderError::RateLimited);
+                skipped_asset_count += 1;
+                last_error = Some(error);
+                if rate_limited {
+                    skipped_asset_count += selected_count.saturating_sub(index + 1);
+                    break;
+                }
+            }
+        }
+    }
+
+    if observations.is_empty() {
+        if let Some(error) = last_error {
+            return Err(error);
+        }
+    }
+    Ok(ProviderCollection {
+        source_id: ALPHA_VANTAGE_SOURCE_ID,
+        observations,
+        skipped_asset_count,
+    })
+}
+
+fn select_alpha_vantage_assets<'a>(assets: &[&'a Asset], rotation_offset: usize) -> Vec<&'a Asset> {
+    if assets.is_empty() {
+        return Vec::new();
+    }
+    let selected_count = assets.len().min(ALPHA_VANTAGE_ASSET_LIMIT_PER_RUN);
+    let offset = rotation_offset % assets.len();
+    assets
+        .iter()
+        .cycle()
+        .skip(offset)
+        .take(selected_count)
+        .copied()
+        .collect()
+}
+
 fn parse_binance_klines(
     asset: &Asset,
     payload: Vec<Vec<Value>>,
@@ -285,6 +387,88 @@ struct BcbPoint {
     valor: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct AlphaVantageDailyResponse {
+    #[serde(rename = "Time Series (Daily)")]
+    time_series: Option<BTreeMap<String, AlphaVantageDailyPoint>>,
+    #[serde(rename = "Note")]
+    note: Option<String>,
+    #[serde(rename = "Information")]
+    information: Option<String>,
+    #[serde(rename = "Error Message")]
+    error_message: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AlphaVantageDailyPoint {
+    #[serde(rename = "1. open")]
+    open: String,
+    #[serde(rename = "2. high")]
+    high: String,
+    #[serde(rename = "3. low")]
+    low: String,
+    #[serde(rename = "4. close")]
+    close: String,
+    #[serde(rename = "5. volume")]
+    volume: String,
+}
+
+fn parse_alpha_vantage_daily(
+    asset: &Asset,
+    payload: AlphaVantageDailyResponse,
+) -> Result<Vec<MarketObservationInput>, MarketProviderError> {
+    if payload.note.is_some() {
+        return Err(MarketProviderError::RateLimited);
+    }
+    if let Some(information) = payload.information {
+        let normalized = information.to_ascii_lowercase();
+        return Err(
+            if normalized.contains("api key")
+                && (normalized.contains("demo") || normalized.contains("invalid"))
+            {
+                MarketProviderError::Authentication
+            } else {
+                MarketProviderError::RateLimited
+            },
+        );
+    }
+    if payload.error_message.is_some() {
+        return Err(MarketProviderError::InvalidPayload);
+    }
+    let series = payload
+        .time_series
+        .ok_or(MarketProviderError::InvalidPayload)?;
+    series
+        .into_iter()
+        .map(|(date, point)| {
+            let date = NaiveDate::parse_from_str(&date, "%Y-%m-%d")
+                .map_err(|_| MarketProviderError::InvalidPayload)?;
+            let observed_at = format!("{}T00:00:00Z", date.format("%Y-%m-%d"));
+            Ok(MarketObservationInput {
+                id: observation_id(ALPHA_VANTAGE_SOURCE_ID, &asset.id, "1d", &observed_at),
+                asset_id: asset.id.clone(),
+                source_id: ALPHA_VANTAGE_SOURCE_ID.to_owned(),
+                interval: "1d".to_owned(),
+                observed_at,
+                open_value: Some(parse_alpha_number(&point.open)?),
+                high_value: Some(parse_alpha_number(&point.high)?),
+                low_value: Some(parse_alpha_number(&point.low)?),
+                close_value: parse_alpha_number(&point.close)?,
+                volume_value: Some(parse_alpha_number(&point.volume)?),
+                collected_at: Utc::now().to_rfc3339(),
+            })
+        })
+        .collect()
+}
+
+fn parse_alpha_number(value: &str) -> Result<f64, MarketProviderError> {
+    value
+        .parse::<f64>()
+        .ok()
+        .filter(|number| number.is_finite())
+        .ok_or(MarketProviderError::InvalidPayload)
+}
+
 fn parse_bcb_points(
     asset: &Asset,
     payload: Vec<BcbPoint>,
@@ -326,7 +510,8 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        BcbPoint, BrapiResponse, parse_bcb_points, parse_binance_klines, parse_brapi_history,
+        AlphaVantageDailyResponse, BcbPoint, BrapiResponse, parse_alpha_vantage_daily,
+        parse_bcb_points, parse_binance_klines, parse_brapi_history, select_alpha_vantage_assets,
     };
     use crate::domain::assets::{Asset, AssetClass};
 
@@ -393,5 +578,66 @@ mod tests {
         .expect("série válida");
         assert_eq!(parsed[0].close_value, 13.65);
         assert_eq!(parsed[0].observed_at, "2026-10-30T00:00:00-03:00");
+    }
+
+    #[test]
+    fn parses_alpha_vantage_daily_history_and_rejects_usage_notices() {
+        let asset = asset("asset:us:AAPL", "AAPL", AssetClass::UsEquity);
+        let payload: AlphaVantageDailyResponse = serde_json::from_value(json!({
+            "Time Series (Daily)": {
+                "2026-10-30": {
+                    "1. open": "270.10",
+                    "2. high": "274.20",
+                    "3. low": "268.40",
+                    "4. close": "272.75",
+                    "5. volume": "23800000"
+                }
+            }
+        }))
+        .expect("fixture diária");
+        let parsed = parse_alpha_vantage_daily(&asset, payload).expect("histórico válido");
+        assert_eq!(parsed[0].close_value, 272.75);
+        assert_eq!(parsed[0].source_id, "source:alpha-vantage");
+
+        let limited: AlphaVantageDailyResponse = serde_json::from_value(json!({
+            "Note": "API call frequency"
+        }))
+        .expect("fixture de limite");
+        assert!(matches!(
+            parse_alpha_vantage_daily(&asset, limited),
+            Err(super::MarketProviderError::RateLimited)
+        ));
+
+        let rejected_demo: AlphaVantageDailyResponse = serde_json::from_value(json!({
+            "Information": "The demo API key is for demo purposes only."
+        }))
+        .expect("fixture de autenticação");
+        assert!(matches!(
+            parse_alpha_vantage_daily(&asset, rejected_demo),
+            Err(super::MarketProviderError::Authentication)
+        ));
+    }
+
+    #[test]
+    fn rotates_alpha_vantage_assets_with_a_bounded_batch() {
+        let assets = (0..7)
+            .map(|index| {
+                asset(
+                    &format!("asset:us:T{index}"),
+                    &format!("T{index}"),
+                    AssetClass::UsEquity,
+                )
+            })
+            .collect::<Vec<_>>();
+        let references = assets.iter().collect::<Vec<_>>();
+        let selected = select_alpha_vantage_assets(&references, 5);
+        assert_eq!(selected.len(), 5);
+        assert_eq!(
+            selected
+                .iter()
+                .map(|asset| asset.symbol.as_str())
+                .collect::<Vec<_>>(),
+            vec!["T5", "T6", "T0", "T1", "T2"]
+        );
     }
 }

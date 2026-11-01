@@ -1,4 +1,4 @@
-export type AssetClass = "b3Equity" | "b3Fund" | "crypto" | "macro";
+export type AssetClass = "b3Equity" | "b3Fund" | "usEquity" | "usFund" | "crypto" | "macro";
 
 export interface Asset {
   id: string;
@@ -33,7 +33,7 @@ export interface Watchlist {
 
 export interface CatalogSourceRefresh {
   sourceId: string;
-  status: "completed" | "failed";
+  status: "completed" | "failed" | "skipped";
   discoveredCount: number;
   errorCode: string | null;
 }

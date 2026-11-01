@@ -1,4 +1,12 @@
 export const ptBR = {
+  assetClass: {
+    b3Equity: "Ações B3",
+    b3Fund: "Fundos B3",
+    usEquity: "Ações dos EUA",
+    usFund: "ETFs dos EUA",
+    crypto: "Cripto",
+    macro: "Macroeconomia",
+  },
   app: {
     name: "JevRadar",
     tagline: "Sentimento, contexto e evidência",
@@ -200,6 +208,8 @@ export const ptBR = {
       all: "Todos",
       b3Equity: "Ações B3",
       b3Fund: "Fundos B3",
+      usEquity: "Ações dos EUA",
+      usFund: "ETFs dos EUA",
       crypto: "Cripto",
       macro: "Macroeconomia",
     },
@@ -654,6 +664,8 @@ export const ptBR = {
     xTokenDescription: "Opcional e cobrado pelo provedor conforme a conta do usuário.",
     brapiToken: "brapi token",
     brapiTokenDescription: "Opcional para endpoints e limites que exijam autenticação.",
+    alphaVantageApiKey: "Chave Alpha Vantage",
+    alphaVantageDescription: "Opcional e armazenada apenas no cofre do Windows. Habilita catálogo e histórico diário de ações e ETFs dos EUA; dados em tempo real podem exigir plano próprio.",
     updateTitle: "Atualizações do aplicativo",
     updateDescription: "Consulte e instale releases assinadas sem baixar executáveis manualmente.",
     updateHint: "Somente builds assinados possuem um canal configurado. O JevRadar nunca instala uma atualização sem confirmação.",

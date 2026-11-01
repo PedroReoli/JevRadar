@@ -6,7 +6,8 @@ export type SecretKind =
   | "redditClientId"
   | "redditClientSecret"
   | "xBearerToken"
-  | "brapiToken";
+  | "brapiToken"
+  | "alphaVantageApiKey";
 
 export interface AppSettings {
   setupCompleted: boolean;
@@ -37,6 +38,7 @@ export interface SecretStatus {
   redditClientSecret: boolean;
   xBearerToken: boolean;
   brapiToken: boolean;
+  alphaVantageApiKey: boolean;
 }
 
 export interface LocalApiAccess {

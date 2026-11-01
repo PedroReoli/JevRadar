@@ -47,7 +47,7 @@ O usuário escolhe o comportamento ao fechar: perguntar, minimizar para a bandej
 
 ## Fontes
 
-O primeiro release inclui Reddit, RSS/notícias, Binance, brapi e Banco Central. X é opcional e BYOK. O usuário pode cadastrar feeds RSS/Atom HTTPS e classificá-los como publicação editorial ou fórum público; ambos usam o parser de feed, mas preservam tipos distintos para filtros, cobertura e pesos. Novas fontes usam adapters isolados.
+O primeiro release inclui Reddit, RSS/notícias, Binance, brapi e Banco Central. X e Alpha Vantage são opcionais e BYOK. Alpha Vantage fornece catálogo de ações/ETFs ativos dos EUA e histórico diário; o app limita cada coleta a cinco ativos americanos e os rotaciona entre execuções. O usuário pode cadastrar feeds RSS/Atom HTTPS e classificá-los como publicação editorial ou fórum público; ambos usam o parser de feed, mas preservam tipos distintos para filtros, cobertura e pesos. Novas fontes usam adapters isolados.
 
 APIs oficiais são preferidas. Scraping é permitido somente quando termos, robots e acesso público permitirem, sem burlar autenticação, paywall ou proteções. Conteúdo bruto tem retenção mínima e não é incluído no repositório.
 
@@ -55,7 +55,7 @@ APIs oficiais são preferidas. Scraping é permitido somente quando termos, robo
 
 O catálogo pode ser amplo, mas cada watchlist monitora inicialmente até 50 ativos. O pipeline faz pré-filtro determinístico por ticker, nome e aliases antes de consultar o Jev.
 
-Classes planejadas incluem ações B3, FIIs, ETFs, índices, renda fixa de referência, cripto e, posteriormente, mercados internacionais.
+Classes suportadas incluem ações B3, fundos/ETFs da B3, ações e ETFs dos EUA, cripto e indicadores macroeconômicos. Índices negociáveis adicionais e renda fixa além dos indicadores de referência permanecem como expansão posterior.
 
 ## Pipeline de sinal
 

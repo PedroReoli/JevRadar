@@ -17,7 +17,7 @@ import {
 import pageStyles from "@/pages/watchlist/WatchlistPage.module.css";
 import type { AssetClass } from "@/types/assets";
 
-const supportedClasses = new Set<AssetClass>(["b3Equity", "b3Fund", "crypto", "macro"]);
+const supportedClasses = new Set<AssetClass>(["b3Equity", "b3Fund", "usEquity", "usFund", "crypto", "macro"]);
 const defaultPage = 1;
 
 function readPage(value: string | null) {

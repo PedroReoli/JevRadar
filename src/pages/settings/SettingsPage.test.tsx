@@ -18,6 +18,7 @@ describe("SettingsPage", () => {
     );
 
     const alertLevel = await screen.findByRole("combobox", { name: /Nível de alerta/i });
+    expect(screen.getByLabelText("Chave Alpha Vantage")).toBeInTheDocument();
     fireEvent.change(alertLevel, { target: { value: "3" } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar preferências" }));
 

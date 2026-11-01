@@ -9,7 +9,7 @@ interface PatternFiltersProps {
   onChange: (key: "class" | "horizon" | "outcome" | "sample", value: string) => void;
 }
 
-const assetClasses: AssetClass[] = ["b3Equity", "b3Fund", "crypto", "macro"];
+const assetClasses: AssetClass[] = ["b3Equity", "b3Fund", "usEquity", "usFund", "crypto", "macro"];
 const outcomes: HistoricalPatternOutcome[] = ["all", "outperformed", "underperformed", "insufficient"];
 
 export function PatternFilters({ filter, onChange }: PatternFiltersProps) {

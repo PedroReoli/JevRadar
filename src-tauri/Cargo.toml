@@ -15,6 +15,7 @@ tauri-build = { version = "2.7.4", features = [] }
 
 [dependencies]
 chrono = { version = "0.4.42", features = ["serde"] }
+csv = "1.4.0"
 axum = "0.8.9"
 feed-rs = "3.0.0"
 keyring = "4.2.0"

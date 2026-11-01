@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import type { AssetCatalogPage, AssetClass, CatalogRefreshSummary, Watchlist } from "@/types/assets";
 
-const assetClassSchema = z.enum(["b3Equity", "b3Fund", "crypto", "macro"]);
+const assetClassSchema = z.enum(["b3Equity", "b3Fund", "usEquity", "usFund", "crypto", "macro"]);
 const assetSchema = z.object({
   id: z.string().min(1),
   symbol: z.string().min(1),
@@ -31,7 +31,7 @@ const catalogRefreshSchema = z.object({
   refreshedAt: z.string().min(1),
   sources: z.array(z.object({
     sourceId: z.string().min(1),
-    status: z.enum(["completed", "failed"]),
+  status: z.enum(["completed", "failed", "skipped"]),
     discoveredCount: z.number().int().nonnegative(),
     errorCode: z.string().nullable(),
   })),

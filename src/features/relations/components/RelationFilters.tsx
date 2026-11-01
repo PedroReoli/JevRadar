@@ -10,7 +10,7 @@ interface RelationFiltersProps {
   onChange: (key: "period" | "country" | "class" | "relation" | "confidence", value: string) => void;
 }
 
-const assetClasses: AssetClass[] = ["b3Equity", "b3Fund", "crypto", "macro"];
+const assetClasses: AssetClass[] = ["b3Equity", "b3Fund", "usEquity", "usFund", "crypto", "macro"];
 const relationTypes: MarketEventSnapshot["relationType"][] = ["known", "correlation", "hypothesis", "unproven_causality"];
 
 export function RelationFilters({ filter, countries, onChange }: RelationFiltersProps) {

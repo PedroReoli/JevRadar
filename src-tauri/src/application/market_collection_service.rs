@@ -8,7 +8,8 @@ use crate::domain::collection::{CollectionSummary, CollectionTrigger, SourceColl
 use crate::domain::settings::SecretKind;
 use crate::infrastructure::database::{Database, DatabaseError};
 use crate::infrastructure::market::{
-    MarketProviderError, ProviderCollection, collect_bcb, collect_binance, collect_brapi,
+    MarketProviderError, ProviderCollection, collect_alpha_vantage, collect_bcb, collect_binance,
+    collect_brapi,
 };
 use crate::infrastructure::secrets::KeyringSecretStore;
 
@@ -31,10 +32,11 @@ impl MarketCollectionService {
         trigger: CollectionTrigger,
     ) -> Result<CollectionSummary, MarketCollectionServiceError> {
         let started_at = Utc::now();
+        let run_sequence = RUN_SEQUENCE.fetch_add(1, Ordering::Relaxed);
         let run_id = format!(
             "collection:{}:{}",
             started_at.timestamp_millis(),
-            RUN_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+            run_sequence
         );
         database.start_collection_run(
             &run_id,
@@ -56,6 +58,7 @@ impl MarketCollectionService {
             .map(|item| item.asset)
             .collect::<Vec<_>>();
         let brapi_token = secrets.read(SecretKind::BrapiToken).unwrap_or(None);
+        let alpha_vantage_api_key = secrets.read(SecretKind::AlphaVantageApiKey).unwrap_or(None);
 
         let provider_results = [
             ("source:binance", collect_binance(&client, &assets)),
@@ -64,6 +67,15 @@ impl MarketCollectionService {
                 collect_brapi(&client, &assets, brapi_token.as_deref()),
             ),
             ("source:bcb", collect_bcb(&client, &assets)),
+            (
+                "source:alpha-vantage",
+                collect_alpha_vantage(
+                    &client,
+                    &assets,
+                    alpha_vantage_api_key.as_deref(),
+                    run_sequence as usize,
+                ),
+            ),
         ];
         let mut sources = Vec::new();
         let mut stored_observation_count = 0;

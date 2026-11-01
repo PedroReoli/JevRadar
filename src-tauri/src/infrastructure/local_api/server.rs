@@ -384,7 +384,7 @@ async fn market_events(
     params(
         ("periodHours" = Option<u16>, Query, description = "1 a 720; padrão 168"),
         ("countryCode" = Option<String>, Query, description = "Código de país ou região em maiúsculas"),
-        ("assetClass" = Option<String>, Query, description = "b3Equity, b3Fund, crypto ou macro"),
+        ("assetClass" = Option<String>, Query, description = "b3Equity, b3Fund, usEquity, usFund, crypto ou macro"),
         ("relationType" = Option<String>, Query, description = "known, correlation, hypothesis ou unproven_causality"),
         ("minimumConfidence" = Option<f64>, Query, description = "0 a 1"),
         ("page" = Option<u32>, Query, description = "Página a partir de 1"),
@@ -428,7 +428,7 @@ async fn market_relations(
     path = "/v1/coverage-gaps",
     params(
         ("periodHours" = Option<u16>, Query, description = "1 a 720; padrão 24"),
-        ("assetClass" = Option<String>, Query, description = "b3Equity, b3Fund, crypto ou macro"),
+        ("assetClass" = Option<String>, Query, description = "b3Equity, b3Fund, usEquity, usFund, crypto ou macro"),
         ("minimumMovementPercent" = Option<f64>, Query, description = "0.5 a 25; padrão 2"),
         ("maximumEvidenceCount" = Option<u8>, Query, description = "0 a 10; padrão 0"),
         ("page" = Option<u32>, Query, description = "Página a partir de 1"),
@@ -470,7 +470,7 @@ async fn coverage_gaps(
     get,
     path = "/v1/historical-patterns",
     params(
-        ("assetClass" = Option<String>, Query, description = "b3Equity, b3Fund, crypto ou macro"),
+        ("assetClass" = Option<String>, Query, description = "b3Equity, b3Fund, usEquity, usFund, crypto ou macro"),
         ("horizonDays" = Option<i64>, Query, description = "1, 7 ou 30; padrão 7"),
         ("outcome" = Option<String>, Query, description = "all, outperformed, underperformed ou insufficient"),
         ("minimumSampleSize" = Option<u32>, Query, description = "0 a 10000; padrão 0"),
@@ -704,6 +704,8 @@ fn parse_asset_class(value: &str) -> Result<AssetClass, StatusCode> {
     match value {
         "b3Equity" => Ok(AssetClass::B3Equity),
         "b3Fund" => Ok(AssetClass::B3Fund),
+        "usEquity" => Ok(AssetClass::UsEquity),
+        "usFund" => Ok(AssetClass::UsFund),
         "crypto" => Ok(AssetClass::Crypto),
         "macro" => Ok(AssetClass::Macro),
         _ => Err(StatusCode::BAD_REQUEST),

@@ -8,7 +8,7 @@ interface AssetClassFilterProps {
   onChange: (value?: AssetClass) => void;
 }
 
-const options: Array<AssetClass | undefined> = [undefined, "b3Equity", "b3Fund", "crypto", "macro"];
+const options: Array<AssetClass | undefined> = [undefined, "b3Equity", "b3Fund", "usEquity", "usFund", "crypto", "macro"];
 
 export function AssetClassFilter({ value, onChange }: AssetClassFilterProps) {
   const { t } = useTranslation();

@@ -7,7 +7,7 @@ import type { AssetClass } from "@/types/assets";
 import type { MarketEventSnapshot, MarketRelationFilter } from "@/types/market";
 
 const periods = new Set<MarketRelationFilter["periodHours"]>([24, 168, 720]);
-const assetClasses = new Set<AssetClass>(["b3Equity", "b3Fund", "crypto", "macro"]);
+const assetClasses = new Set<AssetClass>(["b3Equity", "b3Fund", "usEquity", "usFund", "crypto", "macro"]);
 const relationTypes = new Set<MarketEventSnapshot["relationType"]>(["known", "correlation", "hypothesis", "unproven_causality"]);
 const confidenceLevels = new Set<MarketRelationFilter["minimumConfidence"]>([0, 0.5, 0.7, 0.85]);
 

@@ -20,7 +20,7 @@ import styles from "@/pages/dashboard/DashboardPage.module.css";
 import type { ComponentStatus } from "@/types/system";
 import type { AssetClass } from "@/types/assets";
 
-const supportedClasses = new Set<AssetClass>(["b3Equity", "b3Fund", "crypto", "macro"]);
+const supportedClasses = new Set<AssetClass>(["b3Equity", "b3Fund", "usEquity", "usFund", "crypto", "macro"]);
 const supportedPeriods = new Set([1, 6, 24, 168, 720]);
 const supportedConfidence = new Set([0, 0.5, 0.7, 0.85]);
 

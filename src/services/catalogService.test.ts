@@ -70,6 +70,7 @@ describe("catalogService", () => {
       sources: [
         { sourceId: "source:brapi", status: "completed", discoveredCount: 480, errorCode: null },
         { sourceId: "source:binance", status: "failed", discoveredCount: 0, errorCode: "catalog_request_failed" },
+        { sourceId: "source:alpha-vantage", status: "skipped", discoveredCount: 0, errorCode: "alpha_vantage_credentials_missing" },
       ],
     });
 

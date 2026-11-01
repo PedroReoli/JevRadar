@@ -7,7 +7,7 @@ import type { AssetClass } from "@/types/assets";
 import type { CoverageGapFilter } from "@/types/coverage";
 
 const periods = new Set<CoverageGapFilter["periodHours"]>([24, 168, 720]);
-const classes = new Set<AssetClass>(["b3Equity", "b3Fund", "crypto", "macro"]);
+const classes = new Set<AssetClass>(["b3Equity", "b3Fund", "usEquity", "usFund", "crypto", "macro"]);
 const movements = new Set<CoverageGapFilter["minimumMovementPercent"]>([1, 2, 5]);
 const evidenceLimits = new Set<CoverageGapFilter["maximumEvidenceCount"]>([0, 1, 3]);
 

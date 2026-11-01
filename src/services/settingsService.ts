@@ -36,6 +36,7 @@ const secretStatusSchema = z.object({
   redditClientSecret: z.boolean(),
   xBearerToken: z.boolean(),
   brapiToken: z.boolean(),
+  alphaVantageApiKey: z.boolean(),
 });
 const localApiAccessSchema = z.object({
   baseUrl: z.string().url(),
@@ -84,6 +85,7 @@ let previewSecretStatus: SecretStatus = {
   redditClientSecret: false,
   xBearerToken: false,
   brapiToken: false,
+  alphaVantageApiKey: false,
 };
 
 export async function getAppSettings(): Promise<AppSettings> {

@@ -49,6 +49,12 @@ export function CredentialsSettingsSection({ status }: CredentialsSettingsSectio
         kind="brapiToken"
         label={t("settings.brapiToken")}
       />
+      <SecretField
+        configured={status.alphaVantageApiKey}
+        description={t("settings.alphaVantageDescription")}
+        kind="alphaVantageApiKey"
+        label={t("settings.alphaVantageApiKey")}
+      />
     </SettingsSection>
   );
 }

@@ -6,10 +6,13 @@ use reqwest::blocking::Client;
 use crate::domain::assets::{
     AssetCatalogPage, AssetClass, CatalogRefreshSummary, CatalogSourceRefresh, Watchlist,
 };
+use crate::domain::settings::SecretKind;
 use crate::infrastructure::catalog::{
-    CatalogProviderError, discover_binance_assets, discover_brapi_assets,
+    CatalogProviderError, discover_alpha_vantage_assets, discover_binance_assets,
+    discover_brapi_assets,
 };
 use crate::infrastructure::database::{Database, DatabaseError};
+use crate::infrastructure::secrets::KeyringSecretStore;
 
 pub struct CatalogService;
 
@@ -69,6 +72,7 @@ impl CatalogService {
 
     pub fn refresh_assets(
         database: &Database,
+        secrets: &KeyringSecretStore,
     ) -> Result<CatalogRefreshSummary, CatalogServiceError> {
         let client = Client::builder()
             .timeout(Duration::from_secs(20))
@@ -96,6 +100,27 @@ impl CatalogService {
                 }
                 Err(error) => sources.push(failed_catalog_source(source_id, error)),
             }
+        }
+        match secrets.read(SecretKind::AlphaVantageApiKey).unwrap_or(None) {
+            Some(api_key) => match discover_alpha_vantage_assets(&client, &api_key) {
+                Ok(assets) => {
+                    let discovered_count = assets.len();
+                    upserted_count += database.upsert_assets(&assets)?;
+                    sources.push(CatalogSourceRefresh {
+                        source_id: "source:alpha-vantage".to_owned(),
+                        status: "completed".to_owned(),
+                        discovered_count,
+                        error_code: None,
+                    });
+                }
+                Err(error) => sources.push(failed_catalog_source("source:alpha-vantage", error)),
+            },
+            None => sources.push(CatalogSourceRefresh {
+                source_id: "source:alpha-vantage".to_owned(),
+                status: "skipped".to_owned(),
+                discovered_count: 0,
+                error_code: Some("alpha_vantage_credentials_missing".to_owned()),
+            }),
         }
         let failed_count = sources
             .iter()

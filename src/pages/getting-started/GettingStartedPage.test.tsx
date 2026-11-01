@@ -38,6 +38,7 @@ describe("GettingStartedPage", () => {
       redditClientSecret: false,
       xBearerToken: false,
       brapiToken: false,
+      alphaVantageApiKey: false,
     });
     getContentOverview.mockResolvedValue({ sources: [], totalDocumentCount: 4, unclassifiedDocumentCount: 4 });
     getMarketOverview.mockResolvedValue({ snapshots: [], signals: [], events: [], latestCollection: null });
