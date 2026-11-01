@@ -1,6 +1,7 @@
 use serde::Serialize;
 
 use crate::application::catalog_service::CatalogServiceError;
+use crate::application::classification_service::ClassificationServiceError;
 use crate::application::content_collection_service::ContentCollectionServiceError;
 use crate::application::market_collection_service::MarketCollectionServiceError;
 use crate::application::settings_service::SettingsServiceError;
@@ -86,6 +87,17 @@ impl From<ContentCollectionServiceError> for CommandError {
         Self {
             code,
             message: error.to_string(),
+        }
+    }
+}
+
+impl From<ClassificationServiceError> for CommandError {
+    fn from(error: ClassificationServiceError) -> Self {
+        match error {
+            ClassificationServiceError::Database(error) => Self {
+                code: "database_error",
+                message: error.to_string(),
+            },
         }
     }
 }

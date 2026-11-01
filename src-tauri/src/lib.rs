@@ -13,6 +13,7 @@ use crate::infrastructure::secrets::KeyringSecretStore;
 use crate::interface::commands::catalog::{
     add_watchlist_asset, get_default_watchlist, list_assets, remove_watchlist_asset,
 };
+use crate::interface::commands::classification::classify_pending_documents;
 use crate::interface::commands::collection::refresh_market_data;
 use crate::interface::commands::content::{get_content_overview, refresh_content_sources};
 use crate::interface::commands::desktop::resolve_close_request;
@@ -47,6 +48,7 @@ pub fn run() {
             remove_watchlist_asset,
             refresh_market_data,
             refresh_content_sources,
+            classify_pending_documents,
             get_content_overview,
             get_market_overview,
             get_system_status,

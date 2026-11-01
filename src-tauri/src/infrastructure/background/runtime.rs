@@ -4,6 +4,7 @@ use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::thread;
 use std::time::Duration;
 
+use crate::application::classification_service::ClassificationService;
 use crate::application::content_collection_service::ContentCollectionService;
 use crate::application::market_collection_service::MarketCollectionService;
 use crate::domain::collection::CollectionTrigger;
@@ -48,6 +49,9 @@ impl BackgroundRuntime {
                 }
                 if let Err(error) = ContentCollectionService::collect(&database, &secrets) {
                     tracing::warn!(error = %error, "coleta de conteúdo em background falhou");
+                }
+                if let Err(error) = ClassificationService::classify_pending(&database, &secrets) {
+                    tracing::warn!(error = %error, "classificação Jev em background falhou");
                 }
             }),
         )

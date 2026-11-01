@@ -6,6 +6,9 @@ use rusqlite::{Connection, OptionalExtension, params};
 use thiserror::Error;
 
 use crate::domain::assets::{Asset, AssetClass, Watchlist, WatchlistAsset};
+use crate::domain::classification::{
+    AnalysisCandidateAsset, DocumentAnalysisResult, PendingDocumentAnalysis,
+};
 use crate::domain::collection::{MarketObservationInput, SourceCollectionResult};
 use crate::domain::content::{
     ContentOverview, ContentSource, ContentSourceResult, ContentSourceStatus, SourceDocumentInput,
@@ -17,6 +20,7 @@ const SETTINGS_SCHEMA: &str = include_str!("migrations/0002_settings.sql");
 const MARKET_CORE_SCHEMA: &str = include_str!("migrations/0003_market_core.sql");
 const COLLECTION_SCHEMA: &str = include_str!("migrations/0004_collection_runs.sql");
 const CONTENT_SOURCES_SCHEMA: &str = include_str!("migrations/0005_content_sources.sql");
+const DOCUMENT_ANALYSIS_SCHEMA: &str = include_str!("migrations/0006_document_analysis.sql");
 
 pub struct Database {
     connection: Mutex<Connection>,
@@ -51,6 +55,7 @@ impl Database {
         apply_migration(&connection, 3, MARKET_CORE_SCHEMA)?;
         apply_migration(&connection, 4, COLLECTION_SCHEMA)?;
         apply_migration(&connection, 5, CONTENT_SOURCES_SCHEMA)?;
+        apply_migration(&connection, 6, DOCUMENT_ANALYSIS_SCHEMA)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -518,7 +523,7 @@ impl Database {
              FROM source_documents sd
              WHERE sd.duplicate_of_id IS NULL
                AND NOT EXISTS (
-                   SELECT 1 FROM document_assets da WHERE da.document_id = sd.id
+                   SELECT 1 FROM document_analysis_runs dar WHERE dar.document_id = sd.id
                )",
             [],
             |row| row.get::<_, i64>(0),
@@ -528,6 +533,181 @@ impl Database {
             total_document_count,
             unclassified_document_count,
         })
+    }
+
+    pub fn pending_document_analyses(
+        &self,
+        question_version: &str,
+        limit: usize,
+    ) -> Result<Vec<PendingDocumentAnalysis>, DatabaseError> {
+        let connection = self.connection.lock();
+        let mut asset_statement = connection.prepare(
+            "SELECT a.id, a.symbol, a.name
+             FROM watchlist_assets wa
+             JOIN assets a ON a.id = wa.asset_id
+             WHERE wa.watchlist_id = 'watchlist:default' AND wa.enabled = 1 AND a.active = 1
+             ORDER BY a.symbol",
+        )?;
+        let mut candidates = asset_statement
+            .query_map([], |row| {
+                Ok(AnalysisCandidateAsset {
+                    id: row.get(0)?,
+                    symbol: row.get(1)?,
+                    name: row.get(2)?,
+                    aliases: Vec::new(),
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut alias_statement = connection
+            .prepare("SELECT alias FROM asset_aliases WHERE asset_id = ?1 ORDER BY alias")?;
+        for candidate in &mut candidates {
+            candidate.aliases = alias_statement
+                .query_map(params![candidate.id], |row| row.get(0))?
+                .collect::<Result<Vec<_>, _>>()?;
+        }
+        if candidates.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let scan_limit = i64::try_from(limit).unwrap_or(i64::MAX);
+        let mut document_statement = connection.prepare(
+            "SELECT sd.id, sd.title, sd.raw_text, sd.language
+             FROM source_documents sd
+             WHERE sd.duplicate_of_id IS NULL
+               AND NOT EXISTS (
+                   SELECT 1 FROM document_analysis_runs dar
+                   WHERE dar.document_id = sd.id AND dar.question_version = ?1
+               )
+               AND EXISTS (
+                   SELECT 1
+                   FROM watchlist_assets wa
+                   JOIN assets a ON a.id = wa.asset_id
+                   LEFT JOIN asset_aliases aa ON aa.asset_id = a.id
+                   WHERE wa.watchlist_id = 'watchlist:default'
+                     AND wa.enabled = 1
+                     AND a.active = 1
+                     AND (
+                         instr(lower(COALESCE(sd.title, '') || ' ' || sd.raw_text), lower(a.symbol)) > 0
+                         OR instr(lower(COALESCE(sd.title, '') || ' ' || sd.raw_text), lower(a.name)) > 0
+                         OR (aa.alias IS NOT NULL AND instr(lower(COALESCE(sd.title, '') || ' ' || sd.raw_text), lower(aa.alias)) > 0)
+                     )
+               )
+             ORDER BY sd.published_at DESC
+             LIMIT ?2",
+        )?;
+        let documents = document_statement
+            .query_map(params![question_version, scan_limit], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                ))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(documents
+            .into_iter()
+            .filter_map(|(id, title, raw_text, language)| {
+                let searchable =
+                    format!("{} {raw_text}", title.as_deref().unwrap_or_default()).to_lowercase();
+                let matched_candidates = candidates
+                    .iter()
+                    .filter(|candidate| candidate_matches(candidate, &searchable))
+                    .cloned()
+                    .collect::<Vec<_>>();
+                (!matched_candidates.is_empty()).then_some(PendingDocumentAnalysis {
+                    id,
+                    title,
+                    raw_text,
+                    language,
+                    candidates: matched_candidates,
+                })
+            })
+            .take(limit)
+            .collect())
+    }
+
+    pub fn store_document_analysis(
+        &self,
+        analysis: &DocumentAnalysisResult,
+    ) -> Result<bool, DatabaseError> {
+        let mut connection = self.connection.lock();
+        let transaction = connection.transaction()?;
+        let status = if analysis.selected_asset_id.is_some() {
+            "completed"
+        } else {
+            "no_asset"
+        };
+        let analysis_id = format!(
+            "analysis:{}:{}:{}",
+            analysis.document_id, analysis.model_version, analysis.question_version
+        );
+        transaction.execute(
+            "INSERT OR IGNORE INTO document_analysis_runs (
+                id, document_id, model_name, model_version, question_version, status,
+                asset_present_probability, selected_asset_id, selected_asset_confidence, analyzed_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![
+                analysis_id,
+                analysis.document_id,
+                analysis.model_name,
+                analysis.model_version,
+                analysis.question_version,
+                status,
+                analysis.asset_present_probability,
+                analysis.selected_asset_id,
+                analysis.selected_asset_confidence,
+                analysis.analyzed_at,
+            ],
+        )?;
+        let Some(asset_id) = &analysis.selected_asset_id else {
+            transaction.commit()?;
+            return Ok(false);
+        };
+        let document_asset_id = format!("document-asset:{}:{asset_id}", analysis.document_id);
+        transaction.execute(
+            "INSERT OR IGNORE INTO document_assets (
+                id, document_id, asset_id, match_method, matched_at
+             ) VALUES (?1, ?2, ?3, 'jev', ?4)",
+            params![
+                document_asset_id,
+                analysis.document_id,
+                asset_id,
+                analysis.analyzed_at
+            ],
+        )?;
+        let classification_id = format!(
+            "classification:{}:{}:{}",
+            document_asset_id, analysis.model_version, analysis.question_version
+        );
+        let inserted = transaction.execute(
+            "INSERT OR IGNORE INTO document_classifications (
+                id, document_asset_id, model_name, model_version, question_version,
+                sentiment, sentiment_probability, relevance_score, content_type,
+                hype_probability, factual_claim_probability, confidence, input_language,
+                classified_at, relevance_expected
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+            params![
+                classification_id,
+                document_asset_id,
+                analysis.model_name,
+                analysis.model_version,
+                analysis.question_version,
+                analysis.sentiment,
+                analysis.sentiment_probability,
+                analysis.relevance_score,
+                analysis.content_type,
+                analysis.hype_probability,
+                analysis.factual_claim_probability,
+                analysis.confidence,
+                analysis.input_language,
+                analysis.analyzed_at,
+                analysis.relevance_expected,
+            ],
+        )?;
+        transaction.commit()?;
+        Ok(inserted > 0)
     }
 
     fn read_setting(&self, key: &str) -> Result<Option<String>, DatabaseError> {
@@ -561,6 +741,16 @@ fn map_asset(row: &rusqlite::Row<'_>) -> Result<Asset, rusqlite::Error> {
         currency: row.get(5)?,
         country_code: row.get(6)?,
     })
+}
+
+fn candidate_matches(candidate: &AnalysisCandidateAsset, searchable: &str) -> bool {
+    std::iter::once(candidate.symbol.as_str())
+        .chain(std::iter::once(candidate.name.as_str()))
+        .chain(candidate.aliases.iter().map(String::as_str))
+        .any(|term| {
+            let normalized = term.trim().to_lowercase();
+            normalized.len() >= 3 && searchable.contains(&normalized)
+        })
 }
 
 fn escape_like(value: &str) -> String {
@@ -764,5 +954,70 @@ mod tests {
             .expect("fonte CVM");
         assert_eq!(cvm.status.as_deref(), Some("completed"));
         assert_eq!(cvm.document_count, 1);
+    }
+
+    #[test]
+    fn finds_candidates_and_persists_a_typed_document_analysis() {
+        use crate::domain::classification::DocumentAnalysisResult;
+        use crate::domain::content::SourceDocumentInput;
+
+        let directory = tempdir().expect("diretório temporário");
+        let database =
+            Database::open(directory.path().join("analysis.sqlite3")).expect("banco inicializado");
+        database
+            .add_default_watchlist_asset("asset:b3:PETR4", 50)
+            .expect("ativo monitorado");
+        database
+            .store_source_documents(&[SourceDocumentInput {
+                id: "document:petrobras".to_owned(),
+                source_id: "source:rss:cvm-decisoes".to_owned(),
+                external_id: "entry:petrobras".to_owned(),
+                canonical_url: None,
+                title: Some("Petrobras divulga resultado".to_owned()),
+                raw_text: "A Petrobras informou novo resultado trimestral.".to_owned(),
+                author_reference: None,
+                language: Some("pt-BR".to_owned()),
+                published_at: "2026-11-01T00:00:00Z".to_owned(),
+                collected_at: "2026-11-01T00:01:00Z".to_owned(),
+                content_hash: "hash-petrobras".to_owned(),
+                retention_expires_at: None,
+            }])
+            .expect("documento");
+        let pending = database
+            .pending_document_analyses("document-market-signal-v1", 25)
+            .expect("documentos candidatos");
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].candidates[0].id, "asset:b3:PETR4");
+
+        let classified = database
+            .store_document_analysis(&DocumentAnalysisResult {
+                document_id: "document:petrobras".to_owned(),
+                model_name: "TypeSafe System One".to_owned(),
+                model_version: "jev-latest".to_owned(),
+                question_version: "document-market-signal-v1".to_owned(),
+                asset_present_probability: 0.95,
+                selected_asset_id: Some("asset:b3:PETR4".to_owned()),
+                selected_asset_confidence: Some(0.92),
+                sentiment: "optimistic".to_owned(),
+                sentiment_probability: 0.81,
+                relevance_expected: 2.6,
+                relevance_score: 3,
+                content_type: "news".to_owned(),
+                hype_probability: 0.08,
+                factual_claim_probability: 0.96,
+                confidence: 0.83,
+                input_language: Some("pt-BR".to_owned()),
+                analyzed_at: "2026-11-01T00:02:00Z".to_owned(),
+            })
+            .expect("classificação persistida");
+        assert!(classified);
+        assert!(
+            database
+                .pending_document_analyses("document-market-signal-v1", 25)
+                .expect("fila vazia")
+                .is_empty()
+        );
+        let overview = database.content_overview().expect("visão geral");
+        assert_eq!(overview.unclassified_document_count, 0);
     }
 }

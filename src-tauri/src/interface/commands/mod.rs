@@ -1,4 +1,5 @@
 pub mod catalog;
+pub mod classification;
 pub mod collection;
 pub mod content;
 pub mod desktop;
