@@ -57,6 +57,8 @@
   --size-source-state: 12rem;
   --size-signal-row: 6rem;
   --size-signal-score: 7rem;
+  --size-backtest-asset: 16rem;
+  --size-backtest-threshold: 8rem;
   --size-toggle-width: 2.5rem;
   --size-toggle-height: 1.25rem;
   --icon-size-sm: 1rem;
@@ -115,7 +117,7 @@
   --opacity-disabled: 0.45;
   --backdrop-blur: 0.375rem;
   --z-sticky-actions: 10;
-  --navigation-mobile-columns: 4;
+  --navigation-mobile-columns: 5;
 }
 
 @media (prefers-color-scheme: light) {

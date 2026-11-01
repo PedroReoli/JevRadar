@@ -117,3 +117,10 @@
     justify-content: center;
   }
 }
+
+@media (max-width: 32rem) {
+  .link span,
+  .activeLink span {
+    display: none;
+  }
+}
