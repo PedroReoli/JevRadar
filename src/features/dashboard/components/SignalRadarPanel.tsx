@@ -1,6 +1,8 @@
 import { FileSearch, RadioTower } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { SignalHeatmap } from "@/features/dashboard/components/SignalHeatmap";
+import { getSignalTone } from "@/features/dashboard/utils/signalPresentation";
 import styles from "@/pages/dashboard/DashboardPage.module.css";
 import type { MarketSignalSnapshot } from "@/types/market";
 
@@ -8,12 +10,6 @@ interface SignalRadarPanelProps {
   onSelect?: (signalId: string) => void;
   selectedSignalId?: string | null;
   signals: MarketSignalSnapshot[];
-}
-
-function signalTone(score: number) {
-  if (score > 0.15) return "positive";
-  if (score < -0.15) return "negative";
-  return "neutral";
 }
 
 export function SignalRadarPanel({ onSelect, selectedSignalId, signals }: SignalRadarPanelProps) {
@@ -33,10 +29,12 @@ export function SignalRadarPanel({ onSelect, selectedSignalId, signals }: Signal
       {signals.length === 0 ? (
         <p className={styles.marketEmpty}>{t("dashboard.noCalculatedSignals")}</p>
       ) : (
-        <ul className={styles.signalList}>
-          {signals.map((signal) => {
-            const tone = signalTone(signal.signalScore);
-            return (
+        <>
+          <SignalHeatmap onSelect={onSelect} selectedSignalId={selectedSignalId} signals={signals} />
+          <ul className={styles.signalList}>
+            {signals.map((signal) => {
+              const tone = getSignalTone(signal.signalScore);
+              return (
               <li className={styles.signalRow} data-tone={tone} key={signal.asset.id}>
                 <div className={styles.signalIdentity}>
                   <strong>{signal.asset.symbol}</strong>
@@ -63,9 +61,10 @@ export function SignalRadarPanel({ onSelect, selectedSignalId, signals }: Signal
                   {selectedSignalId === signal.id ? t("dashboard.hideEvidence") : t("dashboard.inspectEvidence")}
                 </button>
               </li>
-            );
-          })}
-        </ul>
+              );
+            })}
+          </ul>
+        </>
       )}
     </section>
   );

@@ -29,7 +29,7 @@ describe("SignalRadarPanel", () => {
       methodologyVersion: "weighted-sentiment-v1",
     }]} />);
 
-    expect(screen.getByText("Viés otimista")).toBeInTheDocument();
+    expect(screen.getAllByText("Viés otimista")).toHaveLength(2);
     expect(screen.getByText("8")).toBeInTheDocument();
     expect(screen.queryByText(/comprar|vender/i)).not.toBeInTheDocument();
   });
