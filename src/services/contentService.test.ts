@@ -1,0 +1,49 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke,
+  isTauri: () => true,
+}));
+
+import { getContentOverview, refreshContentSources } from "@/services/contentService";
+
+describe("contentService", () => {
+  beforeEach(() => invoke.mockReset());
+
+  it("valida a visão geral sem ocultar fontes ignoradas", async () => {
+    invoke.mockResolvedValueOnce({
+      sources: [{
+        id: "source:reddit",
+        name: "Reddit",
+        sourceKind: "reddit",
+        collectionMethod: "official_api",
+        enabled: true,
+        documentCount: 0,
+        status: "skipped",
+        lastCollectedAt: "2026-11-01T12:00:00Z",
+        errorCode: "reddit_credentials_missing",
+      }],
+      totalDocumentCount: 12,
+      unclassifiedDocumentCount: 4,
+    });
+    const overview = await getContentOverview();
+    expect(overview.sources[0]!.status).toBe("skipped");
+    expect(invoke).toHaveBeenCalledWith("get_content_overview");
+  });
+
+  it("valida o resultado da coleta manual", async () => {
+    invoke.mockResolvedValueOnce({
+      storedDocumentCount: 8,
+      sourceErrorCount: 0,
+      sources: [{
+        sourceId: "source:rss:cvm-decisoes",
+        status: "completed",
+        storedDocumentCount: 8,
+        errorCode: null,
+      }],
+    });
+    expect((await refreshContentSources()).storedDocumentCount).toBe(8);
+  });
+});

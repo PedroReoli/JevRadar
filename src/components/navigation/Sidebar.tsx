@@ -1,4 +1,4 @@
-import { ListFilter, Radar, Settings } from "lucide-react";
+import { ListFilter, Newspaper, Radar, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 
@@ -7,6 +7,7 @@ import styles from "@/components/navigation/Sidebar.module.css";
 const navigation = [
   { to: "/dashboard", labelKey: "navigation.dashboard", icon: Radar },
   { to: "/watchlist", labelKey: "navigation.watchlist", icon: ListFilter },
+  { to: "/sources", labelKey: "navigation.sources", icon: Newspaper },
   { to: "/settings", labelKey: "navigation.settings", icon: Settings },
 ] as const;
 
