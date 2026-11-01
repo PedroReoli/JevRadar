@@ -12,6 +12,7 @@
   --font-label-md: 600 0.875rem/1.2 var(--font-family-sans);
   --font-label-sm: 600 0.75rem/1.2 var(--font-family-sans);
   --font-label-xs: 600 0.6875rem/1.2 var(--font-family-sans);
+  --font-code-label: 650 0.8125rem/1.2 var(--font-family-mono);
 
   --tracking-tight: -0.035em;
   --tracking-wide: 0.09em;
@@ -47,6 +48,8 @@
   --size-empty-icon: 3rem;
   --size-empty-card-min: 20rem;
   --size-progress-track: 0.25rem;
+  --size-asset-symbol: 4.5rem;
+  --size-empty-list-min: 10rem;
   --size-toggle-width: 2.5rem;
   --size-toggle-height: 1.25rem;
   --icon-size-sm: 1rem;
@@ -105,6 +108,7 @@
   --opacity-disabled: 0.45;
   --backdrop-blur: 0.375rem;
   --z-sticky-actions: 10;
+  --navigation-mobile-columns: 3;
 }
 
 @media (prefers-color-scheme: light) {
