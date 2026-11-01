@@ -59,6 +59,8 @@
   --size-signal-score: 7rem;
   --size-backtest-asset: 16rem;
   --size-backtest-threshold: 8rem;
+  --size-event-marker: 1rem;
+  --size-event-connector: 10rem;
   --size-toggle-width: 2.5rem;
   --size-toggle-height: 1.25rem;
   --icon-size-sm: 1rem;

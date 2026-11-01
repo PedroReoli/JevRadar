@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { CollectionStatusCard } from "@/features/dashboard/components/CollectionStatusCard";
+import { EventTimeline } from "@/features/dashboard/components/EventTimeline";
 import { MarketSnapshotPanel } from "@/features/dashboard/components/MarketSnapshotPanel";
 import { SignalRadarPanel } from "@/features/dashboard/components/SignalRadarPanel";
 import { SystemHealthCard } from "@/features/dashboard/components/SystemHealthCard";
@@ -56,6 +57,7 @@ export function DashboardPage() {
       ) : (
         <>
           <SignalRadarPanel signals={marketQuery.data?.signals ?? []} />
+          <EventTimeline events={marketQuery.data?.events ?? []} />
           <MarketSnapshotPanel snapshots={marketQuery.data?.snapshots ?? []} />
         </>
       )}

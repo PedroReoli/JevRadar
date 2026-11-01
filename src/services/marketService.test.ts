@@ -45,6 +45,20 @@ describe("marketService", () => {
         windowEndedAt: "2026-11-01T12:00:00Z",
         methodologyVersion: "weighted-sentiment-v1",
       }],
+      events: [{
+        id: "event:1",
+        title: "CVM publica decisão",
+        observedFact: "A CVM publicou uma decisão relacionada à companhia.",
+        eventType: "regulatory",
+        countryCode: "BR",
+        startedAt: "2026-11-01T11:00:00Z",
+        asset,
+        relationType: "known",
+        confidence: 0.84,
+        rationaleTemplateKey: "event.regulatory.known",
+        sourceName: "CVM — Decisões do Colegiado",
+        sourceUrl: "https://www.gov.br/cvm/example",
+      }],
       latestCollection: {
         runId: "collection:1",
         status: "completed",
@@ -57,6 +71,7 @@ describe("marketService", () => {
     const overview = await getMarketOverview();
     expect(overview.snapshots[0]!.asset.symbol).toBe("BTC");
     expect(overview.signals[0]!.signalScore).toBe(0.64);
+    expect(overview.events[0]!.relationType).toBe("known");
     expect(invoke).toHaveBeenCalledWith("get_market_overview");
   });
 

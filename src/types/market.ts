@@ -22,7 +22,23 @@ export interface LatestCollectionRun {
 export interface MarketOverview {
   snapshots: MarketSnapshot[];
   signals: MarketSignalSnapshot[];
+  events: MarketEventSnapshot[];
   latestCollection: LatestCollectionRun | null;
+}
+
+export interface MarketEventSnapshot {
+  id: string;
+  title: string;
+  observedFact: string;
+  eventType: "political" | "economic" | "regulatory" | "climate" | "health" | "technology" | "geopolitical" | "other";
+  countryCode: string | null;
+  startedAt: string;
+  asset: Asset;
+  relationType: "known" | "correlation" | "hypothesis" | "unproven_causality";
+  confidence: number;
+  rationaleTemplateKey: string;
+  sourceName: string;
+  sourceUrl: string | null;
 }
 
 export interface MarketSignalSnapshot {

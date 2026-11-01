@@ -87,7 +87,8 @@
 .emptyCard,
 .collectionCard,
 .marketPanel,
-.signalPanel {
+.signalPanel,
+.eventPanel {
   border: var(--border-width-thin) solid var(--color-border-subtle);
   border-radius: var(--radius-xl);
   background: var(--color-surface-panel);
@@ -148,6 +149,103 @@
 
 .signalPanel {
   overflow: hidden;
+}
+
+.eventPanel {
+  overflow: hidden;
+}
+
+.eventList {
+  margin: 0;
+  padding: var(--space-5);
+  list-style: none;
+}
+
+.eventItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.eventMarker {
+  position: relative;
+  width: var(--size-event-marker);
+  height: var(--size-event-marker);
+  margin-top: var(--space-2);
+  border: var(--border-width-emphasis) solid var(--color-accent-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-panel);
+}
+
+.eventMarker::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: var(--border-width-thin);
+  height: var(--size-event-connector);
+  background: var(--color-border-strong);
+}
+
+.eventItem:last-child .eventMarker::after {
+  display: none;
+}
+
+.eventItem article {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-3);
+  padding-bottom: var(--space-6);
+}
+
+.eventItem h3,
+.eventItem p,
+.eventItem footer {
+  margin: 0;
+}
+
+.eventItem h3 {
+  color: var(--color-text-primary);
+  font: var(--font-title-lg);
+}
+
+.eventItem p {
+  color: var(--color-text-secondary);
+  font: var(--font-body-sm);
+}
+
+.eventItem small,
+.eventItem footer {
+  color: var(--color-text-muted);
+  font: var(--font-label-xs);
+}
+
+.eventMeta,
+.eventRelation {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.eventMeta span,
+.eventMeta time,
+.eventRelation {
+  color: var(--color-text-muted);
+  font: var(--font-label-xs);
+}
+
+.eventMeta span,
+.eventRelation {
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-raised);
+}
+
+.eventRelation strong {
+  color: var(--color-accent-text);
+  font: var(--font-code-label);
 }
 
 .signalList {

@@ -36,6 +36,20 @@ const marketOverviewSchema = z.object({
     windowEndedAt: z.string(),
     methodologyVersion: z.string(),
   })),
+  events: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    observedFact: z.string(),
+    eventType: z.enum(["political", "economic", "regulatory", "climate", "health", "technology", "geopolitical", "other"]),
+    countryCode: z.string().nullable(),
+    startedAt: z.string(),
+    asset: assetSchema,
+    relationType: z.enum(["known", "correlation", "hypothesis", "unproven_causality"]),
+    confidence: z.number().min(0).max(1),
+    rationaleTemplateKey: z.string(),
+    sourceName: z.string(),
+    sourceUrl: z.string().nullable(),
+  })),
   latestCollection: z
     .object({
       runId: z.string(),
