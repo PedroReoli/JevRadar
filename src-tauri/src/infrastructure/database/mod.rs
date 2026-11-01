@@ -35,6 +35,7 @@ const ALERT_DELIVERIES_SCHEMA: &str = include_str!("migrations/0008_alert_delive
 const JEV_USAGE_LIMITS_SCHEMA: &str = include_str!("migrations/0009_jev_usage_limits.sql");
 const X_SOURCE_SCHEMA: &str = include_str!("migrations/0010_x_source.sql");
 const ALERT_PREFERENCES_SCHEMA: &str = include_str!("migrations/0011_alert_preferences.sql");
+const SIGNAL_WEIGHT_AUDIT_SCHEMA: &str = include_str!("migrations/0012_signal_weight_audit.sql");
 
 pub struct Database {
     connection: Mutex<Connection>,
@@ -75,6 +76,7 @@ impl Database {
         apply_migration(&connection, 9, JEV_USAGE_LIMITS_SCHEMA)?;
         apply_migration(&connection, 10, X_SOURCE_SCHEMA)?;
         apply_migration(&connection, 11, ALERT_PREFERENCES_SCHEMA)?;
+        apply_migration(&connection, 12, SIGNAL_WEIGHT_AUDIT_SCHEMA)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -891,14 +893,30 @@ impl Database {
     ) -> Result<Vec<SignalEvidenceInput>, DatabaseError> {
         let connection = self.connection.lock();
         let mut statement = connection.prepare(
-            "SELECT dc.id, da.asset_id, sd.source_id, dc.sentiment,
+            "WITH source_history AS (
+                SELECT prior_sd.source_id,
+                       (3.25 + SUM(
+                           prior_dc.factual_claim_probability
+                           * prior_dc.confidence
+                           * (1.0 - 0.5 * prior_dc.hype_probability)
+                       )) / (5.0 + COUNT(*)) AS credibility
+                FROM document_classifications prior_dc
+                JOIN document_assets prior_da ON prior_da.id = prior_dc.document_asset_id
+                JOIN source_documents prior_sd ON prior_sd.id = prior_da.document_id
+                WHERE prior_dc.classified_at < ?1
+                  AND prior_sd.duplicate_of_id IS NULL
+                GROUP BY prior_sd.source_id
+             )
+             SELECT dc.id, da.asset_id, sd.source_id, sd.published_at, dc.sentiment,
                     dc.sentiment_probability, COALESCE(dc.relevance_expected, dc.relevance_score),
                     dc.content_type, dc.hype_probability, dc.factual_claim_probability,
-                    dc.confidence
+                    dc.confidence, COALESCE(source_history.credibility, 0.65)
              FROM document_classifications dc
              JOIN document_assets da ON da.id = dc.document_asset_id
              JOIN source_documents sd ON sd.id = da.document_id
+             LEFT JOIN source_history ON source_history.source_id = sd.source_id
              WHERE sd.published_at >= ?1 AND sd.published_at <= ?2
+               AND sd.duplicate_of_id IS NULL
              ORDER BY da.asset_id, sd.published_at",
         )?;
         statement
@@ -907,13 +925,15 @@ impl Database {
                     classification_id: row.get(0)?,
                     asset_id: row.get(1)?,
                     source_id: row.get(2)?,
-                    sentiment: row.get(3)?,
-                    sentiment_probability: row.get(4)?,
-                    relevance_expected: row.get(5)?,
-                    content_type: row.get(6)?,
-                    hype_probability: row.get(7)?,
-                    factual_claim_probability: row.get(8)?,
-                    confidence: row.get(9)?,
+                    published_at: row.get(3)?,
+                    sentiment: row.get(4)?,
+                    sentiment_probability: row.get(5)?,
+                    relevance_expected: row.get(6)?,
+                    content_type: row.get(7)?,
+                    hype_probability: row.get(8)?,
+                    factual_claim_probability: row.get(9)?,
+                    confidence: row.get(10)?,
+                    source_credibility: row.get(11)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()
@@ -959,12 +979,23 @@ impl Database {
         )?;
         for evidence in &signal.evidence {
             transaction.execute(
-                "INSERT INTO signal_evidence (signal_id, classification_id, contribution_weight)
-                 VALUES (?1, ?2, ?3)",
+                "INSERT INTO signal_evidence (
+                    signal_id, classification_id, contribution_weight, relevance_weight,
+                    content_type_weight, factual_weight, source_credibility, diversity_factor,
+                    recency_factor, hype_factor, confidence_factor
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
                 params![
                     signal.id,
                     evidence.classification_id,
-                    evidence.contribution_weight
+                    evidence.contribution_weight,
+                    evidence.relevance_weight,
+                    evidence.content_type_weight,
+                    evidence.factual_weight,
+                    evidence.source_credibility,
+                    evidence.diversity_factor,
+                    evidence.recency_factor,
+                    evidence.hype_factor,
+                    evidence.confidence_factor,
                 ],
             )?;
         }
@@ -1019,7 +1050,10 @@ impl Database {
                     sd.published_at, dc.sentiment, dc.sentiment_probability,
                     COALESCE(dc.relevance_expected, dc.relevance_score), dc.content_type,
                     dc.hype_probability, dc.factual_claim_probability, dc.confidence,
-                    se.contribution_weight, dc.model_version, dc.question_version
+                    se.contribution_weight, se.relevance_weight, se.content_type_weight,
+                    se.factual_weight, se.source_credibility, se.diversity_factor,
+                    se.recency_factor, se.hype_factor, se.confidence_factor,
+                    dc.model_version, dc.question_version
              FROM signal_evidence se
              JOIN document_classifications dc ON dc.id = se.classification_id
              JOIN document_assets da ON da.id = dc.document_asset_id
@@ -1045,8 +1079,16 @@ impl Database {
                     factual_claim_probability: row.get(11)?,
                     confidence: row.get(12)?,
                     contribution_weight: row.get(13)?,
-                    model_version: row.get(14)?,
-                    question_version: row.get(15)?,
+                    relevance_weight: row.get(14)?,
+                    content_type_weight: row.get(15)?,
+                    factual_weight: row.get(16)?,
+                    source_credibility: row.get(17)?,
+                    diversity_factor: row.get(18)?,
+                    recency_factor: row.get(19)?,
+                    hype_factor: row.get(20)?,
+                    confidence_factor: row.get(21)?,
+                    model_version: row.get(22)?,
+                    question_version: row.get(23)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()
@@ -1790,11 +1832,19 @@ mod tests {
                 independent_source_count: 1,
                 evidence_count: 1,
                 hype_penalty: 0.08,
-                methodology_version: "weighted-sentiment-v1".to_owned(),
+                methodology_version: "weighted-sentiment-v2".to_owned(),
                 calculated_at: "2026-11-02T00:01:00Z".to_owned(),
                 evidence: vec![WeightedEvidence {
                     classification_id: evidence[0].classification_id.clone(),
                     contribution_weight: 0.72,
+                    relevance_weight: 0.87,
+                    content_type_weight: 1.0,
+                    factual_weight: 0.99,
+                    source_credibility: 0.65,
+                    diversity_factor: 1.0,
+                    recency_factor: 0.25,
+                    hype_factor: 0.95,
+                    confidence_factor: 0.83,
                 }],
             })
             .expect("sinal persistido");
@@ -1812,6 +1862,7 @@ mod tests {
             .expect("rastreabilidade");
         assert_eq!(snapshots.len(), 1);
         assert_eq!(snapshots[0].model_version, "jev-latest");
+        assert_eq!(snapshots[0].source_credibility, 0.65);
         let alert_candidates = database
             .pending_alert_candidates(2, "2026-01-01T00:00:00Z")
             .expect("candidatos de alerta");

@@ -89,6 +89,14 @@ export interface SignalEvidenceSnapshot {
   factualClaimProbability: number;
   confidence: number;
   contributionWeight: number;
+  relevanceWeight: number;
+  contentTypeWeight: number;
+  factualWeight: number;
+  sourceCredibility: number;
+  diversityFactor: number;
+  recencyFactor: number;
+  hypeFactor: number;
+  confidenceFactor: number;
   modelVersion: string;
   questionVersion: string;
 }

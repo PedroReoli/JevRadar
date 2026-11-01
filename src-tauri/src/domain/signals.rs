@@ -3,6 +3,7 @@ pub struct SignalEvidenceInput {
     pub classification_id: String,
     pub asset_id: String,
     pub source_id: String,
+    pub published_at: String,
     pub sentiment: String,
     pub sentiment_probability: f64,
     pub relevance_expected: f64,
@@ -10,12 +11,21 @@ pub struct SignalEvidenceInput {
     pub hype_probability: f64,
     pub factual_claim_probability: f64,
     pub confidence: f64,
+    pub source_credibility: f64,
 }
 
 #[derive(Debug, Clone)]
 pub struct WeightedEvidence {
     pub classification_id: String,
     pub contribution_weight: f64,
+    pub relevance_weight: f64,
+    pub content_type_weight: f64,
+    pub factual_weight: f64,
+    pub source_credibility: f64,
+    pub diversity_factor: f64,
+    pub recency_factor: f64,
+    pub hype_factor: f64,
+    pub confidence_factor: f64,
 }
 
 #[derive(Debug, Clone)]
@@ -71,6 +81,14 @@ pub struct SignalEvidenceSnapshot {
     pub factual_claim_probability: f64,
     pub confidence: f64,
     pub contribution_weight: f64,
+    pub relevance_weight: f64,
+    pub content_type_weight: f64,
+    pub factual_weight: f64,
+    pub source_credibility: f64,
+    pub diversity_factor: f64,
+    pub recency_factor: f64,
+    pub hype_factor: f64,
+    pub confidence_factor: f64,
     pub model_version: String,
     pub question_version: String,
 }

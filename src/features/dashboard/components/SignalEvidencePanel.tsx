@@ -38,6 +38,9 @@ export function SignalEvidencePanel({ evidence, isLoading }: SignalEvidencePanel
                 <div><dt>{t("dashboard.confidence")}</dt><dd>{percent.format(item.confidence)}</dd></div>
                 <div><dt>{t("dashboard.hype")}</dt><dd>{percent.format(item.hypeProbability)}</dd></div>
                 <div><dt>{t("dashboard.factualClaim")}</dt><dd>{percent.format(item.factualClaimProbability)}</dd></div>
+                <div><dt>{t("dashboard.sourceCredibility")}</dt><dd>{percent.format(item.sourceCredibility)}</dd></div>
+                <div><dt>{t("dashboard.recencyFactor")}</dt><dd>{percent.format(item.recencyFactor)}</dd></div>
+                <div><dt>{t("dashboard.diversityFactor")}</dt><dd>{percent.format(item.diversityFactor)}</dd></div>
               </dl>
               <footer>{t("dashboard.evidenceVersion", { model: item.modelVersion, questions: item.questionVersion })}</footer>
             </li>
