@@ -85,6 +85,7 @@ async function validateApplication(page) {
   await page.getByRole("heading", { name: "Radar de mercado" }).waitFor();
 
   const routes = [
+    ["Sinais", "Central de sinais", "/signals"],
     ["Alertas", "Central de alertas", "/alerts"],
     ["Eventos", "Eventos e relações", "/events"],
     ["Backtest", "Qualidade dos sinais", "/backtest"],

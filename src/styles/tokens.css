@@ -57,6 +57,8 @@
   --size-source-state: 12rem;
   --size-signal-row: 6rem;
   --size-signal-score: 7rem;
+  --size-signal-metrics: 15rem;
+  --size-signal-meta: 9rem;
   --size-heatmap-cell-min: 9rem;
   --size-heatmap-cell-min-height: 5.5rem;
   --size-heatmap-legend: 0.75rem;

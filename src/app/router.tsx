@@ -7,6 +7,7 @@ export const appRouter = createBrowserRouter([
     children: [
       { index: true, element: <Navigate replace to="/dashboard" /> },
       { path: "/dashboard", lazy: async () => ({ Component: (await import("@/pages/dashboard/DashboardPage")).DashboardPage }) },
+      { path: "/signals", lazy: async () => ({ Component: (await import("@/pages/signals/SignalsPage")).SignalsPage }) },
       { path: "/getting-started", lazy: async () => ({ Component: (await import("@/pages/getting-started/GettingStartedPage")).GettingStartedPage }) },
       { path: "/assets/:assetId", lazy: async () => ({ Component: (await import("@/pages/asset/AssetDetailPage")).AssetDetailPage }) },
       { path: "/signals/:signalId", lazy: async () => ({ Component: (await import("@/pages/signal/SignalReportPage")).SignalReportPage }) },
