@@ -13,6 +13,8 @@ const settingsSchema = z.object({
   telemetryEnabled: z.boolean(),
   alertLevel: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
   watchlistLimit: z.number().int().min(1).max(50),
+  jevBatchLimit: z.number().int().min(1).max(100),
+  jevDailyDocumentLimit: z.number().int().min(1).max(5000),
   experienceLevel: z.enum(["beginner", "intermediate", "advanced"]),
   investmentRange: z.enum(["undisclosed", "upTo5k", "from5kTo20k", "from20kTo100k", "above100k"]),
 });
@@ -40,6 +42,8 @@ let previewSettings: AppSettings = {
   telemetryEnabled: false,
   alertLevel: 2,
   watchlistLimit: 50,
+  jevBatchLimit: 25,
+  jevDailyDocumentLimit: 250,
   experienceLevel: "beginner",
   investmentRange: "undisclosed",
 };

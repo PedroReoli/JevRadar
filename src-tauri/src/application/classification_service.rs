@@ -4,7 +4,6 @@ use crate::infrastructure::database::{Database, DatabaseError};
 use crate::infrastructure::jev::{JevClient, JevClientError};
 use crate::infrastructure::secrets::KeyringSecretStore;
 
-const CLASSIFICATION_BATCH_LIMIT: usize = 25;
 const QUESTION_VERSION: &str = "document-market-signal-v1";
 
 pub struct ClassificationService;
@@ -25,8 +24,15 @@ impl ClassificationService {
             Ok(None) => return Ok(skipped("typesafe_api_key_missing")),
             Err(_) => return Ok(skipped("typesafe_credential_store_unavailable")),
         };
-        let documents =
-            database.pending_document_analyses(QUESTION_VERSION, CLASSIFICATION_BATCH_LIMIT)?;
+        let batch_limit = usize::from(database.read_u8_setting("jev_batch_limit", 25)?);
+        let daily_limit = usize::from(database.read_u16_setting("jev_daily_document_limit", 250)?);
+        let used_today = database.analyses_completed_today()?;
+        let remaining_today = daily_limit.saturating_sub(used_today);
+        if remaining_today == 0 {
+            return Ok(skipped("jev_daily_document_limit_reached"));
+        }
+        let documents = database
+            .pending_document_analyses(QUESTION_VERSION, batch_limit.min(remaining_today))?;
         if documents.is_empty() {
             return Ok(ClassificationSummary {
                 status: "completed".to_owned(),

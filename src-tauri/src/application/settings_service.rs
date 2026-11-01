@@ -37,6 +37,8 @@ impl SettingsService {
             telemetry_enabled: database.read_bool_setting("telemetry_enabled")?,
             alert_level: database.read_u8_setting("alert_level", 2)?,
             watchlist_limit: database.read_u8_setting("watchlist_limit", 50)?,
+            jev_batch_limit: database.read_u8_setting("jev_batch_limit", 25)?,
+            jev_daily_document_limit: database.read_u16_setting("jev_daily_document_limit", 250)?,
             experience_level: database.read_setting_or("experience_level", "beginner")?,
             investment_range: database.read_setting_or("investment_range", "undisclosed")?,
         })
@@ -82,6 +84,11 @@ impl SettingsService {
             ("telemetry_enabled", update.telemetry_enabled.to_string()),
             ("alert_level", update.alert_level.to_string()),
             ("watchlist_limit", update.watchlist_limit.to_string()),
+            ("jev_batch_limit", update.jev_batch_limit.to_string()),
+            (
+                "jev_daily_document_limit",
+                update.jev_daily_document_limit.to_string(),
+            ),
             ("experience_level", update.experience_level),
             ("investment_range", update.investment_range),
         ])?;

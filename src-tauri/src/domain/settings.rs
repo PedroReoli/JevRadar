@@ -38,6 +38,8 @@ pub struct AppSettings {
     pub telemetry_enabled: bool,
     pub alert_level: u8,
     pub watchlist_limit: u8,
+    pub jev_batch_limit: u8,
+    pub jev_daily_document_limit: u16,
     pub experience_level: String,
     pub investment_range: String,
 }
@@ -54,6 +56,8 @@ pub struct UpdateAppSettings {
     pub telemetry_enabled: bool,
     pub alert_level: u8,
     pub watchlist_limit: u8,
+    pub jev_batch_limit: u8,
+    pub jev_daily_document_limit: u16,
     pub experience_level: String,
     pub investment_range: String,
 }
@@ -68,6 +72,12 @@ impl UpdateAppSettings {
         }
         if !(1..=50).contains(&self.watchlist_limit) {
             return Err("limite da watchlist deve estar entre 1 e 50");
+        }
+        if !(1..=100).contains(&self.jev_batch_limit) {
+            return Err("limite por lote do Jev deve estar entre 1 e 100");
+        }
+        if !(1..=5000).contains(&self.jev_daily_document_limit) {
+            return Err("limite diário do Jev deve estar entre 1 e 5000");
         }
         if !matches!(
             self.experience_level.as_str(),
@@ -142,6 +152,8 @@ mod tests {
             telemetry_enabled: false,
             alert_level: 2,
             watchlist_limit: 50,
+            jev_batch_limit: 25,
+            jev_daily_document_limit: 250,
             experience_level: "intermediate".to_owned(),
             investment_range: "upTo5k".to_owned(),
         }
@@ -166,6 +178,20 @@ mod tests {
         assert_eq!(
             settings.validate(),
             Err("limite da watchlist deve estar entre 1 e 50")
+        );
+
+        settings.watchlist_limit = 50;
+        settings.jev_batch_limit = 0;
+        assert_eq!(
+            settings.validate(),
+            Err("limite por lote do Jev deve estar entre 1 e 100")
+        );
+
+        settings.jev_batch_limit = 25;
+        settings.jev_daily_document_limit = 5001;
+        assert_eq!(
+            settings.validate(),
+            Err("limite diário do Jev deve estar entre 1 e 5000")
         );
     }
 

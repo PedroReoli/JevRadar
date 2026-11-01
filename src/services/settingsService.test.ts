@@ -20,6 +20,8 @@ describe("settingsService no preview web", () => {
       localApiEnabled: false,
       telemetryEnabled: false,
       watchlistLimit: 50,
+      jevBatchLimit: 25,
+      jevDailyDocumentLimit: 250,
     });
 
     const updated = await updateAppSettings({

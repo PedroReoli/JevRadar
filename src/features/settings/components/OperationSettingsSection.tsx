@@ -72,6 +72,24 @@ export function OperationSettingsSection({ disabled, settings, update }: Operati
         onChange={(value) => update("watchlistLimit", value)}
         value={settings.watchlistLimit}
       />
+      <NumberField
+        description={t("settings.jevBatchLimitDescription")}
+        disabled={disabled}
+        label={t("settings.jevBatchLimit")}
+        max={100}
+        min={1}
+        onChange={(value) => update("jevBatchLimit", value)}
+        value={settings.jevBatchLimit}
+      />
+      <NumberField
+        description={t("settings.jevDailyLimitDescription")}
+        disabled={disabled}
+        label={t("settings.jevDailyLimit")}
+        max={5000}
+        min={1}
+        onChange={(value) => update("jevDailyDocumentLimit", value)}
+        value={settings.jevDailyDocumentLimit}
+      />
     </SettingsSection>
   );
 }

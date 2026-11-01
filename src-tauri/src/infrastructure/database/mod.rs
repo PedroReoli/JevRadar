@@ -29,6 +29,7 @@ const CONTENT_SOURCES_SCHEMA: &str = include_str!("migrations/0005_content_sourc
 const DOCUMENT_ANALYSIS_SCHEMA: &str = include_str!("migrations/0006_document_analysis.sql");
 const BACKTEST_PARAMETERS_SCHEMA: &str = include_str!("migrations/0007_backtest_parameters.sql");
 const ALERT_DELIVERIES_SCHEMA: &str = include_str!("migrations/0008_alert_deliveries.sql");
+const JEV_USAGE_LIMITS_SCHEMA: &str = include_str!("migrations/0009_jev_usage_limits.sql");
 
 pub struct Database {
     connection: Mutex<Connection>,
@@ -66,6 +67,7 @@ impl Database {
         apply_migration(&connection, 6, DOCUMENT_ANALYSIS_SCHEMA)?;
         apply_migration(&connection, 7, BACKTEST_PARAMETERS_SCHEMA)?;
         apply_migration(&connection, 8, ALERT_DELIVERIES_SCHEMA)?;
+        apply_migration(&connection, 9, JEV_USAGE_LIMITS_SCHEMA)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -95,6 +97,23 @@ impl Database {
             .read_setting(key)?
             .and_then(|value| value.parse::<u8>().ok())
             .unwrap_or(default))
+    }
+
+    pub fn read_u16_setting(&self, key: &str, default: u16) -> Result<u16, DatabaseError> {
+        Ok(self
+            .read_setting(key)?
+            .and_then(|value| value.parse::<u16>().ok())
+            .unwrap_or(default))
+    }
+
+    pub fn analyses_completed_today(&self) -> Result<usize, DatabaseError> {
+        let count = self.connection.lock().query_row(
+            "SELECT COUNT(*) FROM document_analysis_runs
+             WHERE date(analyzed_at) = date('now')",
+            [],
+            |row| row.get::<_, i64>(0),
+        )?;
+        Ok(usize::try_from(count).unwrap_or(usize::MAX))
     }
 
     pub fn write_settings(

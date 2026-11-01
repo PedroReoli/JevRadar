@@ -18,6 +18,8 @@ export interface AppSettings {
   telemetryEnabled: boolean;
   alertLevel: 1 | 2 | 3 | 4;
   watchlistLimit: number;
+  jevBatchLimit: number;
+  jevDailyDocumentLimit: number;
   experienceLevel: ExperienceLevel;
   investmentRange: InvestmentRange;
 }
