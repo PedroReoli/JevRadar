@@ -20,6 +20,8 @@ const commands = new Map([
   ["5", ["npm", ["run", "test:unit", "--", "--run"], "Testes unitários"]],
   ["6", ["npm", ["run", "build:web"], "Build frontend"]],
   ["7", ["npm", ["run", "build"], "Build desktop"]],
+  ["8", ["npm", ["run", "check:all"], "Validação completa"]],
+  ["9", ["npm", ["run", "release:verify"], "Verificação de release"]],
 ]);
 
 function run(program, args, label) {
@@ -65,6 +67,8 @@ async function main() {
     console.log("  [5] Testes unitários");
     console.log("  [6] Build frontend");
     console.log("  [7] Build desktop");
+    console.log("  [8] Validação completa");
+    console.log("  [9] Verificação de release");
     console.log("  [0] Sair\n");
     const terminal = readline.createInterface({ input: process.stdin, output: process.stdout });
     choice = (await terminal.question(`${colors.cyan}Escolha [3]:${colors.reset} `)).trim() || "3";

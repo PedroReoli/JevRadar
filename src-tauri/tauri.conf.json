@@ -34,7 +34,14 @@
     "category": "Finance",
     "windows": {
       "wix": null,
-      "nsis": null
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "displayLanguageSelector": false,
+        "installMode": "currentUser",
+        "languages": ["PortugueseBR", "English"]
+      }
     }
   }
 }
