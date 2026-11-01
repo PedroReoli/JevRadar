@@ -28,7 +28,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
     "shortDescription": "Radar de sentimento e sinais de mercado",
     "longDescription": "Aplicativo local-first para acompanhar sentimento, contexto e relações históricas de mercado sem recomendações de investimento.",
     "category": "Finance",
