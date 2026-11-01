@@ -7,12 +7,16 @@ use thiserror::Error;
 
 use crate::domain::assets::{Asset, AssetClass, Watchlist, WatchlistAsset};
 use crate::domain::collection::{MarketObservationInput, SourceCollectionResult};
+use crate::domain::content::{
+    ContentOverview, ContentSource, ContentSourceResult, ContentSourceStatus, SourceDocumentInput,
+};
 use crate::domain::market::{LatestCollectionRun, MarketSnapshot};
 
 const INITIAL_SCHEMA: &str = include_str!("migrations/0001_initial.sql");
 const SETTINGS_SCHEMA: &str = include_str!("migrations/0002_settings.sql");
 const MARKET_CORE_SCHEMA: &str = include_str!("migrations/0003_market_core.sql");
 const COLLECTION_SCHEMA: &str = include_str!("migrations/0004_collection_runs.sql");
+const CONTENT_SOURCES_SCHEMA: &str = include_str!("migrations/0005_content_sources.sql");
 
 pub struct Database {
     connection: Mutex<Connection>,
@@ -46,6 +50,7 @@ impl Database {
         apply_migration(&connection, 2, SETTINGS_SCHEMA)?;
         apply_migration(&connection, 3, MARKET_CORE_SCHEMA)?;
         apply_migration(&connection, 4, COLLECTION_SCHEMA)?;
+        apply_migration(&connection, 5, CONTENT_SOURCES_SCHEMA)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -324,15 +329,16 @@ impl Database {
             .query_map([], |row| {
                 let close_value = row.get::<_, Option<f64>>(7)?;
                 let previous_close_value = row.get::<_, Option<f64>>(8)?;
-                let change_percent = close_value.zip(previous_close_value).and_then(
-                    |(current, previous)| {
-                        if previous == 0.0 {
-                            None
-                        } else {
-                            Some(((current / previous) - 1.0) * 100.0)
-                        }
-                    },
-                );
+                let change_percent =
+                    close_value
+                        .zip(previous_close_value)
+                        .and_then(|(current, previous)| {
+                            if previous == 0.0 {
+                                None
+                            } else {
+                                Some(((current / previous) - 1.0) * 100.0)
+                            }
+                        });
                 Ok(MarketSnapshot {
                     asset: map_asset(row)?,
                     close_value,
@@ -370,6 +376,158 @@ impl Database {
             )
             .optional()
             .map_err(Into::into)
+    }
+
+    pub fn enabled_content_sources(&self) -> Result<Vec<ContentSource>, DatabaseError> {
+        let connection = self.connection.lock();
+        let mut statement = connection.prepare(
+            "SELECT id, name, source_kind, base_url
+             FROM sources
+             WHERE enabled = 1 AND source_kind IN ('rss', 'reddit')
+             ORDER BY source_kind, name",
+        )?;
+        statement
+            .query_map([], |row| {
+                Ok(ContentSource {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    source_kind: row.get(2)?,
+                    base_url: row.get(3)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(Into::into)
+    }
+
+    pub fn store_source_documents(
+        &self,
+        documents: &[SourceDocumentInput],
+    ) -> Result<usize, DatabaseError> {
+        let mut connection = self.connection.lock();
+        let transaction = connection.transaction()?;
+        let mut stored_count = 0;
+        for document in documents {
+            let duplicate_of_id = transaction
+                .query_row(
+                    "SELECT id FROM source_documents
+                     WHERE content_hash = ?1 AND id <> ?2
+                     ORDER BY collected_at
+                     LIMIT 1",
+                    params![document.content_hash, document.id],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()?;
+            stored_count += transaction.execute(
+                "INSERT OR IGNORE INTO source_documents (
+                    id, source_id, external_id, canonical_url, title, raw_text,
+                    author_reference, language, published_at, collected_at, content_hash,
+                    duplicate_of_id, retention_expires_at
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                params![
+                    document.id,
+                    document.source_id,
+                    document.external_id,
+                    document.canonical_url,
+                    document.title,
+                    document.raw_text,
+                    document.author_reference,
+                    document.language,
+                    document.published_at,
+                    document.collected_at,
+                    document.content_hash,
+                    duplicate_of_id,
+                    document.retention_expires_at,
+                ],
+            )?;
+        }
+        transaction.commit()?;
+        Ok(stored_count)
+    }
+
+    pub fn purge_expired_source_documents(&self, now: &str) -> Result<usize, DatabaseError> {
+        self.connection
+            .lock()
+            .execute(
+                "DELETE FROM source_documents
+                 WHERE retention_expires_at IS NOT NULL AND retention_expires_at <= ?1",
+                params![now],
+            )
+            .map_err(Into::into)
+    }
+
+    pub fn update_content_source_state(
+        &self,
+        result: &ContentSourceResult,
+        collected_at: &str,
+    ) -> Result<(), DatabaseError> {
+        self.connection.lock().execute(
+            "INSERT INTO source_collection_state (
+                source_id, status, stored_document_count, last_collected_at, error_code
+             ) VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(source_id) DO UPDATE SET
+                status = excluded.status,
+                stored_document_count = excluded.stored_document_count,
+                last_collected_at = excluded.last_collected_at,
+                error_code = excluded.error_code",
+            params![
+                result.source_id,
+                result.status,
+                result.stored_document_count as i64,
+                collected_at,
+                result.error_code,
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn content_overview(&self) -> Result<ContentOverview, DatabaseError> {
+        let connection = self.connection.lock();
+        let mut statement = connection.prepare(
+            "SELECT s.id, s.name, s.source_kind, s.collection_method, s.enabled,
+                    COUNT(sd.id) AS document_count,
+                    scs.status, scs.last_collected_at, scs.error_code
+             FROM sources s
+             LEFT JOIN source_documents sd ON sd.source_id = s.id
+             LEFT JOIN source_collection_state scs ON scs.source_id = s.id
+             WHERE s.source_kind IN ('rss', 'reddit', 'forum', 'x')
+             GROUP BY s.id
+             ORDER BY s.enabled DESC, s.source_kind, s.name",
+        )?;
+        let sources = statement
+            .query_map([], |row| {
+                Ok(ContentSourceStatus {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    source_kind: row.get(2)?,
+                    collection_method: row.get(3)?,
+                    enabled: row.get(4)?,
+                    document_count: row.get::<_, i64>(5)? as usize,
+                    status: row.get(6)?,
+                    last_collected_at: row.get(7)?,
+                    error_code: row.get(8)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        let total_document_count = connection.query_row(
+            "SELECT COUNT(*) FROM source_documents WHERE duplicate_of_id IS NULL",
+            [],
+            |row| row.get::<_, i64>(0),
+        )? as usize;
+        let unclassified_document_count = connection.query_row(
+            "SELECT COUNT(*)
+             FROM source_documents sd
+             WHERE sd.duplicate_of_id IS NULL
+               AND NOT EXISTS (
+                   SELECT 1 FROM document_assets da WHERE da.document_id = sd.id
+               )",
+            [],
+            |row| row.get::<_, i64>(0),
+        )? as usize;
+        Ok(ContentOverview {
+            sources,
+            total_document_count,
+            unclassified_document_count,
+        })
     }
 
     fn read_setting(&self, key: &str) -> Result<Option<String>, DatabaseError> {
@@ -539,5 +697,72 @@ mod tests {
             )
             .expect("migration registrada");
         assert!(applied);
+    }
+
+    #[test]
+    fn applies_content_sources_and_deduplicates_documents() {
+        use crate::domain::content::{ContentSourceResult, SourceDocumentInput};
+
+        let directory = tempdir().expect("diretório temporário");
+        let database =
+            Database::open(directory.path().join("content.sqlite3")).expect("banco inicializado");
+        let sources = database.enabled_content_sources().expect("fontes");
+        assert!(sources.iter().any(|source| source.id == "source:reddit"));
+        assert!(
+            sources
+                .iter()
+                .filter(|source| source.source_kind == "rss")
+                .count()
+                >= 4
+        );
+
+        let document = SourceDocumentInput {
+            id: "document:test".to_owned(),
+            source_id: "source:rss:cvm-decisoes".to_owned(),
+            external_id: "entry:test".to_owned(),
+            canonical_url: Some("https://example.com/item".to_owned()),
+            title: Some("Decisão".to_owned()),
+            raw_text: "Conteúdo".to_owned(),
+            author_reference: None,
+            language: Some("pt-BR".to_owned()),
+            published_at: "2026-11-01T00:00:00Z".to_owned(),
+            collected_at: "2026-11-01T00:01:00Z".to_owned(),
+            content_hash: "hash".to_owned(),
+            retention_expires_at: None,
+        };
+        assert_eq!(
+            database
+                .store_source_documents(&[document.clone()])
+                .expect("insere"),
+            1
+        );
+        assert_eq!(
+            database
+                .store_source_documents(&[document])
+                .expect("idempotente"),
+            0
+        );
+
+        database
+            .update_content_source_state(
+                &ContentSourceResult {
+                    source_id: "source:rss:cvm-decisoes".to_owned(),
+                    status: "completed".to_owned(),
+                    stored_document_count: 1,
+                    error_code: None,
+                },
+                "2026-11-01T00:02:00Z",
+            )
+            .expect("estado da fonte");
+        let overview = database.content_overview().expect("visão geral");
+        assert_eq!(overview.total_document_count, 1);
+        assert_eq!(overview.unclassified_document_count, 1);
+        let cvm = overview
+            .sources
+            .iter()
+            .find(|source| source.id == "source:rss:cvm-decisoes")
+            .expect("fonte CVM");
+        assert_eq!(cvm.status.as_deref(), Some("completed"));
+        assert_eq!(cvm.document_count, 1);
     }
 }

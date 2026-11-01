@@ -4,6 +4,7 @@ use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::thread;
 use std::time::Duration;
 
+use crate::application::content_collection_service::ContentCollectionService;
 use crate::application::market_collection_service::MarketCollectionService;
 use crate::domain::collection::CollectionTrigger;
 use crate::infrastructure::database::Database;
@@ -44,6 +45,9 @@ impl BackgroundRuntime {
                     CollectionTrigger::Background,
                 ) {
                     tracing::warn!(error = %error, "ciclo de coleta em background falhou");
+                }
+                if let Err(error) = ContentCollectionService::collect(&database, &secrets) {
+                    tracing::warn!(error = %error, "coleta de conteúdo em background falhou");
                 }
             }),
         )

@@ -14,6 +14,7 @@ use crate::interface::commands::catalog::{
     add_watchlist_asset, get_default_watchlist, list_assets, remove_watchlist_asset,
 };
 use crate::interface::commands::collection::refresh_market_data;
+use crate::interface::commands::content::{get_content_overview, refresh_content_sources};
 use crate::interface::commands::desktop::resolve_close_request;
 use crate::interface::commands::market::get_market_overview;
 use crate::interface::commands::settings::{
@@ -45,6 +46,8 @@ pub fn run() {
             add_watchlist_asset,
             remove_watchlist_asset,
             refresh_market_data,
+            refresh_content_sources,
+            get_content_overview,
             get_market_overview,
             get_system_status,
             get_app_settings,

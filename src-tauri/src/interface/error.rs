@@ -1,6 +1,7 @@
 use serde::Serialize;
 
 use crate::application::catalog_service::CatalogServiceError;
+use crate::application::content_collection_service::ContentCollectionServiceError;
 use crate::application::market_collection_service::MarketCollectionServiceError;
 use crate::application::settings_service::SettingsServiceError;
 use crate::infrastructure::database::DatabaseError;
@@ -68,6 +69,19 @@ impl From<MarketCollectionServiceError> for CommandError {
         let code = match error {
             MarketCollectionServiceError::Database(_) => "database_error",
             MarketCollectionServiceError::HttpClient => "market_client_error",
+        };
+        Self {
+            code,
+            message: error.to_string(),
+        }
+    }
+}
+
+impl From<ContentCollectionServiceError> for CommandError {
+    fn from(error: ContentCollectionServiceError) -> Self {
+        let code = match error {
+            ContentCollectionServiceError::Database(_) => "database_error",
+            ContentCollectionServiceError::HttpClient => "content_client_error",
         };
         Self {
             code,

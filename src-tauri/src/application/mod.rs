@@ -1,4 +1,6 @@
 pub mod catalog_service;
+pub mod content_collection_service;
+pub mod content_query_service;
 pub mod market_collection_service;
 pub mod market_query_service;
 pub mod settings_service;
