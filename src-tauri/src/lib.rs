@@ -23,7 +23,7 @@ use crate::interface::commands::content::{
     add_rss_source, get_content_overview, refresh_content_sources, set_content_source_enabled,
 };
 use crate::interface::commands::data::{export_local_data, purge_local_data};
-use crate::interface::commands::desktop::resolve_close_request;
+use crate::interface::commands::desktop::{resolve_close_request, send_test_notification};
 use crate::interface::commands::insights::{
     get_jev_usage, get_signal_report, list_alert_history, list_backtest_history,
     list_collection_history,
@@ -96,6 +96,7 @@ pub fn run() {
             get_local_api_access,
             regenerate_local_api_token,
             resolve_close_request,
+            send_test_notification,
             export_local_data,
             purge_local_data,
             run_backtest,

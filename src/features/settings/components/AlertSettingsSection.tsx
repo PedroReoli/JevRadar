@@ -1,9 +1,10 @@
-import { BellRing } from "lucide-react";
+import { BellRing, Send } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { SelectField, ToggleField } from "@/features/settings/components/SettingsFields";
 import { SettingsSection } from "@/features/settings/components/SettingsSection";
 import styles from "@/features/settings/SettingsForm.module.css";
+import { useTestNotification } from "@/features/settings/hooks/useTestNotification";
 import { useContentOverview } from "@/features/sources/hooks/useContentSources";
 import { useDefaultWatchlist } from "@/features/watchlist/hooks/useWatchlist";
 import type { AppSettings } from "@/types/settings";
@@ -22,6 +23,7 @@ export function AlertSettingsSection({ disabled, settings, update }: AlertSettin
   const { t } = useTranslation();
   const watchlist = useDefaultWatchlist();
   const sources = useContentOverview();
+  const testNotification = useTestNotification();
   const contentSources = sources.data?.sources.filter((source) => ["rss", "reddit", "forum", "x"].includes(source.sourceKind)) ?? [];
 
   return (
@@ -38,6 +40,17 @@ export function AlertSettingsSection({ disabled, settings, update }: AlertSettin
         label={t("settings.alertsEnabled")}
         onChange={(value) => update("alertsEnabled", value)}
       />
+      <div className={styles.dataActions}>
+        <div aria-live="polite">
+          <strong>{t("settings.testNotificationTitle")}</strong>
+          <small>{testNotification.isSuccess ? t("settings.testNotificationSent") : t("settings.testNotificationDescription")}</small>
+          {testNotification.isError ? <small className={styles.fieldError}>{t("settings.testNotificationError")}</small> : null}
+        </div>
+        <button className={styles.secondaryButton} disabled={disabled || testNotification.isPending} onClick={() => testNotification.mutate()} type="button">
+          <Send aria-hidden="true" size="var(--icon-size-sm)" />
+          {testNotification.isPending ? t("settings.testingNotification") : t("settings.testNotification")}
+        </button>
+      </div>
       <SelectField
         description={t("settings.alertLevelDescription")}
         disabled={disabled || !settings.alertsEnabled}

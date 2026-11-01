@@ -19,6 +19,20 @@ pub enum AlertServiceError {
 }
 
 impl AlertService {
+    pub fn send_test_notification(
+        database: &Database,
+        app: &AppHandle,
+    ) -> Result<(), AlertServiceError> {
+        let settings = SettingsService::read(database).map_err(|_| AlertServiceError::Settings)?;
+        let (title, body) = test_message(settings.alert_level.clamp(1, 4), &settings.language);
+        app.notification()
+            .builder()
+            .title(title)
+            .body(body)
+            .show()
+            .map_err(|_| AlertServiceError::Notification)
+    }
+
     pub fn notify_new_signals(
         database: &Database,
         app: &AppHandle,
@@ -54,6 +68,19 @@ impl AlertService {
         }
         Ok(delivered)
     }
+}
+
+fn test_message(level: u8, language: &str) -> (String, String) {
+    if language == "en" {
+        return (
+            format!("JevRadar · Level {level} test"),
+            "Local notifications are working. This is a system test, not a market signal or investment recommendation.".to_owned(),
+        );
+    }
+    (
+        format!("JevRadar · Teste do nível {level}"),
+        "As notificações locais estão funcionando. Este é um teste do sistema, não um sinal de mercado ou recomendação de investimento.".to_owned(),
+    )
 }
 
 fn matches_filters(
@@ -156,7 +183,7 @@ fn message(candidate: &AlertCandidate, level: u8, language: &str) -> (String, St
 mod tests {
     use chrono::NaiveTime;
 
-    use super::{is_quiet_time, matches_filters, qualifies};
+    use super::{is_quiet_time, matches_filters, qualifies, test_message};
     use crate::domain::alerts::AlertCandidate;
 
     fn candidate() -> AlertCandidate {
@@ -209,5 +236,13 @@ mod tests {
         assert!(is_quiet_time(late, "22:00", "08:00"));
         assert!(is_quiet_time(early, "22:00", "08:00"));
         assert!(!is_quiet_time(daytime, "22:00", "08:00"));
+    }
+
+    #[test]
+    fn test_notification_is_explicitly_not_a_market_signal() {
+        let (_, portuguese) = test_message(2, "pt-BR");
+        let (_, english) = test_message(2, "en");
+        assert!(portuguese.contains("não um sinal de mercado"));
+        assert!(english.contains("not a market signal"));
     }
 }

@@ -15,6 +15,7 @@ O repositório está em **alpha para Windows**. O núcleo público funciona sem 
 - lista configurável de até 25 comunidades do Reddit, com coleta oficial de posts e comentários;
 - classificação Jev por ativo, sentimento, relevância, tipo, alegação factual, hype e contexto externo;
 - agregação auditável, alertas locais em quatro níveis e coleta em background configurável;
+- teste explícito de notificação nas configurações, sem criar sinal ou alterar o histórico;
 - dashboard com filtros na URL, mapa de calor, preço × sentimento, eventos, contexto educacional e lacunas de cobertura;
 - backtest cronológico em 1, 7 e 30 dias, com baseline, intervalo de confiança e separação calibração/avaliação;
 - API local opcional, autenticada e somente leitura, com Swagger e evidências auditáveis em `http://127.0.0.1:47831/docs/`;

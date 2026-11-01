@@ -6,3 +6,8 @@ export async function resolveCloseRequest(resolution: CloseResolution): Promise<
   if (!isTauri()) return;
   await invoke("resolve_close_request", { resolution });
 }
+
+export async function sendTestNotification(): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("send_test_notification");
+}
