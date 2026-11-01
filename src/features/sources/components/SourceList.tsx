@@ -1,5 +1,6 @@
 import { CircleCheck, CircleDashed, CircleOff, TriangleAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import styles from "@/pages/sources/SourcesPage.module.css";
 import type { ContentSourceStatus } from "@/types/content";
@@ -39,7 +40,7 @@ export function SourceList({ disabled, onToggle, sources }: SourceListProps) {
                 <Icon aria-hidden="true" size="var(--icon-size-md)" />
               </span>
               <div className={styles.sourceIdentity}>
-                <strong>{source.name}</strong>
+                <strong><Link to={`/sources/${encodeURIComponent(source.id)}`}>{source.name}</Link></strong>
                 <span>{t(`sources.kind.${source.sourceKind}`)} · {source.collectionMethod.toUpperCase()}</span>
               </div>
               <div className={styles.sourceDocuments}>

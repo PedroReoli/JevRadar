@@ -344,6 +344,11 @@
   font: var(--font-label-md);
 }
 
+.sourceIdentity a {
+  color: inherit;
+  text-decoration: none;
+}
+
 .sourceIdentity span,
 .sourceDocuments span,
 .sourceState span,
